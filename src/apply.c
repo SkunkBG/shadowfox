@@ -71,8 +71,18 @@ int apply_config(const apply_opts_t *o, const char *json,
         }
     }
 
+    /* Xray определяет формат конфига по расширению, поэтому временный
+       файл обязан оканчиваться так же, как рабочий: xray.json.new он
+       читать отказывается, а xray.new.json принимает. */
     char tmp[APPLY_PATH_MAX + 8];
-    snprintf(tmp, sizeof(tmp), "%s.new", o->config_path);
+    const char *dot = strrchr(o->config_path, '.');
+    const char *sep = strrchr(o->config_path, '/');
+    if (dot && (!sep || dot > sep)) {
+        int head = (int)(dot - o->config_path);
+        snprintf(tmp, sizeof(tmp), "%.*s.new%s", head, o->config_path, dot);
+    } else {
+        snprintf(tmp, sizeof(tmp), "%s.new", o->config_path);
+    }
 
     /* 0600 обязательно: в конфиге лежит uuid, то есть ключ доступа
        к серверу. Читать его посторонним на роутере незачем. */

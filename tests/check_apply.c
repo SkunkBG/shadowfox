@@ -113,7 +113,7 @@ static void test_bad_config_keeps_old(void)
 {
     char cfg[160], out[512], tmp[192];
     snprintf(cfg, sizeof(cfg), "%s/config2.json", g_dir);
-    snprintf(tmp, sizeof(tmp), "%s.new", cfg);
+    snprintf(tmp, sizeof(tmp), "%s/config2.new.json", g_dir);
 
     FILE *f = fopen(cfg, "w");
     fprintf(f, "РАБОЧИЙ");
@@ -151,6 +151,40 @@ static void test_missing_xray(void)
     CHECK(err[0] != '\0', "причина заполнена: %s", err);
 }
 
+/* Xray определяет формат конфига по расширению. Временный файл с именем
+   xray.json.new он читать отказывается — на роутере это выглядело как
+   "Failed to get format". */
+static void test_temp_keeps_extension(void)
+{
+    char cfg[160], seen[160], bin[160];
+    snprintf(cfg,  sizeof(cfg),  "%s/cfg4.json", g_dir);
+    snprintf(seen, sizeof(seen), "%s/seen4.txt", g_dir);
+    snprintf(bin,  sizeof(bin),  "%s/xray-echo", g_dir);
+
+    char body[256];
+    /* Запуск идёт как: xray run -test -c <файл>, путь четвёртым. */
+    snprintf(body, sizeof(body), "echo \"$4\" > %s; exit 0", seen);
+    make_stub("xray-echo", body);
+
+    apply_opts_t o;
+    memset(&o, 0, sizeof(o));
+    snprintf(o.xray_bin, sizeof(o.xray_bin), "%s", bin);
+    snprintf(o.config_path, sizeof(o.config_path), "%s", cfg);
+    o.test_timeout = 5;
+
+    char err[512] = "";
+    CHECK(apply_config(&o, "{}", err, sizeof(err)) == 0, "применено: %s", err);
+
+    char got[256] = "";
+    FILE *f = fopen(seen, "r");
+    if (f) { if (fgets(got, sizeof(got), f)) { } fclose(f); }
+
+    CHECK(strstr(got, ".json") != NULL,
+          "проверяемый файл сохраняет расширение: %s", got);
+    CHECK(strstr(got, ".json.new") == NULL,
+          "и не оканчивается на .new: %s", got);
+}
+
 int main(void)
 {
     printf("check_apply " VERSION "\n");
@@ -163,6 +197,7 @@ int main(void)
     test_good_config_replaces();
     test_bad_config_keeps_old();
     test_missing_xray();
+    test_temp_keeps_extension();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);
