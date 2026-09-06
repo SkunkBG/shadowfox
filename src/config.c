@@ -121,6 +121,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
         return 0;
     }
 
+    if (!strcasecmp(key, "routerHost")) {
+        str_copy(cfg->router_host, sizeof(cfg->router_host), value);
+        return 0;
+    }
+
     if (!strcasecmp(key, "routerPort")) {
         cfg->router_port = atoi(value);
         return 0;
@@ -294,7 +299,11 @@ int config_write_default(const char *path)
         "# Веб-интерфейс: http://<адрес роутера>:8090\n"
         "web=yes\n"
         "webPort=8090\n"
-        "# Порт веб-сервера роутера: по нему проверяется логин с паролем.\n"
+        "# Веб-сервер роутера: по нему проверяется логин с паролем.\n"
+        "# Адрес пустой — берётся адрес на интерфейсе выше. Петля не\n"
+        "# годится: на 127.0.0.1 роутер отвечает отказом по уровню\n"
+        "# безопасности, вход разрешён только с адреса сети.\n"
+        "routerHost=\n"
         "routerPort=80\n"
         "\n"
         "# Адрес, на котором слушать. Пусто — адрес интерфейса локальной\n"

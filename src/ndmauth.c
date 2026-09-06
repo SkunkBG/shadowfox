@@ -140,6 +140,17 @@ ndm_result_t ndm_check_password(const char *host, int port,
         return NDM_UNAVAILABLE;
     }
 
+    /* Роутер разрешает вход не с любого адреса: с петли он отвечает
+       отказом по уровню безопасности. Называем причину прямо — иначе
+       она выглядит как «схема не та», и искать будут не там. */
+    if (code == 403) {
+        if (err)
+            snprintf(err, err_size,
+                     "роутер не принимает вход с адреса %s "
+                     "— укажи в настройке routerHost адрес из своей сети", host);
+        return NDM_UNAVAILABLE;
+    }
+
     char realm[128] = "", challenge[128] = "";
     if (!ndm_header(resp, "X-NDM-Realm", realm, sizeof(realm)) ||
         !ndm_header(resp, "X-NDM-Challenge", challenge, sizeof(challenge))) {

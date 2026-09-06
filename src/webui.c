@@ -585,8 +585,19 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
 
     if (!login[0]) { send_login(fd, "Введи логин"); return; }
 
+    /* Спрашивать роутер надо с адреса сети, а не с петли: на 127.0.0.1
+       он отвечает «insufficient security level» и заголовков схемы не
+       присылает вовсе. */
+    char host[64] = "";
+    if (cfg->router_host[0])
+        str_copy(host, sizeof(host), cfg->router_host);
+    else if (!iface_ipv4(cfg->capture_iface, host, sizeof(host))) {
+        send_login(fd, "не узнать адрес роутера, задай routerHost");
+        return;
+    }
+
     char         err[160] = "";
-    ndm_result_t r = ndm_check_password("127.0.0.1", cfg->router_port,
+    ndm_result_t r = ndm_check_password(host, cfg->router_port,
                                         login, password, err, sizeof(err));
 
     /* Пароль в памяти не задерживаем дольше нужного. */

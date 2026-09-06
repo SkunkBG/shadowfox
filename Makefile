@@ -136,6 +136,9 @@ check:
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_digest.c \
 		src/digest.c -o $(BUILD)/check_digest
 	./$(BUILD)/check_digest
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_ndmauth.c \
+		src/ndmauth.c src/digest.c src/util.c src/log.c -o $(BUILD)/check_ndmauth
+	./$(BUILD)/check_ndmauth
 
 ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \

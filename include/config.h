@@ -32,6 +32,7 @@ typedef struct {
     int         web_port;
     char        web_bind[64];                 /* пусто — адрес интерфейса ЛС */
     char        web_token[64];                /* пусто — без проверки */
+    char        router_host[64];              /* пусто — адрес на интерфейсе */
     int         router_port;                  /* веб-сервер роутера: вход */
     char        web_proxy[32];                /* имя в прокси роутера */
 } config_t;
