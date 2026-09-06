@@ -744,7 +744,9 @@ async function loadDns(){
     const r=await fetch(api('/dns'));
     const d=await r.json();
     if(!d.ok || !d.servers.length){
-      box.innerHTML=UI.i+'Не удалось прочитать настройки DNS роутера';
+      box.innerHTML=UI.i+'Не прочитать настройки DNS роутера'+
+        (d.why?' — '+esc(d.why):'')+
+        '. Покажи вывод: <code>command -v ndmc</code>';
       return;
     }
     box.className='';

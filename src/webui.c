@@ -386,15 +386,26 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
    точного пути в RCI я не знаю, а выдумывать нельзя. Из вывода отбираем
    только строки про DNS — там же лежит хеш пароля администратора, и
    отдавать наружу всё подряд недопустимо. */
+/* ndmc лежит в прошивке, и путь у разных моделей разный. Перебираем
+   обычные места, как это уже делается для ipset и iptables. */
+static const char *NDMC_CANDIDATES[] = {
+    "/opt/bin/ndmc", "/opt/sbin/ndmc",
+    "/usr/bin/ndmc", "/usr/sbin/ndmc",
+    "/bin/ndmc",     "/sbin/ndmc",
+    NULL
+};
+
 static void send_dns(int fd)
 {
-    char bin[] = "/opt/bin/ndmc";
+    char bin[64] = "";
     char arg[] = "-c";
     char cmd[] = "show running-config";
 
-    if (access(bin, X_OK) != 0) {
-        char alt[] = "/usr/bin/ndmc";
-        if (access(alt, X_OK) == 0) memcpy(bin, alt, sizeof(alt));
+    for (int i = 0; NDMC_CANDIDATES[i]; i++) {
+        if (access(NDMC_CANDIDATES[i], X_OK) == 0) {
+            str_copy(bin, sizeof(bin), NDMC_CANDIDATES[i]);
+            break;
+        }
     }
 
     static char out[64 * 1024];
@@ -405,9 +416,15 @@ static void send_dns(int fd)
     json_init(&j, buf, sizeof(buf));
     json_obj_open(&j);
 
-    int rc = proc_run(argv, out, sizeof(out), 10);
+    /* Без ndmc спрашивать нечего, и это надо сказать прямо: «не удалось
+       прочитать» одинаково звучит и когда программы нет, и когда она
+       ответила ошибкой — а чинится это по-разному. */
+    int rc = bin[0] ? proc_run(argv, out, sizeof(out), 10) : -1;
 
     json_kv_bool(&j, "ok", rc == 0);
+    json_kv_str(&j, "why", bin[0] ? (rc == 0 ? "" : "ndmc ответил ошибкой")
+                                  : "ndmc не найден");
+    json_kv_str(&j, "bin", bin);
     json_key(&j, "servers");
     json_arr_open(&j);
 
