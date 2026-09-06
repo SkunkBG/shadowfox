@@ -585,15 +585,23 @@ function viewConn(){
     идёт по HTTPS, и его не видит никто.</p>
   </div>
 
-  ${fold('dnscmd','Поставить чистые серверы командами',
-    `<p>Если настраивать через панель неудобно, то же самое делается из
-     консоли роутера. Выполняй по одной — <code>ndmc</code> несколько сразу
-     не принимает:</p>
+  ${fold('dnscmd','Поставить чистые серверы',
+    `<p>Cloudflare и Quad9 по DNS-over-TLS. Серверы <b>добавляются</b>,
+     существующие не трогаются. Это меняет настройки роутера, поэтому
+     сначала посмотри, что именно будет выполнено:</p>
      <pre>${esc(DNSCMDS)}</pre>
-     <p>После этого проверь, что получилось:</p>
+     <div class="bar"><button class="b" id="dns-apply">Установить</button>
+       <span class="msg" id="m-dns"></span></div>
+     <p style="margin-top:14px"><b>Провайдерский DNS отключить придётся
+     самому.</b> Если он останется в списке, роутер будет спрашивать и его —
+     а он обычно ближе и быстрее наших, значит отвечать будет чаще. Толку
+     от чистых серверов тогда немного. Выключается в панели роутера, в
+     настройках интернет-соединения: снять получение адресов DNS от
+     провайдера. Команду для этого я не даю намеренно — точной её формы
+     не знаю, а угадывать то, что меняет настройки роутера, нельзя.</p>
+     <p>Проверить, что получилось:</p>
      <pre>ndmc -c "show running-config" | grep upstream</pre>
-     <p>Команды меняют настройки роутера, поэтому выполняешь их ты, а не мы.
-     Убрать лишний сервер можно тем же способом со словом <code>no</code>
+     <p>Лишний сервер убирается тем же способом со словом <code>no</code>
      впереди.</p>`)}
 
   ${fold('pol','Как настроить политику доступа',
@@ -961,6 +969,22 @@ document.addEventListener('click',async ev=>{
   if(ev.target.id==='reshow'){ ev.preventDefault();
     try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
     gate(); return; }
+
+  if(ev.target.id==='dns-apply'){
+    const btn=ev.target, m=$('#m-dns');
+    if(!confirm('Добавить серверы Cloudflare и Quad9 в настройки роутера?\n'+
+                'Существующие не удаляются.')) return;
+    btn.disabled=true; m.className='msg'; m.textContent='выполняю…';
+    try{
+      const r=await fetch(api('/dns'),{method:'POST'});
+      const t=await r.text();
+      m.className=r.ok?'msg ok':'msg bad';
+      m.textContent=r.ok?'готово':'были сбои';
+      $('#dnsbox').innerHTML='<label style="margin-top:0">Что выполнено</label>'+
+        '<pre>'+esc(t)+'</pre>';
+      setTimeout(loadDns,1500);
+    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    btn.disabled=false; return; }
 
   const b=ev.target.closest('[data-save]');
   if(b) return save(b.dataset.save,$('#'+b.dataset.save).value,'m-'+b.dataset.save);

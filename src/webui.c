@@ -395,18 +395,25 @@ static const char *NDMC_CANDIDATES[] = {
     NULL
 };
 
+static int ndmc_path(char *dst, unsigned size)
+{
+    for (int i = 0; NDMC_CANDIDATES[i]; i++) {
+        if (access(NDMC_CANDIDATES[i], X_OK) == 0) {
+            str_copy(dst, size, NDMC_CANDIDATES[i]);
+            return 1;
+        }
+    }
+    dst[0] = '\0';
+    return 0;
+}
+
 static void send_dns(int fd)
 {
     char bin[64] = "";
     char arg[] = "-c";
     char cmd[] = "show running-config";
 
-    for (int i = 0; NDMC_CANDIDATES[i]; i++) {
-        if (access(NDMC_CANDIDATES[i], X_OK) == 0) {
-            str_copy(bin, sizeof(bin), NDMC_CANDIDATES[i]);
-            break;
-        }
-    }
+    ndmc_path(bin, sizeof(bin));
 
     static char out[64 * 1024];
     char *argv[] = { bin, arg, cmd, NULL };
@@ -442,6 +449,58 @@ static void send_dns(int fd)
         return;
     }
     http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
+}
+
+/* Команды взяты из running-config настоящего роутера, а не придуманы:
+   серверы там записаны ровно в этой форме. Только добавление — ничего
+   существующего не трогаем, и провайдерский DNS не отключаем: точной
+   формы этой команды я не знаю, а угадывать то, что меняет настройки
+   роутера, нельзя. */
+static const char *DNS_SETUP[] = {
+    "dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com",
+    "dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com",
+    "dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net",
+    "dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net",
+    "service dns-proxy",
+    "system configuration save",
+    NULL
+};
+
+static void apply_dns(const http_req_t *req, int fd)
+{
+    char bin[64] = "";
+    if (!ndmc_path(bin, sizeof(bin))) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8",
+                       "ndmc не найден, настройки роутера не тронуты\n");
+        return;
+    }
+
+    static char report[8 * 1024];
+    int  used = 0, failed = 0;
+
+    for (int i = 0; DNS_SETUP[i]; i++) {
+        char arg[] = "-c";
+        char cmd[128];
+        str_copy(cmd, sizeof(cmd), DNS_SETUP[i]);
+
+        char *argv[] = { bin, arg, cmd, NULL };
+        char  out[512] = "";
+        int   rc = proc_run(argv, out, sizeof(out), 15);
+
+        if (rc != 0) failed++;
+        log_info("веб: ndmc «%s» -> %d", DNS_SETUP[i], rc);
+
+        int n = snprintf(report + used, sizeof(report) - (size_t)used,
+                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", DNS_SETUP[i]);
+        if (n < 0 || (size_t)n >= sizeof(report) - (size_t)used) break;
+        used += n;
+    }
+
+    log_info("веб: серверы DNS установлены, сбоев %d, запрос с %s",
+             failed, req->peer);
+
+    http_send(fd, failed ? 500 : 200, "text/plain; charset=utf-8",
+              report, strlen(report));
 }
 
 static void save(const http_req_t *req, int fd, const config_t *cfg)
@@ -796,7 +855,8 @@ static void handle(const http_req_t *req, int fd, void *ctx)
     }
 
     if (!strcmp(req->path, "/dns")) {
-        send_dns(fd);
+        if (!strcmp(req->method, "POST")) apply_dns(req, fd);
+        else                              send_dns(fd);
         return;
     }
 
