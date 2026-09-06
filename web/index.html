@@ -293,8 +293,8 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
     </a>
 
     <nav>
-      <button data-tab="rules" class="on"></button>
-      <button data-tab="conn"></button>
+      <button data-tab="conn" class="on"></button>
+      <button data-tab="rules"></button>
       <button data-tab="info"></button>
     </nav>
 
@@ -336,8 +336,11 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;
   return n+' '+(m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c);};
 
-let D=null, tab='rules', edit={}, dirty=false, dnsShown=0,
-    nodesMode='masked', query='', folds={}, dnsLoaded=0, dnsInfo=null;
+/* Первым встречает раздел подключений: с него настройка и начинается,
+   а правила без рабочего подключения ничего не дают. */
+let D=null, tab='conn', edit={}, dirty=false, dnsShown=0,
+    nodesMode='masked', query='', folds={}, dnsLoaded=0, dnsInfo=null,
+    updInfo=null;
 
 /* Значки интерфейса. Обводкой, чтобы одинаково читались в обеих темах. */
 const UI={
@@ -720,6 +723,20 @@ function viewInfo(){
     </div>
   </div>
 
+  <div class="card"><h3>Обновление</h3>
+    <div class="kv"><span>Установлено</span><span><b>${esc(D.version)}</b></span></div>
+    <div id="updbox" class="note" style="margin:12px 0 0">${updBox()}</div>
+    <div class="bar">
+      <button class="b ghost" id="upd-check">Проверить</button>
+      ${updInfo && updInfo.available
+        ? `<button class="b" id="upd-go">Обновить до ${esc(updInfo.available)}</button>`
+        : ''}
+      <span class="msg" id="m-upd"></span></div>
+    <p style="margin-top:12px">Обновление ставится тем же <code>opkg</code>,
+    что и вручную. Демон при этом перезапускается, поэтому страница на
+    несколько секунд потеряет связь и вернётся сама.</p>
+  </div>
+
   <div class="card"><h3>Как это работает</h3>
     <div class="flow"><span>Домен</span><i>→</i><span>DNS</span><i>→</i>
       <span>Правило</span><i>→</i><span>Xray</span><i>→</i><span>Сервер</span></div>
@@ -765,7 +782,7 @@ function disclaimer(){ return `
 function chrome(){
   $('#ver').textContent=D.version;
 
-  const nav={rules:['Правила',UI.rules],conn:['Подключения',UI.conn],
+  const nav={conn:['Подключения',UI.conn],rules:['Правила',UI.rules],
              info:['Информация',UI.info]};
   document.querySelectorAll('aside nav button').forEach(b=>{
     const [t,ic]=nav[b.dataset.tab];
@@ -799,6 +816,15 @@ function draw(){
 /* Что известно про провайдерский DNS. Отключаем только те интерфейсы,
    где он ещё включён, и показываем их поимённо: команда меняет
    настройки роутера, и человек должен видеть, чего именно она коснётся. */
+/* Проверка обновлений: opkg update занимает секунды, поэтому только по
+   нажатию, а результат хранится — иначе перерисовка его потеряет. */
+function updBox(){
+  if(!updInfo) return UI.i+'Нажми «Проверить», чтобы спросить у opkg';
+  if(!updInfo.ok) return UI.i+'Не проверить: '+esc(updInfo.why||'opkg молчит');
+  if(!updInfo.available) return UI.ok+'Установлена последняя версия';
+  return UI.i+'Доступна версия <b>'+esc(updInfo.available)+'</b>';
+}
+
 function dnsIspBox(){
   if(!dnsInfo || !dnsInfo.ok)
     return `<div class="note" style="margin:0">${UI.i}Настройки роутера
@@ -1063,6 +1089,42 @@ document.addEventListener('click',async ev=>{
   if(ev.target.id==='reshow'){ ev.preventDefault();
     try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
     gate(); return; }
+
+  if(ev.target.id==='upd-check'){
+    const btn=ev.target, m=$('#m-upd');
+    btn.disabled=true; m.className='msg'; m.textContent='спрашиваю opkg…';
+    try{
+      const r=await fetch(api('/update'));
+      updInfo=await r.json();
+      m.textContent='';
+    }catch(e){ updInfo={ok:false,why:e.message}; }
+    btn.disabled=false; draw(); return; }
+
+  if(ev.target.id==='upd-go'){
+    if(!confirm('Обновить Shadow Fox до '+updInfo.available+'?\n'+
+                'Демон перезапустится, связь со страницей ненадолго пропадёт.'))
+      return;
+    const btn=ev.target, m=$('#m-upd');
+    btn.disabled=true; m.className='msg'; m.textContent='обновляю…';
+    try{
+      const r=await fetch(api('/update'),{method:'POST'});
+      const t=(await r.text()).trim();
+      if(!r.ok){ m.className='msg bad'; m.textContent=t; btn.disabled=false; return; }
+      m.textContent='обновление идёт, жду перезапуска…';
+      /* Ждём, пока демон вернётся с новой версией. */
+      const was=D.version;
+      for(let i=0;i<40;i++){
+        await new Promise(r=>setTimeout(r,3000));
+        try{
+          const rr=await fetch(api('/data'));
+          if(rr.ok){ const d=await rr.json();
+            if(d.version!==was){ updInfo=null; location.reload(); return; } }
+        }catch(e){}
+      }
+      m.className='msg bad';
+      m.textContent='версия не сменилась — посмотри /opt/var/log/shadowfox-update.log';
+    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    btn.disabled=false; return; }
 
   if(ev.target.id==='mkpolicy'){
     const btn=ev.target, m=$('#m-policy');

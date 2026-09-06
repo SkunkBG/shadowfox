@@ -8,6 +8,8 @@
 #define DNS_LINES_MAX 32
 
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -677,6 +679,132 @@ static void apply_policy(const http_req_t *req, int fd, const config_t *cfg)
               report, strlen(report));
 }
 
+/* ---- обновление пакета ---- */
+
+static const char *OPKG_CANDIDATES[] = {
+    "/opt/bin/opkg", "/opt/sbin/opkg", "/bin/opkg", "/usr/bin/opkg", NULL
+};
+
+static int opkg_path(char *dst, unsigned size)
+{
+    for (int i = 0; OPKG_CANDIDATES[i]; i++) {
+        if (access(OPKG_CANDIDATES[i], X_OK) == 0) {
+            str_copy(dst, size, OPKG_CANDIDATES[i]);
+            return 1;
+        }
+    }
+    dst[0] = '\0';
+    return 0;
+}
+
+/* Запуск, переживающий смерть родителя. Обновление снимает демона
+   своим же prerm, поэтому обычный дочерний процесс погиб бы вместе с
+   ним на середине замены файлов. Двойной fork с setsid отвязывает
+   работу от нас; ответ странице уходит сразу. */
+static int spawn_detached(const char *command)
+{
+    pid_t first = fork();
+    if (first < 0) return -1;
+
+    if (first == 0) {
+        if (setsid() < 0) _exit(1);
+
+        pid_t second = fork();
+        if (second < 0) _exit(1);
+        if (second > 0) _exit(0);       /* родителя ждёт наш вызывающий */
+
+        for (int fdn = 0; fdn < 3; fdn++) close(fdn);
+        open("/dev/null", O_RDWR);
+        if (dup(0) < 0 || dup(0) < 0) _exit(1);
+
+        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
+        _exit(127);
+    }
+
+    int st = 0;
+    waitpid(first, &st, 0);            /* короткий: он сразу форкается и выходит */
+    return 0;
+}
+
+#define UPDATE_LOG "/opt/var/log/shadowfox-update.log"
+
+static void check_update(int fd)
+{
+    char bin[192] = "";
+    char buf[2048];
+    json_t j;
+
+    json_init(&j, buf, sizeof(buf));
+    json_obj_open(&j);
+    json_kv_str(&j, "current", VERSION);
+
+    if (!opkg_path(bin, sizeof(bin))) {
+        json_kv_bool(&j, "ok", 0);
+        json_kv_str(&j, "why", "opkg не найден");
+        json_kv_str(&j, "available", "");
+        json_obj_close(&j);
+        if (json_done(&j) == 0)
+            http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
+        return;
+    }
+
+    static char out[16 * 1024];
+    char upd[] = "update";
+    char *uargv[] = { bin, upd, NULL };
+    proc_run(uargv, out, sizeof(out), 60);
+
+    char lst[] = "list-upgradable";
+    char *largv[] = { bin, lst, NULL };
+    int rc = proc_run(largv, out, sizeof(out), 30);
+
+    char available[64] = "";
+    if (rc == 0) {
+        for (char *line = strtok(out, "\n"); line; line = strtok(NULL, "\n")) {
+            char *t = str_trim(line);
+            if (strncmp(t, "shadowfox ", 10) != 0) continue;
+
+            /* Формат: «shadowfox - старая - новая». Берём последнее поле. */
+            char *last = strrchr(t, ' ');
+            if (last) str_copy(available, sizeof(available), last + 1);
+            break;
+        }
+    }
+
+    json_kv_bool(&j, "ok", rc == 0);
+    json_kv_str(&j, "why", rc == 0 ? "" : "opkg ответил ошибкой");
+    json_kv_str(&j, "available", available);
+    json_obj_close(&j);
+
+    if (json_done(&j) != 0) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "не поместилось\n");
+        return;
+    }
+    http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
+}
+
+static void do_update(const http_req_t *req, int fd)
+{
+    char bin[192] = "";
+    if (!opkg_path(bin, sizeof(bin))) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "opkg не найден\n");
+        return;
+    }
+
+    char command[512];
+    snprintf(command, sizeof(command),
+             "sleep 1; { date; %s update; %s upgrade shadowfox; date; } > %s 2>&1",
+             bin, bin, UPDATE_LOG);
+
+    if (spawn_detached(command) != 0) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "не запустить\n");
+        return;
+    }
+
+    log_info("веб: запущено обновление пакета, запрос с %s", req->peer);
+    http_send_text(fd, 200, "text/plain; charset=utf-8",
+                   "обновление запущено\n");
+}
+
 static void save(const http_req_t *req, int fd, const config_t *cfg)
 {
     char what[32];
@@ -1042,6 +1170,12 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/data")) {
         send_data(req, fd, c->engine, c->cfg);
+        return;
+    }
+
+    if (!strcmp(req->path, "/update")) {
+        if (!strcmp(req->method, "POST")) do_update(req, fd);
+        else                              check_update(fd);
         return;
     }
 
