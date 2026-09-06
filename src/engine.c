@@ -95,6 +95,38 @@ static int load_lists(engine_t *e, const config_t *cfg)
     return e->wl.group_count;
 }
 
+/* Перехват держим ровно тогда, когда есть кого ловить, и пересчитываем
+   это при каждом перечитывании. Раньше он открывался один раз при
+   старте и только если списки уже непусты: на свежей установке список
+   пуст, и перехват не включался никогда — ни после добавления доменов
+   через страницу, ни после SIGHUP. Снаружи это выглядело как «домены
+   сохранены, правила стоят, а адресов ноль». */
+static void sync_capture(engine_t *e, const config_t *cfg)
+{
+    int want = e->wl.group_count > 0;
+    if (want == e->capturing) return;
+
+    if (!want) {
+        dcap_close(&e->cap);
+        e->capturing = 0;
+        log_info("перехват DNS остановлен: доменов не осталось");
+        return;
+    }
+
+    char cap_err[160] = "";
+    if (dcap_open(&e->cap, cfg->capture_iface, cap_err, sizeof(cap_err)) == 0) {
+        e->capturing = 1;
+        log_info("перехват DNS на %s%s",
+                 cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах",
+                 e->cap.filtered ? "" : " (без фильтра ядра)");
+    } else {
+        /* Без перехвата домены наполняться не будут, но подсети из
+           ip.list работают. Останавливаться из-за этого неправильно. */
+        log_warn("перехват DNS недоступен: %s. Домены наполняться не будут, "
+                 "подсети из ip.list работают", cap_err);
+    }
+}
+
 /* Для целей-политик метку назначает роутер, и спросить её можно только
    у него. Без метки правило ставить нельзя: пустая увела бы трафик в
    никуда, поэтому такие группы просто пропускаются до следующей попытки. */
@@ -273,22 +305,11 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
        туда трафик бессмысленно. */
     start_own_xray(e, cfg);
 
-    if (!load_lists(e, cfg)) return 0;
+    int have = load_lists(e, cfg);
 
-    if (apply_all(e, err, err_size, 1) != 0) return -1;
+    if (have && apply_all(e, err, err_size, 1) != 0) return -1;
 
-    char cap_err[160] = "";
-    if (dcap_open(&e->cap, cfg->capture_iface, cap_err, sizeof(cap_err)) == 0) {
-        e->capturing = 1;
-        log_info("перехват DNS на %s%s",
-                 cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах",
-                 e->cap.filtered ? "" : " (без фильтра ядра)");
-    } else {
-        /* Без перехвата домены наполняться не будут, но подсети из
-           ip.list работают. Останавливаться из-за этого неправильно. */
-        log_warn("перехват DNS недоступен: %s. Домены наполняться не будут, "
-                 "подсети из ip.list работают", cap_err);
-    }
+    sync_capture(e, cfg);
 
     status_write(e, cfg);
     return 0;
@@ -342,7 +363,13 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
     }
     start_own_xray(e, cfg);
 
-    if (!load_lists(e, cfg)) return 0;
+    int have = load_lists(e, cfg);
+
+    /* Перехват пересчитываем всегда: именно здесь появляются домены,
+       добавленные через страницу. */
+    sync_capture(e, cfg);
+
+    if (!have) return 0;
     return apply_all(e, err, err_size, 1);
 }
 
