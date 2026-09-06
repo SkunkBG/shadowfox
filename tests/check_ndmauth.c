@@ -77,12 +77,42 @@ static void test_answer(void)
           "ответ: %s", out);
 }
 
+/* Логин попадает в тело JSON, поэтому кавычки и обратные косые в нём
+   надо экранировать. Иначе тело перестаёт разбираться, а выглядит это
+   как неверный пароль — искать будут пароль, а не кавычку. */
+static void test_json_escape(void)
+{
+    char out[64];
+
+    CHECK(json_escape("admin", out, sizeof(out)) == 0, "обычный логин");
+    CHECK(!strcmp(out, "admin"), "не испорчен: %s", out);
+
+    CHECK(json_escape("a\"b", out, sizeof(out)) == 0, "кавычка");
+    CHECK(!strcmp(out, "a\\\"b"), "кавычка экранирована: %s", out);
+
+    CHECK(json_escape("a\\b", out, sizeof(out)) == 0, "косая");
+    CHECK(!strcmp(out, "a\\\\b"), "косая экранирована: %s", out);
+
+    CHECK(json_escape("a\nb", out, sizeof(out)) == -1, "перевод строки отвергнут");
+
+    char tiny[4];
+    CHECK(json_escape("abcdef", tiny, sizeof(tiny)) == -1, "не влезло — отказ");
+
+    /* Экранирование удлиняет строку: место должно считаться по итогу. */
+    char five[5];
+    CHECK(json_escape("\"\"", five, sizeof(five)) == 0, "две кавычки влезли");
+    CHECK(!strcmp(five, "\\\"\\\""), "и обе экранированы: %s", five);
+    char four[4];
+    CHECK(json_escape("\"\"", four, sizeof(four)) == -1, "а в четыре байта нет");
+}
+
 int main(void)
 {
     printf("check_ndmauth " VERSION "\n");
 
     test_headers();
     test_answer();
+    test_json_escape();
 
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);

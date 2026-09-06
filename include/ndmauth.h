@@ -22,6 +22,11 @@ ndm_result_t ndm_check_password(const char *host, int port,
                                 const char *login, const char *password,
                                 char *err, unsigned err_size);
 
+/* Экранирует кавычки и обратные косые для вставки в строку JSON.
+   Возвращает 0, либо -1 если не помещается или встретился управляющий
+   символ. Вынесено ради проверок. */
+int json_escape(const char *in, char *out, unsigned out_size);
+
 /* Разбор заголовков из ответа: вынесено ради проверок. */
 int ndm_header(const char *response, const char *name,
                char *out, unsigned out_size);

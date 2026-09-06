@@ -13,6 +13,30 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+int json_escape(const char *in, char *out, unsigned out_size)
+{
+    unsigned o = 0;
+
+    for (const char *p = in; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+
+        /* Управляющие символы в логине — заведомо мусор, а корректно
+           закодировать их значило бы усложнять ради невозможного. */
+        if (c < 0x20) return -1;
+
+        if (c == '"' || c == '\\') {
+            if (o + 2 >= out_size) return -1;
+            out[o++] = '\\';
+        } else if (o + 1 >= out_size) {
+            return -1;
+        }
+        out[o++] = (char)c;
+    }
+
+    out[o] = '\0';
+    return 0;
+}
+
 int ndm_header(const char *response, const char *name, char *out, unsigned out_size)
 {
     if (!response || !name || !out || !out_size) return 0;
@@ -172,6 +196,15 @@ ndm_result_t ndm_check_password(const char *host, int port,
         return NDM_UNAVAILABLE;
     }
 
+    /* Логин попадает в JSON, поэтому кавычки и обратные косые в нём
+       надо экранировать: иначе тело перестанет быть разбираемым, а
+       выглядеть это будет как неверный пароль. */
+    char jlogin[256];
+    if (json_escape(login, jlogin, sizeof(jlogin)) != 0) {
+        if (err) str_copy(err, err_size, "слишком длинный логин");
+        return NDM_UNAVAILABLE;
+    }
+
     char answer[65];
     ndm_answer(realm, challenge, login, password, answer);
     if (!answer[0]) {
@@ -185,14 +218,29 @@ ndm_result_t ndm_check_password(const char *host, int port,
     char *semi = strchr(cookie, ';');
     if (semi) *semi = '\0';
 
+    /* Логин с ответом идут телом JSON: прошивка 5.x отвечает на пустой
+       POST «no data», а на форму — «bad content type». Заголовки
+       X-NDM-* шлём вдобавок: на прошивках постарше работают только они,
+       а новой они не мешают. */
+    char body[512];
+    n = snprintf(body, sizeof(body),
+                 "{\"login\":\"%s\",\"password\":\"%s\"}", jlogin, answer);
+    if (n < 0 || (size_t)n >= sizeof(body)) {
+        if (err) str_copy(err, err_size, "слишком длинный логин");
+        return NDM_UNAVAILABLE;
+    }
+    size_t blen = (size_t)n;
+
     n = snprintf(req, sizeof(req),
                  "POST /auth HTTP/1.1\r\nHost: %s\r\n"
                  "User-Agent: ShadowFox\r\nAccept: */*\r\n"
                  "X-NDM-Login: %s\r\nX-NDM-Password: %s\r\n"
                  "%s%s%s"
-                 "Content-Length: 0\r\nConnection: close\r\n\r\n",
+                 "Content-Type: application/json\r\n"
+                 "Content-Length: %zu\r\nConnection: close\r\n\r\n%s",
                  host, login, answer,
-                 cookie[0] ? "Cookie: " : "", cookie, cookie[0] ? "\r\n" : "");
+                 cookie[0] ? "Cookie: " : "", cookie, cookie[0] ? "\r\n" : "",
+                 blen, body);
     if (n < 0 || (size_t)n >= sizeof(req)) {
         if (err) str_copy(err, err_size, "слишком длинный логин");
         return NDM_UNAVAILABLE;
