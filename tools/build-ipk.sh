@@ -78,6 +78,28 @@ for arch in "$@"; do
         cp "$ROOT/ipk/control/$f" "$STAGE/control/$f"
     done
 
+    # Путь к pid-файлу указан в трёх местах: настройки демона, init-скрипт
+    # и оба ndm-хука. Разойдись они — демон пишет по одному пути, хук ищет
+    # по другому и молча ничего не делает. Ровно так и случилось при
+    # переименовании проекта: файл настроек не попал под замену, и хуки
+    # бездействовали, ничем себя не выдавая.
+    conf_pid=$(sed -n 's/^pidFile=//p' "$STAGE/data/opt/etc/shadowfox/shadowfox.conf")
+    init_pid=$(sed -n 's/^PIDFILE=//p' "$STAGE/data/opt/etc/init.d/S99shadowfox")
+
+    for hook in "$STAGE"/data/opt/etc/ndm/*/015-shadowfox.sh; do
+        hook_pid=$(sed -n 's/^pidfile="\(.*\)"$/\1/p' "$hook")
+        if [ "$hook_pid" != "$conf_pid" ]; then
+            echo "хук $(basename "$hook") ищет pid в '$hook_pid'," >&2
+            echo "а демон пишет его в '$conf_pid'" >&2
+            exit 1
+        fi
+    done
+
+    if [ "$init_pid" != "$conf_pid" ]; then
+        echo "init-скрипт указывает pid '$init_pid', а настройки '$conf_pid'" >&2
+        exit 1
+    fi
+
     # Каждый conffile обязан реально лежать в пакете. Рассинхрон между
     # списком и файлами opkg не заметит, а пользователь потеряет свои
     # настройки при первом же обновлении.
