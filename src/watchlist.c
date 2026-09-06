@@ -33,20 +33,39 @@ static long pool_put(wl_t *w, const char *s)
     return off;
 }
 
-/* Имя набора ipset: префикс плюс имя группы, обрезанное по лимиту ipset. */
-static void set_name(char *dst, size_t size, const char *prefix, const char *group)
-{
-    size_t p = strlen(prefix);
-    size_t i = 0;
+/* Имя набора ipset: префикс, номер группы, затем очищенное имя.
 
-    while (i < p && i + 1 < size) { dst[i] = prefix[i]; i++; }
+   Номер здесь не для красоты. ipset принимает узкий набор символов, а
+   имена групп бывают кириллицей — при простой замене посторонних байтов
+   на подчёркивание две разные русские группы дали бы одинаковое имя, и
+   трафик одной молча уехал бы в другую. Номер делает совпадение
+   невозможным, а очищенный остаток нужен, чтобы имя читалось в
+   `ipset list`. */
+static void set_name(char *dst, size_t size, const char *prefix,
+                     int index, const char *group)
+{
+    int n = snprintf(dst, size, "%s%d_", prefix, index);
+    if (n < 0 || (size_t)n >= size) { if (size) dst[0] = '\0'; return; }
+
+    size_t i    = (size_t)n;
+    int    prev_underscore = 0;
 
     for (const char *g = group; *g && i + 1 < size; g++) {
         unsigned char c = (unsigned char)*g;
-        /* ipset принимает узкий набор символов, а имена групп у нас
-           бывают и кириллицей. Всё постороннее заменяем на подчёркивание. */
-        dst[i++] = (char)(isalnum(c) ? tolower(c) : '_');
+
+        if (isalnum(c)) {
+            dst[i++] = (char)tolower(c);
+            prev_underscore = 0;
+        } else if (!prev_underscore) {
+            /* Многобайтный символ не должен превращаться в вереницу
+               подчёркиваний: схлопываем их в одно. */
+            dst[i++] = '_';
+            prev_underscore = 1;
+        }
     }
+
+    /* Подчёркивание на конце ничего не добавляет. */
+    while (i > (size_t)n && dst[i - 1] == '_') i--;
     dst[i] = '\0';
 }
 
@@ -62,8 +81,10 @@ static int group_find_or_add(wl_t *w, const char *name)
 
     memset(g, 0, sizeof(*g));
     str_copy(g->name, sizeof(g->name), name);
-    set_name(g->ipset4, sizeof(g->ipset4), "sf_",  name);
-    set_name(g->ipset6, sizeof(g->ipset6), "sf6_", name);
+    /* Префиксы sf4_ и sf6_, а не sf_ и sf6_: иначе "sf6" и номер группы
+       сливаются в "sf60", что читается как группа 60 семейства v4. */
+    set_name(g->ipset4, sizeof(g->ipset4), "sf4_", idx, name);
+    set_name(g->ipset6, sizeof(g->ipset6), "sf6_", idx, name);
     g->mark  = WL_MARK_OF(idx);
     g->table = WL_TABLE_BASE + (unsigned)idx;
     return idx;

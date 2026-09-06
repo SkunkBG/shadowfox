@@ -1,4 +1,5 @@
 #include "config.h"
+#include "engine.h"
 #include "log.h"
 #include "node.h"
 #include "nodelist.h"
@@ -12,7 +13,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 static void usage(FILE *out)
@@ -29,6 +32,7 @@ static void usage(FILE *out)
         "      --sub ФАЙЛ        то же из файла: подписка base64 или список ссылок\n"
         "      --socks-port N    порт локального SOCKS для --link (по умолчанию 2080)\n"
         "      --listen АДРЕС    адрес входа SOCKS (по умолчанию 127.0.0.1)\n"
+        "      --dry-run         показать план правил и выйти, ничего не меняя\n"
         "      --fragment        включить фрагментацию TLS и шум UDP\n"
         "      --no-fragment     выключить их явно (и так выключены)\n"
         "      --log УРОВЕНЬ     off | error | warn | info | debug\n"
@@ -186,6 +190,31 @@ int main(int argc, char **argv)
             fprintf(stderr, "узлов: %d\n", list.count);
             printf("%s\n", out);
             return 0;
+        } else if (!strcmp(argv[i], "--dry-run")) {
+            config_t dry;
+            config_defaults(&dry);
+            str_copy(dry.conf_file, sizeof(dry.conf_file), conf_path);
+            config_load_file(&dry, dry.conf_file);
+            config_apply_args(&dry, argc, argv);
+
+            static engine_t preview;
+            engine_init(&preview);
+            rt_find_bins(&preview.rt);
+            preview.rt.ipv6 = dry.ipv6 && preview.rt.ip6tables[0];
+
+            char dpath[CFG_PATH_MAX + 32], ipath[CFG_PATH_MAX + 32];
+            snprintf(dpath, sizeof(dpath), "%s/domain.conf", dry.conf_dir);
+            snprintf(ipath, sizeof(ipath), "%s/ip.list", dry.conf_dir);
+            wl_load_domains(&preview.wl, dpath);
+            wl_load_cidrs(&preview.wl, ipath);
+
+            fprintf(stderr, "групп %d, доменов %d, подсетей %d, "
+                            "пропущено строк %d\n",
+                    preview.wl.group_count, preview.wl.domain_count,
+                    preview.wl.cidr_count, preview.wl.skipped);
+
+            engine_print_plan(&preview);
+            return 0;
         } else if (!strcmp(argv[i], "--genconfig")) {
             const char *dir = (i + 1 < argc) ? argv[++i] : DEFAULT_CONF_DIR;
             char path[CFG_PATH_MAX];
@@ -233,8 +262,17 @@ int main(int argc, char **argv)
     log_info(SHADOWFOX_DAEMON " " VERSION " запущен, pid %ld, конфиг %s",
              (long)getpid(), cfg.conf_file);
 
-    /* Главный цикл. На этапе 1 демон только держится живым и корректно
-       отвечает на сигналы — это проверяемый каркас для этапов 3 и 4. */
+    static engine_t engine;
+    engine_init(&engine);
+
+    char eerr[256] = "";
+    if (cfg.auto_start) {
+        if (engine_start(&engine, &cfg, eerr, sizeof(eerr)) != 0)
+            log_error("маршрутизация не поднята: %s", eerr);
+    } else {
+        log_info("autoStart выключен, правила не ставятся");
+    }
+
     while (!g_shutdown) {
         if (g_reload) {
             g_reload = 0;
@@ -251,7 +289,10 @@ int main(int argc, char **argv)
                 config_apply_args(&fresh, argc, argv) == 0) {
                 cfg = fresh;
                 log_open(cfg.foreground ? NULL : cfg.log_file, cfg.log_level);
-                log_info("конфиг перечитан");
+                if (engine_reload(&engine, &cfg, eerr, sizeof(eerr)) != 0)
+                    log_error("правила не переставлены: %s", eerr);
+                else
+                    log_info("конфиг перечитан");
             } else {
                 log_error("конфиг с ошибками, оставляю прежний");
             }
@@ -260,14 +301,32 @@ int main(int argc, char **argv)
         if (g_restore) {
             g_restore = 0;
             /* Роутер переписал netfilter или сменил состояние интерфейса.
-               Этап 4 повесит сюда восстановление правил. */
-            log_info("SIGUSR1: запрошено восстановление правил");
+               План идемпотентен, поэтому просто применяем его заново. */
+            log_info("SIGUSR1: восстанавливаю правила");
+            if (engine_restore(&engine, eerr, sizeof(eerr)) != 0)
+                log_error("восстановить не удалось: %s", eerr);
         }
 
-        pause();                        /* просыпаемся только по сигналу */
+        /* Ждём либо пакет, либо секунду: накопленные адреса надо отдавать
+           в ipset регулярно, даже когда в сети тихо. Сигнал прерывает
+           ожидание, и мы обработаем его на следующем витке. */
+        int            fd = engine_fd(&engine);
+        struct timeval tv = { 1, 0 };
+        fd_set         rd;
+
+        FD_ZERO(&rd);
+        if (fd >= 0) FD_SET(fd, &rd);
+        select(fd >= 0 ? fd + 1 : 0, fd >= 0 ? &rd : NULL, NULL, NULL, &tv);
+
+        engine_tick(&engine, time(NULL));
     }
 
-    log_info("завершение по сигналу");
+    log_info("завершение по сигналу, снимаю правила");
+    engine_stop(&engine);
+
+    log_info("поймано адресов %lu, пачек в ipset %lu, восстановлений %lu",
+             engine.matched, engine.flushes, engine.restores);
+
     pidfile_remove(cfg.pid_file);
     log_close();
     return 0;

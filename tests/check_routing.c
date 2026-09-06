@@ -78,10 +78,10 @@ static void test_apply_plan(void)
     CHECK(strstr(text, "-t mangle -F SHADOWFOX") != NULL, "цепочка чистится");
 
     CHECK(strstr(text,
-        "-A SHADOWFOX -m set --match-set sf_youtube dst "
+        "-A SHADOWFOX -m set --match-set sf4_0_youtube dst "
         "-j MARK --set-xmark 0x53460000/0xffff0000") != NULL,
         "метка по совпадению в наборе:\n%s", text);
-    CHECK(strstr(text, "--match-set sf_soc dst") != NULL, "вторая группа");
+    CHECK(strstr(text, "--match-set sf4_1_soc dst") != NULL, "вторая группа");
     CHECK(strstr(text, "--set-xmark 0x53470000/0xffff0000") != NULL,
           "у второй группы своя метка");
 
@@ -128,7 +128,7 @@ static void test_ipv6_added_only_when_asked(void)
     plan_text(&p6, t6, sizeof(t6));
     CHECK(strstr(t6, "ip6tables -t mangle -N SHADOWFOX") != NULL,
           "цепочка v6");
-    CHECK(strstr(t6, "--match-set sf6_youtube dst") != NULL, "набор v6");
+    CHECK(strstr(t6, "--match-set sf6_0_youtube dst") != NULL, "набор v6");
     CHECK(strstr(t6, "-6 rule add fwmark") != NULL, "правило v6");
     CHECK(p6.count > p4.count, "с IPv6 команд больше");
 }

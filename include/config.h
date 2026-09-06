@@ -7,11 +7,14 @@
 
 typedef struct {
     char        conf_file[CFG_PATH_MAX];
+    char        conf_dir[CFG_PATH_MAX];      /* где лежат domain.conf и ip.list */
+    char        capture_iface[32];           /* где слушать DNS */
     char        pid_file[CFG_PATH_MAX];
     char        log_file[CFG_PATH_MAX];
     log_level_t log_level;
     int         foreground;      /* 1 — не уходить в фон */
-    int         auto_start;      /* зарезервировано под этап 3 */
+    int         auto_start;      /* ставить правила сразу при старте */
+    int         ipv6;            /* обслуживать ли IPv6 */
 } config_t;
 
 /* Заполняет cfg встроенными значениями по умолчанию. */

@@ -62,15 +62,20 @@ static void test_groups_and_naming(void)
     CHECK(!strcmp(w.groups[0].iface, "Proxy0"), "интерфейс первой группы");
     CHECK(!strcmp(w.groups[1].iface, "Proxy1"), "интерфейс второй группы");
 
-    CHECK(!strcmp(w.groups[0].ipset4, "sf_youtube"), "имя набора v4: %s",
+    CHECK(!strcmp(w.groups[0].ipset4, "sf4_0_youtube"), "имя набора v4: %s",
           w.groups[0].ipset4);
-    CHECK(!strcmp(w.groups[0].ipset6, "sf6_youtube"), "имя набора v6");
+    CHECK(!strcmp(w.groups[0].ipset6, "sf6_0_youtube"), "имя набора v6: %s",
+          w.groups[0].ipset6);
 
     /* ipset не примет кириллицу — посторонние символы заменяются. */
     CHECK(strspn(w.groups[1].ipset4, "abcdefghijklmnopqrstuvwxyz0123456789_")
               == strlen(w.groups[1].ipset4),
           "в имени набора только допустимые символы: %s", w.groups[1].ipset4);
     CHECK(strlen(w.groups[1].ipset4) < WL_SETNAME_MAX, "имя набора влезает");
+    /* Многобайтные символы не должны превращаться в вереницу
+       подчёркиваний. */
+    CHECK(strstr(w.groups[1].ipset4, "__") == NULL,
+          "подчёркивания схлопнуты: %s", w.groups[1].ipset4);
 
     /* Метки и таблицы не должны пересекаться с hrneo: он берёт метки от
        12289 и таблицы от 301. */
@@ -88,6 +93,30 @@ static void test_groups_and_naming(void)
     CHECK(w.groups[0].table == WL_TABLE_BASE, "таблица первой группы");
     CHECK(w.groups[1].table == WL_TABLE_BASE + 1, "таблицы различаются");
     CHECK(w.groups[0].table > 301 + 256, "таблица далеко от диапазона hrneo");
+}
+
+/* Две группы, чьи имена целиком состоят из символов, недопустимых для
+   ipset. При наивной очистке они дали бы одно и то же имя набора, и
+   трафик одной молча уехал бы в другую. */
+static void test_set_names_are_unique(void)
+{
+    wl_t w;
+    load_domains(&w,
+        "[Кино]\n"
+        "interface = Proxy0\n"
+        "a.com\n"
+        "[Музыка]\n"
+        "interface = Proxy1\n"
+        "b.com\n");
+
+    CHECK(w.group_count == 2, "две группы");
+    CHECK(strcmp(w.groups[0].ipset4, w.groups[1].ipset4) != 0,
+          "имена наборов v4 различаются: %s и %s",
+          w.groups[0].ipset4, w.groups[1].ipset4);
+    CHECK(strcmp(w.groups[0].ipset6, w.groups[1].ipset6) != 0,
+          "имена наборов v6 различаются");
+    CHECK(strcmp(w.groups[0].ipset4, w.groups[0].ipset6) != 0,
+          "наборы v4 и v6 одной группы тоже различаются");
 }
 
 static void test_domain_kinds(void)
@@ -244,6 +273,7 @@ int main(void)
     snprintf(g_dir, sizeof(g_dir), "%s", tpl);
 
     test_groups_and_naming();
+    test_set_names_are_unique();
     test_domain_kinds();
     test_longest_match_wins();
     test_bad_lines_are_skipped();

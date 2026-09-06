@@ -180,9 +180,14 @@ static void plan_both(rt_plan_t *p, const rt_t *r, const wl_t *w, int remove)
     if (!p || !r || !w) return;
     memset(p, 0, sizeof(*p));
 
-    plan_family(p, r->iptables, r->ip, "-4", w, 0, remove);
+    /* В сухом прогоне на машине без iptables пути пусты, и команда
+       выглядела бы как начинающаяся с пробела. Лучше сказать прямо. */
+    const char *ipt = r->iptables[0] ? r->iptables : "<нет:iptables>";
+    const char *ipb = r->ip[0]       ? r->ip       : "<нет:ip>";
+
+    plan_family(p, ipt, ipb, "-4", w, 0, remove);
     if (r->ipv6 && r->ip6tables[0])
-        plan_family(p, r->ip6tables, r->ip, "-6", w, 1, remove);
+        plan_family(p, r->ip6tables, ipb, "-6", w, 1, remove);
 }
 
 void rt_plan_apply(rt_plan_t *p, const rt_t *r, const wl_t *w)

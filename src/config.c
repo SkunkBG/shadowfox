@@ -13,9 +13,13 @@ void config_defaults(config_t *cfg)
     str_copy(cfg->conf_file, sizeof(cfg->conf_file), DEFAULT_CONF_FILE);
     str_copy(cfg->pid_file,  sizeof(cfg->pid_file),  DEFAULT_PID_FILE);
     str_copy(cfg->log_file,  sizeof(cfg->log_file),  DEFAULT_LOG_FILE);
+    str_copy(cfg->conf_dir, sizeof(cfg->conf_dir), DEFAULT_CONF_DIR);
+    /* Мост локальной сети: через него идут DNS-ответы клиентам. */
+    str_copy(cfg->capture_iface, sizeof(cfg->capture_iface), "br0");
     cfg->log_level  = LOG_INFO;
     cfg->foreground = 0;
     cfg->auto_start = 1;
+    cfg->ipv6       = 1;
 }
 
 int config_set(config_t *cfg, const char *key, const char *value)
@@ -34,6 +38,21 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "log")) {
         cfg->log_level = log_level_from_string(value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "confDir")) {
+        str_copy(cfg->conf_dir, sizeof(cfg->conf_dir), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "interface")) {
+        str_copy(cfg->capture_iface, sizeof(cfg->capture_iface), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "ipv6")) {
+        cfg->ipv6 = parse_bool(value, cfg->ipv6);
         return 0;
     }
 
@@ -64,7 +83,8 @@ int config_apply_args(config_t *cfg, int argc, char **argv)
             continue;
         }
         if (!strcmp(argv[i], "--no-fragment") ||
-            !strcmp(argv[i], "--fragment")) continue;
+            !strcmp(argv[i], "--fragment") ||
+            !strcmp(argv[i], "--dry-run")) continue;
 
         if (!strncmp(argv[i], "--", 2) && i + 1 < argc &&
             config_set(cfg, argv[i] + 2, argv[i + 1]) == 0) {
@@ -151,8 +171,18 @@ int config_write_default(const char *path)
         "pidFile=%s\n"
         "\n"
         "# Поднимать маршрутизацию сразу при старте.\n"
-        "autoStart=yes\n",
-        cfg.log_file, cfg.pid_file);
+        "autoStart=yes\n"
+        "\n"
+        "# Где лежат domain.conf и ip.list.\n"
+        "confDir=%s\n"
+        "\n"
+        "# Интерфейс, на котором ловим DNS-ответы. Обычно мост локальной\n"
+        "# сети. Пустое значение — слушать все интерфейсы.\n"
+        "interface=%s\n"
+        "\n"
+        "# Обслуживать ли IPv6.\n"
+        "ipv6=yes\n",
+        cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface);
 
     fclose(f);
     return 0;
