@@ -271,6 +271,72 @@ static void test_numeric_domain_stays_domain(void)
     CHECK(match(&w, "1337x.to") == 0, "домен с цифр совпадает");
 }
 
+/* Выключенная группа не совпадает ни с чем — ни доменом, ни адресом,
+   — но из списка не исчезает: включить её обратно надо тем же щелчком. */
+static void test_disabled_group(void)
+{
+    wl_t w;
+    load_domains(&w,
+        "[Включена]\n"
+        "interface = ShadowFox\n"
+        "on.example\n"
+        "10.0.0.0/8\n"
+        "\n"
+        "[Выключена]\n"
+        "interface = ShadowFox\n"
+        "enabled = no\n"
+        "off.example\n"
+        "172.16.0.0/12\n");
+
+    CHECK(w.group_count == 2, "групп две: %d", w.group_count);
+    CHECK(w.groups[0].enabled == 1, "первая включена");
+    CHECK(w.groups[1].enabled == 0, "вторая выключена");
+    CHECK(w.skipped == 0, "ничего не отброшено: %d", w.skipped);
+
+    CHECK(match(&w, "on.example") == 0, "включённая совпадает");
+    CHECK(match(&w, "off.example") == -1, "выключенная не совпадает");
+    CHECK(match(&w, "sub.off.example") == -1, "и её поддомены тоже");
+
+    unsigned char a[4] = { 10, 1, 2, 3 };
+    CHECK(wl_match_ip(&w, 4, a) == 0, "адрес включённой совпадает");
+
+    unsigned char b[4] = { 172, 16, 0, 1 };
+    CHECK(wl_match_ip(&w, 4, b) == -1, "адрес выключенной не совпадает");
+
+    /* Записи никуда не делись: страница их показывает и правит. */
+    CHECK(w.domain_count == 2, "домены на месте: %d", w.domain_count);
+    CHECK(w.cidr_count == 2, "подсети на месте: %d", w.cidr_count);
+}
+
+/* Разбор ключей не должен портить строку. Проверка ключа «enabled»
+   затирала пробел перед '=' и не возвращала его, после чего «interface»
+   в той же строке уже не находился. Ошибка была тихой: группа просто
+   оставалась без цели. */
+static void test_settings_survive_probing(void)
+{
+    wl_t w;
+    load_domains(&w,
+        "[g]\n"
+        "interface = Proxy0\n"
+        "enabled = yes\n"
+        "x.example\n");
+
+    CHECK(!strcmp(w.groups[0].iface, "Proxy0"),
+          "интерфейс разобран после чужого ключа: «%s»", w.groups[0].iface);
+    CHECK(w.groups[0].enabled == 1, "и включённость тоже");
+
+    /* Обратный порядок ключей обязан давать то же самое. */
+    wl_t v;
+    load_domains(&v,
+        "[g]\n"
+        "enabled = no\n"
+        "interface = Proxy0\n"
+        "x.example\n");
+
+    CHECK(!strcmp(v.groups[0].iface, "Proxy0"), "порядок ключей не важен");
+    CHECK(v.groups[0].enabled == 0, "выключение прочитано");
+}
+
 static void test_longest_prefix_wins(void)
 {
     write_file("ip2.list",
@@ -320,6 +386,8 @@ int main(void)
     test_longest_match_wins();
     test_bad_lines_are_skipped();
     test_cidrs();
+    test_disabled_group();
+    test_settings_survive_probing();
     test_ip_in_domain_list();
     test_numeric_domain_stays_domain();
     test_longest_prefix_wins();

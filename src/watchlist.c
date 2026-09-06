@@ -81,6 +81,7 @@ static int group_find_or_add(wl_t *w, const char *name)
     wl_group_t *g   = &w->groups[idx];
 
     memset(g, 0, sizeof(*g));
+    g->enabled = 1;            /* пока не сказано обратного — работает */
     str_copy(g->name, sizeof(g->name), name);
     /* Префиксы sf4_ и sf6_, а не sf_ и sf6_: иначе "sf6" и номер группы
        сливаются в "sf60", что читается как группа 60 семейства v4. */
@@ -107,9 +108,15 @@ static int parse_setting(char *s, const char *key, char **val)
     char *eq = strchr(s, '=');
     if (!eq) return 0;
 
-    *eq = '\0';
-    char *k = str_trim(s);
-    if (strcasecmp(k, key) != 0) { *eq = '='; return 0; }
+    /* Сравниваем, ничего не переписывая. Раньше здесь ставился '\0' и
+       строка обрезалась str_trim: при несовпадении '=' возвращался, а
+       затёртый пробел перед ним — нет. Пока ключ был один, это не
+       проявлялось; со вторым ключом строка приходила уже порченой. */
+    char *end = eq;
+    while (end > s && (end[-1] == ' ' || end[-1] == '\t')) end--;
+
+    size_t klen = (size_t)(end - s);
+    if (klen != strlen(key) || strncasecmp(s, key, klen) != 0) return 0;
 
     *val = str_trim(eq + 1);
     return 1;
@@ -230,6 +237,15 @@ static int load(wl_t *w, const char *path, int cidrs)
         }
 
         char *val = NULL;
+        if (parse_setting(s, "enabled", &val)) {
+            /* Непонятное значение считаем «включено»: выключить группу
+               по опечатке хуже, чем оставить её работать. */
+            if (group >= 0)
+                w->groups[group].enabled =
+                    (unsigned char)(parse_bool(val, 1) ? 1 : 0);
+            else w->skipped++;
+            continue;
+        }
         if (parse_setting(s, "interface", &val)) {
             if (group >= 0) str_copy(w->groups[group].iface,
                                      sizeof(w->groups[group].iface), val);
@@ -313,6 +329,8 @@ int wl_match_domain(const wl_t *w, const char *host)
     size_t best_len   = 0;
 
     for (int i = 0; i < w->domain_count; i++) {
+        if (!w->groups[w->domains[i].group].enabled) continue;
+
         const char *pat  = w->pool + w->domains[i].offset;
         size_t      plen = strlen(pat);
         int         hit  = 0;
@@ -364,6 +382,7 @@ int wl_match_ip(const wl_t *w, int family, const unsigned char *addr)
     for (int i = 0; i < w->cidr_count; i++) {
         const wl_cidr_t *c = &w->cidrs[i];
         if (c->family != family) continue;
+        if (!w->groups[c->group].enabled) continue;
         if (!prefix_matches(addr, c->addr, c->prefix)) continue;
 
         if ((int)c->prefix > best_len) {

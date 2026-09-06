@@ -57,6 +57,7 @@ typedef enum {
 typedef struct {
     char     name[WL_NAME_MAX];
     char     iface[WL_IFACE_MAX];
+    unsigned char enabled;       /* выключенная группа не метит и не ловит */
     unsigned char target;        /* wl_target_t */
     unsigned policy_mark;        /* метка политики, полученная из RCI */
     char     ipset4[WL_SETNAME_MAX];
@@ -87,6 +88,7 @@ void wl_init(wl_t *w);
 
        [имя-группы]
        interface = Proxy0
+       enabled = no
        example.com
 
    Битая строка пропускается и считается в w->skipped: одна опечатка не

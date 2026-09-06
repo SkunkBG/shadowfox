@@ -229,10 +229,24 @@ int status_print(const config_t *cfg)
 
     for (int i = 0; i < wl.group_count; i++) {
         const wl_group_t *g = &wl.groups[i];
-        printf("    %-14s -> %s", g->name, g->iface[0] ? g->iface : "(не задан)");
+
+        /* Ширину считаем в буквах, а не в байтах: "%-14s" ровняет по
+           длине в байтах, и русские имена уезжают вдвое. */
+        int width = 0;
+        for (const char *c = g->name; *c; c++)
+            if ((*c & 0xC0) != 0x80) width++;
+
+        printf("    %s%*s -> %s", g->name,
+               width < 14 ? 14 - width : 0, "",
+               g->iface[0] ? g->iface : "(не задан)");
         if (g->target == WL_TARGET_IFACE)  printf(" (устройство)");
         if (g->target == WL_TARGET_POLICY) printf(" (политика)");
+        if (!g->enabled) printf(" — ВЫКЛЮЧЕНА");
         printf("\n");
+
+        /* У выключенной группы наборов нет по замыслу, и печатать
+           «наборы ещё не созданы» значило бы намекать на поломку. */
+        if (!g->enabled) continue;
 
         if (have_ipset) {
             long c4 = ipset_count(ipbin, g->ipset4);

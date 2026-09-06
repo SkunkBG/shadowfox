@@ -111,6 +111,7 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
     for (int i = 0; i < w->group_count; i++) {
         const wl_group_t *g = &w->groups[i];
         if (!g->iface[0]) continue;
+        if (!g->enabled) continue;      /* выключенная группа трафик не метит */
 
         const char *set = v6 ? g->ipset6 : g->ipset4;
 

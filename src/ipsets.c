@@ -73,6 +73,10 @@ void ips_queue_create(ips_t *s, const wl_t *w, int timeout)
     if (timeout > 0) snprintf(tmo, sizeof(tmo), " timeout %d", timeout);
 
     for (int i = 0; i < w->group_count; i++) {
+        /* Выключенной группе набор не нужен: правил на неё нет, а лишний
+           набор потом уберёт уборка сирот. */
+        if (!w->groups[i].enabled) continue;
+
         /* -exist делает создание идемпотентным: после перезапуска демона
            наборы уже есть, и это нормальная ситуация, а не ошибка. */
         queue(s, "create %s hash:net family inet%s -exist\n",
@@ -133,10 +137,13 @@ int ips_destroy_orphans(ips_t *s, const wl_t *w)
         if (strncmp(name, "sf4_", 4) != 0 && strncmp(name, "sf6_", 4) != 0)
             continue;
 
+        /* Выключенная группа своим набором не считается: его и надо
+           убрать, чтобы в ядре не оставалось того, чего нет в правилах. */
         int ours = 0;
         for (int i = 0; i < w->group_count && !ours; i++)
-            ours = !strcmp(name, w->groups[i].ipset4) ||
-                   !strcmp(name, w->groups[i].ipset6);
+            ours = w->groups[i].enabled &&
+                   (!strcmp(name, w->groups[i].ipset4) ||
+                    !strcmp(name, w->groups[i].ipset6));
         if (ours) continue;
 
         char nbin[IPS_BIN_MAX];
