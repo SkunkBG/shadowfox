@@ -72,6 +72,15 @@ int http_parse_request(const char *buf, size_t len, http_req_t *out)
     /* Токен: заголовок Authorization целиком, без разбора схемы —
        сравнивать всё равно с одним заданным значением. */
     const char *hdr_end = sep ? sep : buf + len;
+
+    for (const char *h = buf; h + 7 < hdr_end; h++) {
+        if (h != buf && h[-1] != '\n') continue;
+        if (strncasecmp(h, "Cookie:", 7) != 0) continue;
+        const char *v = h + 7;
+        while (v < hdr_end && (*v == ' ' || *v == '\t')) v++;
+        copy_until(v, (size_t)(hdr_end - v), '\r', out->cookie, sizeof(out->cookie));
+        break;
+    }
     for (const char *h = buf; h + 14 < hdr_end; h++) {
         if (strncasecmp(h, "Authorization:", 14) != 0) continue;
         h += 14;
@@ -261,6 +270,38 @@ void http_send(int fd, int code, const char *ctype, const char *body, size_t len
             if (k <= 0) break;
             off += (size_t)k;
         }
+    }
+}
+
+void http_send_with(int fd, int code, const char *ctype,
+                    const char *extra1, const char *extra2,
+                    const char *body, size_t len)
+{
+    char head[512];
+    int  n = snprintf(head, sizeof(head),
+                      "HTTP/1.1 %d %s\r\n"
+                      "Content-Type: %s\r\n"
+                      "Content-Length: %zu\r\n"
+                      "Cache-Control: no-store\r\n"
+                      "%s%s%s%s"
+                      "Connection: close\r\n\r\n",
+                      code, code == 303 ? "See Other" : "OK", ctype, len,
+                      extra1 && *extra1 ? extra1 : "", extra1 && *extra1 ? "\r\n" : "",
+                      extra2 && *extra2 ? extra2 : "", extra2 && *extra2 ? "\r\n" : "");
+    if (n < 0 || (size_t)n >= sizeof(head)) return;
+
+    size_t off = 0;
+    while (off < (size_t)n) {
+        ssize_t k = write(fd, head + off, (size_t)n - off);
+        if (k <= 0) return;
+        off += (size_t)k;
+    }
+
+    off = 0;
+    while (len && body && off < len) {
+        ssize_t k = write(fd, body + off, len - off);
+        if (k <= 0) return;
+        off += (size_t)k;
     }
 }
 

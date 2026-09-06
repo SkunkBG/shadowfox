@@ -32,6 +32,9 @@ void config_defaults(config_t *cfg)
     cfg->web_enabled = 1;
     /* 2000 занят hrweb, 8080 у MagiTrickle, 92 был у neofit. */
     cfg->web_port    = 8090;
+    /* Вход проверяется у веб-сервера роутера. Порт вынесен в настройку:
+       его можно сменить, и тогда вход перестал бы работать молча. */
+    cfg->router_port = 80;
     str_copy(cfg->web_proxy, sizeof(cfg->web_proxy), "shadowfox");
 
     str_copy(cfg->policy, sizeof(cfg->policy), "ShadowFox");
@@ -115,6 +118,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "webPort")) {
         cfg->web_port = atoi(value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "routerPort")) {
+        cfg->router_port = atoi(value);
         return 0;
     }
 
@@ -286,6 +294,8 @@ int config_write_default(const char *path)
         "# Веб-интерфейс: http://<адрес роутера>:8090\n"
         "web=yes\n"
         "webPort=8090\n"
+        "# Порт веб-сервера роутера: по нему проверяется логин с паролем.\n"
+        "routerPort=80\n"
         "\n"
         "# Адрес, на котором слушать. Пусто — адрес интерфейса локальной\n"
         "# сети. Слушать 0.0.0.0 нельзя.\n"

@@ -26,6 +26,7 @@ typedef struct {
     size_t      body_len;
     long        declared_len;             /* Content-Length, -1 если нет */
     char        peer[64];                 /* адрес, с которого пришли */
+    char        cookie[256];              /* заголовок Cookie целиком */
     char        token[HTTP_TOKEN_MAX];   /* из заголовка авторизации */
 } http_req_t;
 
@@ -63,6 +64,13 @@ void http_poll(http_t *h,
 /* Отправка ответа. */
 void http_send(int fd, int code, const char *ctype,
                const char *body, size_t len);
+/* Ответ с двумя дополнительными заголовками: нужны входу и выходу
+   (Set-Cookie и Location). Отдельная функция, чтобы не заводить общий
+   механизм заголовков ради двух мест. */
+void http_send_with(int fd, int code, const char *ctype,
+                    const char *extra1, const char *extra2,
+                    const char *body, size_t len);
+
 void http_send_text(int fd, int code, const char *ctype, const char *body);
 void http_send_gzip(int fd, const char *ctype,
                     const unsigned char *body, size_t len);

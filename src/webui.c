@@ -1,6 +1,10 @@
 #include "webui.h"
 
+#include "digest.h"
+#include "ndmauth.h"
+
 #include <arpa/inet.h>
+#include <stdlib.h>
 #include <time.h>
 
 /* За сколько секунд считаем наблюдение свежим. Десять минут: реже этого
@@ -287,6 +291,30 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
                 dns = "bypass";
         }
     }
+    /* Модель и версия прошивки — из роутера, для подвала страницы. */
+    char model[64] = "", osver[32] = "";
+    {
+        char out[1024] = "";
+        if (rci_request(&rci, "GET", "/rci/show/version", NULL, out, sizeof(out)) == 200) {
+            const char *d = strstr(out, "\"device\":\"");
+            if (d) {
+                d += 10;
+                unsigned i = 0;
+                while (d[i] && d[i] != '"' && i + 1 < sizeof(model)) { model[i] = d[i]; i++; }
+                model[i] = '\0';
+            }
+            const char *t = strstr(out, "\"title\":\"");
+            if (t) {
+                t += 9;
+                unsigned i = 0;
+                while (t[i] && t[i] != '"' && i + 1 < sizeof(osver)) { osver[i] = t[i]; i++; }
+                osver[i] = '\0';
+            }
+        }
+    }
+    json_kv_str(&j, "model", model);
+    json_kv_str(&j, "osver", osver);
+
     json_kv_str(&j, "dns", dns);
     json_kv_str(&j, "peer", req->peer);
 
@@ -412,9 +440,223 @@ static void save(const http_req_t *req, int fd, const config_t *cfg)
     http_send_text(fd, 200, "text/plain; charset=utf-8", "сохранено, применяю\n");
 }
 
+/* ---------- Сессии ---------- */
+
+/* Вход проверяется паролем от роутера: своего пароля мы не заводим,
+   чтобы не появилось второго секрета, который надо где-то хранить и
+   потом восстанавливать. Успешная проверка выдаёт случайную метку
+   сессии; сам пароль нигде не сохраняется. */
+
+#define SESSIONS_MAX   8
+#define SESSION_HOURS  12
+
+static struct {
+    char token[41];
+    long until;
+} g_sessions[SESSIONS_MAX];
+
+static void session_new(char *out, unsigned out_size)
+{
+    unsigned char raw[20];
+    FILE *f = fopen("/dev/urandom", "rb");
+    if (!f || fread(raw, 1, sizeof(raw), f) != sizeof(raw)) {
+        /* Предсказуемая метка пустила бы посторонних, поэтому лучше
+           не выдать никакой. */
+        if (f) fclose(f);
+        out[0] = '\0';
+        return;
+    }
+    fclose(f);
+
+    char hex[41];
+    hex_encode(raw, sizeof(raw), hex);
+    str_copy(out, out_size, hex);
+
+    long now  = (long)time(NULL);
+    int  slot = 0;
+    for (int i = 0; i < SESSIONS_MAX; i++) {
+        if (g_sessions[i].until <= now) { slot = i; break; }
+        if (g_sessions[i].until < g_sessions[slot].until) slot = i;
+    }
+
+    str_copy(g_sessions[slot].token, sizeof(g_sessions[slot].token), hex);
+    g_sessions[slot].until = now + SESSION_HOURS * 3600;
+}
+
+static int cookie_value(const char *cookie, const char *name,
+                        char *out, unsigned out_size)
+{
+    if (!cookie || !*cookie) return 0;
+
+    size_t nlen = strlen(name);
+    for (const char *p = cookie; *p; p++) {
+        if (p != cookie && !(p[-1] == ' ' || p[-1] == ';')) continue;
+        if (strncmp(p, name, nlen) != 0 || p[nlen] != '=') continue;
+
+        const char *v = p + nlen + 1;
+        unsigned    i = 0;
+        while (v[i] && v[i] != ';' && i + 1 < out_size) { out[i] = v[i]; i++; }
+        out[i] = '\0';
+        return i > 0;
+    }
+    return 0;
+}
+
+static int session_valid(const http_req_t *req)
+{
+    char tok[64] = "";
+    if (!cookie_value(req->cookie, "sfsession", tok, sizeof(tok))) return 0;
+
+    long now = (long)time(NULL);
+    for (int i = 0; i < SESSIONS_MAX; i++) {
+        if (g_sessions[i].until <= now) continue;
+        if (!strcmp(g_sessions[i].token, tok)) return 1;
+    }
+    return 0;
+}
+
+static void session_drop(const http_req_t *req)
+{
+    char tok[64] = "";
+    if (!cookie_value(req->cookie, "sfsession", tok, sizeof(tok))) return;
+
+    for (int i = 0; i < SESSIONS_MAX; i++)
+        if (!strcmp(g_sessions[i].token, tok)) g_sessions[i].until = 0;
+}
+
+/* Значение поля из тела формы. Тело короткое и своё, поэтому разбор
+   простой; проценты раскрываем, плюс считаем пробелом. */
+static void form_field(const char *body, size_t len, const char *name,
+                       char *out, unsigned out_size)
+{
+    out[0] = '\0';
+    if (!body) return;
+
+    size_t nlen = strlen(name);
+    for (size_t i = 0; i + nlen + 1 <= len; i++) {
+        if (i && body[i - 1] != '&') continue;
+        if (strncmp(body + i, name, nlen) != 0 || body[i + nlen] != '=') continue;
+
+        size_t   v = i + nlen + 1;
+        unsigned o = 0;
+        while (v < len && body[v] != '&' && o + 1 < out_size) {
+            if (body[v] == '+') { out[o++] = ' '; v++; }
+            else if (body[v] == '%' && v + 2 < len) {
+                char h[3] = { body[v+1], body[v+2], '\0' };
+                out[o++] = (char)strtol(h, NULL, 16);
+                v += 3;
+            } else out[o++] = body[v++];
+        }
+        out[o] = '\0';
+        return;
+    }
+}
+
+static void send_login(int fd, const char *message)
+{
+    static char page[4096];
+    snprintf(page, sizeof(page),
+        "<!doctype html><meta charset=utf-8>"
+        "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
+        "<title>Shadow Fox</title><style>"
+        ":root{color-scheme:dark light}"
+        "body{margin:0;min-height:100vh;display:grid;place-items:center;"
+        "background:#0d1014;color:#e8ecf2;"
+        "font:14px/1.55 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}"
+        "form{background:#151a21;border:1px solid #28303b;border-radius:12px;"
+        "padding:26px 28px;width:min(340px,92vw)}"
+        "h1{margin:0 0 4px;font:650 21px/1.2 'Avenir Next',Futura,system-ui,sans-serif;"
+        "letter-spacing:.03em}"
+        "p{margin:0 0 18px;color:#8b95a5;font-size:13px}"
+        "label{display:block;color:#8b95a5;font-size:12.5px;margin:12px 0 5px}"
+        "input{width:100%%;box-sizing:border-box;background:#0d1014;color:#e8ecf2;"
+        "border:1px solid #28303b;border-radius:7px;padding:10px;font:14px/1.4 inherit}"
+        "button{width:100%%;margin-top:20px;background:#22b8d6;color:#04222a;border:0;"
+        "border-radius:8px;padding:11px;font:650 14px/1 inherit;cursor:pointer}"
+        ".bad{color:#ff6b6b;font-size:13px;margin-top:14px}"
+        "</style>"
+        "<form method=post action=/login>"
+        "<h1>Shadow Fox</h1>"
+        "<p>Логин и пароль администратора роутера</p>"
+        "<label>Логин</label><input name=login autofocus autocomplete=username>"
+        "<label>Пароль</label>"
+        "<input name=password type=password autocomplete=current-password>"
+        "<button>Войти</button>"
+        "%s%s%s</form>",
+        message && *message ? "<div class=bad>" : "",
+        message && *message ? message : "",
+        message && *message ? "</div>" : "");
+
+    http_send(fd, 200, "text/html; charset=utf-8", page, strlen(page));
+}
+
+static void do_login(const http_req_t *req, int fd, const config_t *cfg)
+{
+    char login[128] = "", password[128] = "";
+    form_field(req->body, req->body_len, "login", login, sizeof(login));
+    form_field(req->body, req->body_len, "password", password, sizeof(password));
+
+    if (!login[0]) { send_login(fd, "Введи логин"); return; }
+
+    char         err[160] = "";
+    ndm_result_t r = ndm_check_password("127.0.0.1", cfg->router_port,
+                                        login, password, err, sizeof(err));
+
+    /* Пароль в памяти не задерживаем дольше нужного. */
+    memset(password, 0, sizeof(password));
+
+    if (r != NDM_OK) {
+        log_warn("веб: вход отклонён (%s), запрос с %s",
+                 err[0] ? err : "не подошло", req->peer);
+        send_login(fd, err[0] ? err : "Неверный логин или пароль");
+        return;
+    }
+
+    char tok[64];
+    session_new(tok, sizeof(tok));
+    if (!tok[0]) { send_login(fd, "Не удалось создать сессию"); return; }
+
+    log_info("веб: вход выполнен, запрос с %s", req->peer);
+
+    char head[256];
+    snprintf(head, sizeof(head),
+             "Set-Cookie: sfsession=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d",
+             tok, SESSION_HOURS * 3600);
+    http_send_with(fd, 303, "text/plain; charset=utf-8", head, "Location: /", "", 0);
+}
+
 static void handle(const http_req_t *req, int fd, void *ctx)
 {
     webctx_t *c = ctx;
+
+    if (!strcmp(req->path, "/login") && !strcmp(req->method, "POST")) {
+        do_login(req, fd, c->cfg);
+        return;
+    }
+
+    /* Заданный токен остаётся запасным входом: если проверка пароля на
+       какой-то прошивке не сработает, доступ к интерфейсу не потеряется.
+       По умолчанию он пуст, и тогда единственный путь — пароль роутера. */
+    int allowed = session_valid(req) ||
+                  (c->cfg->web_token[0] && !strcmp(c->cfg->web_token, req->token));
+
+    if (!strcmp(req->path, "/logout")) {
+        session_drop(req);
+        http_send_with(fd, 303, "text/plain; charset=utf-8",
+                       "Set-Cookie: sfsession=; Path=/; Max-Age=0",
+                       "Location: /", "", 0);
+        return;
+    }
+
+    if (!allowed) {
+        /* Страницу подменяем формой входа, а данным отвечаем отказом:
+           иначе страница показала бы форму внутри себя. */
+        if (!strcmp(req->path, "/") || !strcmp(req->path, "/index.html"))
+            send_login(fd, "");
+        else
+            http_send_text(fd, 401, "text/plain; charset=utf-8", "нужен вход\n");
+        return;
+    }
 
     if (!strcmp(req->path, "/") || !strcmp(req->path, "/index.html")) {
         http_send_gzip(fd, "text/html; charset=utf-8", web_page, web_page_len);
