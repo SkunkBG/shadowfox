@@ -11,6 +11,41 @@ chmod 0755 /opt/etc/ndm/ifstatechanged.d/015-shadowfox.sh 2>/dev/null || true
 # Короткая команда управления: `shadowfox status`, `shadowfox restart` и т.д.
 ln -sf /opt/etc/init.d/S99shadowfox /opt/bin/shadowfox
 
+# Списки создаём только при отсутствии. Файлами пакета их держать нельзя:
+# это пользовательские данные, и при каждой правке шаблона opkg оставлял
+# бы рядом domain.conf-opkg.
+if [ ! -f /opt/etc/shadowfox/domain.conf ]; then
+    cat > /opt/etc/shadowfox/domain.conf <<'DOMAINS'
+# Домены, которые нужно заворачивать в туннель.
+#
+#   [имя-группы]
+#   interface = HydraRoute     # политика Keenetic либо сетевой интерфейс
+#   example.com                # домен и все его поддомены
+#   *.wildcard.example.com     # только поддомены
+#   =exact.example.com         # точное совпадение
+#
+# Цель различается сама: если такое устройство есть в системе — трафик
+# заворачивается прямо в него; иначе это политика Keenetic, и метку для
+# неё демон спросит у роутера.
+#
+# Посмотреть, что получится: shadowfoxd --dry-run
+DOMAINS
+fi
+
+if [ ! -f /opt/etc/shadowfox/ip.list ]; then
+    cat > /opt/etc/shadowfox/ip.list <<'CIDRS'
+# Статические подсети, которые нужно заворачивать в туннель.
+#
+#   [имя-группы]
+#   interface = HydraRoute
+#   192.0.2.0/24
+#   2001:db8::/32
+#
+# Нужны для сервисов с зашитыми адресами, которые не спрашивают DNS, —
+# там перехват ответов бессилен.
+CIDRS
+fi
+
 # Намеренно НЕ правим /opt/etc/init.d/rc.unslung.
 # neofit и hrneo вставляют туда `sleep 10`, чтобы дождаться сети роутера.
 # Это правка чужого общего файла ради задержки на старте. Вместо этого
