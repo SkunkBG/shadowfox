@@ -409,7 +409,7 @@ static int ndmc_path(char *dst, unsigned size)
 
 static void send_dns(int fd)
 {
-    char bin[64] = "";
+    char bin[192] = "";
     char arg[] = "-c";
     char cmd[] = "show running-config";
 
@@ -435,6 +435,11 @@ static void send_dns(int fd)
     json_key(&j, "servers");
     json_arr_open(&j);
 
+    /* Разбор портит текст, поэтому держим вторую копию: интерфейсы
+       ищутся по нему же. */
+    static char copy[64 * 1024];
+    if (rc == 0) str_copy(copy, sizeof(copy), out);
+
     if (rc == 0) {
         const char *found[DNS_LINES_MAX];
         int n = dns_upstreams(out, found, DNS_LINES_MAX);
@@ -442,6 +447,17 @@ static void send_dns(int fd)
     }
 
     json_arr_close(&j);
+
+    /* Интерфейсы, которые ещё берут DNS у провайдера. */
+    json_key(&j, "isp");
+    json_arr_open(&j);
+    if (rc == 0) {
+        const char *ifs[DNS_LINES_MAX];
+        int n = dns_isp_interfaces(copy, ifs, DNS_LINES_MAX);
+        for (int i = 0; i < n; i++) json_str(&j, ifs[i]);
+    }
+    json_arr_close(&j);
+
     json_obj_close(&j);
 
     if (json_done(&j) != 0) {
@@ -488,7 +504,7 @@ static int chosen(const char *list, const char *key)
 
 static void apply_dns(const http_req_t *req, int fd)
 {
-    char bin[64] = "";
+    char bin[192] = "";
     if (!ndmc_path(bin, sizeof(bin))) {
         http_send_text(fd, 500, "text/plain; charset=utf-8",
                        "ndmc не найден, настройки роутера не тронуты\n");
@@ -505,18 +521,50 @@ static void apply_dns(const http_req_t *req, int fd)
 
     /* Собираем список выбранного, а в конце — включение службы и
        сохранение конфигурации, иначе после перезагрузки всё пропадёт. */
-    const char *plan[16];
+    const char *plan[32];
     int         count = 0;
 
-    for (int i = 0; DNS_SETS[i].key && count < 12; i++) {
+    for (int i = 0; DNS_SETS[i].key && count < 10; i++) {
         if (!chosen(sets, DNS_SETS[i].key)) continue;
         for (int k = 0; DNS_SETS[i].cmds[k]; k++) plan[count++] = DNS_SETS[i].cmds[k];
     }
 
-    if (!count) {
+    char isp_early[8] = "";
+    http_query_get(req, "isp", isp_early, sizeof(isp_early));
+    if (!count && isp_early[0] != '1') {
         http_send_text(fd, 400, "text/plain; charset=utf-8",
                        "выбранных наборов нет\n");
         return;
+    }
+
+    /* Отключение провайдерского DNS: команды берём из running-config,
+       он печатает ровно то, чем конфигурация воспроизводится. Трогаем
+       только те интерфейсы, где это ещё включено. */
+    static char ifcmds[DNS_LINES_MAX][96];
+    int         ifn = 0;
+
+    char isp[8] = "";
+    http_query_get(req, "isp", isp, sizeof(isp));
+
+    if (isp[0] == '1') {
+        char arg[] = "-c";
+        char show[] = "show running-config";
+        char *sargv[] = { bin, arg, show, NULL };
+        static char cfgtext[64 * 1024];
+
+        if (proc_run(sargv, cfgtext, sizeof(cfgtext), 10) == 0) {
+            const char *ifs[DNS_LINES_MAX];
+            int n = dns_isp_interfaces(cfgtext, ifs, DNS_LINES_MAX);
+
+            for (int i = 0; i < n && ifn + 2 < DNS_LINES_MAX && count < 14; i++) {
+                snprintf(ifcmds[ifn], sizeof(ifcmds[ifn]),
+                         "interface %s ip no name-servers", ifs[i]);
+                plan[count++] = ifcmds[ifn++];
+                snprintf(ifcmds[ifn], sizeof(ifcmds[ifn]),
+                         "interface %s ipv6 no name-servers", ifs[i]);
+                plan[count++] = ifcmds[ifn++];
+            }
+        }
     }
 
     plan[count++] = "service dns-proxy";

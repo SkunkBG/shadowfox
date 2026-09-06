@@ -14,4 +14,8 @@
    text изменяется: строки разрезаются на месте. */
 int dns_upstreams(char *text, const char **out, int max);
 
+/* Имена интерфейсов, которые ещё берут DNS у провайдера: внешние
+   (есть «ip dhcp client») и без «ip no name-servers». text изменяется. */
+int dns_isp_interfaces(char *text, const char **out, int max);
+
 #endif /* SHADOWFOX_DNSCFG_H */

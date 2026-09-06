@@ -542,11 +542,14 @@ const DNSSETS=[
     'dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net',
     'dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net']}
 ];
-let dnsPick={cf:1,google:0,quad9:1};
+let dnsPick={cf:1,google:0,quad9:1}, dnsIsp=1;
 
 function dnsCmds(){
   const c=[];
   for(const s of DNSSETS) if(dnsPick[s.key]) c.push(...s.cmds);
+  const isp=(dnsInfo && dnsInfo.ok && dnsIsp) ? (dnsInfo.isp||[]) : [];
+  for(const i of isp) c.push('interface '+i+' ip no name-servers',
+                             'interface '+i+' ipv6 no name-servers');
   if(!c.length) return '';
   c.push('service dns-proxy','system configuration save');
   return c.map(x=>`ndmc -c "${x}"`).join('\n');
@@ -615,13 +618,12 @@ function viewConn(){
      <pre>${esc(dnsCmds()||'ничего не выбрано')}</pre>
      <div class="bar"><button class="b" id="dns-apply">Установить</button>
        <span class="msg" id="m-dns"></span></div>
-     <p style="margin-top:14px"><b>Провайдерский DNS отключить придётся
-     самому.</b> Если он останется в списке, роутер будет спрашивать и его —
-     а он обычно ближе и быстрее наших, значит отвечать будет чаще. Толку
-     от чистых серверов тогда немного. Выключается в панели роутера, в
-     настройках интернет-соединения: снять получение адресов DNS от
-     провайдера. Команду для этого я не даю намеренно — точной её формы
-     не знаю, а угадывать то, что меняет настройки роутера, нельзя.</p>
+     <p style="margin-top:14px">Если провайдерский DNS останется включён,
+     роутер будет спрашивать и его — а он обычно ближе и быстрее наших,
+     значит отвечать будет чаще, и толку от чистых серверов немного.
+     То же самое делается в панели роутера галочками «Игнорировать DNSv4
+     и DNSv6 интернет-провайдера» в настройках соединения.</p>
+     ${dnsIspBox()}
      <p>Проверить, что получилось:</p>
      <pre>ndmc -c "show running-config" | grep upstream</pre>
      <p>Лишний сервер убирается тем же способом со словом <code>no</code>
@@ -772,6 +774,22 @@ function draw(){
    для них демон запускает ndmc, и делать это каждые десять секунд ради
    строчки в карточке незачем. Ответ храним: иначе перерисовка возвращала
    бы надпись «читаю» и повторный запрос уже не шёл. */
+/* Что известно про провайдерский DNS. Отключаем только те интерфейсы,
+   где он ещё включён, и показываем их поимённо: команда меняет
+   настройки роутера, и человек должен видеть, чего именно она коснётся. */
+function dnsIspBox(){
+  if(!dnsInfo || !dnsInfo.ok) return '';
+  const isp=dnsInfo.isp||[];
+  if(!isp.length)
+    return `<div class="note" style="margin:0">${UI.ok}Провайдерский DNS уже
+      отключён на всех внешних подключениях</div>`;
+  return `<div class="note" style="margin:0 0 10px">${UI.i}Ещё берут DNS у
+      провайдера: <b>${isp.map(esc).join(', ')}</b></div>
+    <button class="pick ${dnsIsp?'sel':''}" data-dnsisp style="max-width:340px">
+      <span class="box">${dnsIsp?'✓':''}</span>
+      <span>Отключить провайдерский DNS<i>на этих подключениях</i></span></button>`;
+}
+
 function dnsBox(){
   if(!dnsInfo) return `<div class="note">${UI.i}читаю настройки роутера…</div>`;
   if(dnsInfo.report)
@@ -1024,19 +1042,28 @@ document.addEventListener('click',async ev=>{
     gate(); return; }
 
   const dset=ev.target.closest('[data-dnsset]');
-  if(dset){ const k=dset.dataset.dnsset; dnsPick[k]=!dnsPick[k]; draw();
+  if(dset){ const k=dset.dataset.dnsset; dnsPick[k]=!dnsPick[k];
+    folds.dnscmd=1; draw(); return; }
+
+  if(ev.target.closest('[data-dnsisp]')){ dnsIsp=!dnsIsp;
     folds.dnscmd=1; draw(); return; }
 
   if(ev.target.id==='dns-apply'){
     const btn=ev.target, m=$('#m-dns');
     const picked=DNSSETS.filter(x=>dnsPick[x.key]);
-    if(!picked.length){ m.className='msg bad'; m.textContent='ничего не выбрано'; return; }
-    if(!confirm('Добавить в настройки роутера: '+picked.map(x=>x.name).join(', ')+
+    const isp=(dnsInfo && dnsInfo.ok && dnsIsp) ? (dnsInfo.isp||[]) : [];
+    if(!picked.length && !isp.length){
+      m.className='msg bad'; m.textContent='ничего не выбрано'; return; }
+
+    let what=[];
+    if(picked.length) what.push('добавить '+picked.map(x=>x.name).join(', '));
+    if(isp.length) what.push('отключить DNS провайдера на '+isp.join(', '));
+    if(!confirm('В настройках роутера: '+what.join('; ')+
                 '?\nСуществующие серверы не удаляются.')) return;
     btn.disabled=true; m.className='msg'; m.textContent='выполняю…';
     try{
-      const r=await fetch(api('/dns?sets='+picked.map(x=>x.key).join(',')),
-                          {method:'POST'});
+      const r=await fetch(api('/dns?sets='+picked.map(x=>x.key).join(',')+
+                              (isp.length?'&isp=1':'')),{method:'POST'});
       const t=await r.text();
       m.className=r.ok?'msg ok':'msg bad';
       m.textContent=r.ok?'готово':'были сбои';

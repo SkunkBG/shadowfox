@@ -89,6 +89,53 @@ int main(void)
     memcpy(text, REAL, sizeof(REAL));
     CHECK(dns_upstreams(text, out, 3) == 3, "больше запрошенного не вернём");
 
+    /* Интерфейсы, у которых DNS провайдера ещё включён. */
+    {
+        static char cfg[] =
+            "interface GigabitEthernet1\n"
+            "    ip dhcp client dns-routes\n"
+            "    ip no name-servers\n"
+            "!\n"
+            "interface GigabitEthernet2\n"
+            "    ip dhcp client dns-routes\n"
+            "!\n"
+            "interface Home\n"
+            "    ip address 192.168.1.1 255.255.255.0\n"
+            "!\n"
+            "interface Wireguard0\n"
+            "    ip dhcp client dns-routes\n"
+            "!\n"
+            "system\n"
+            "    hostname Keenetic\n"
+            "!\n";
+
+        char        buf[sizeof(cfg)];
+        const char *ifs[8];
+
+        memcpy(buf, cfg, sizeof(cfg));
+        int k = dns_isp_interfaces(buf, ifs, 8);
+
+        CHECK(k == 2, "интерфейсов с DNS провайдера: %d, ждали 2", k);
+        CHECK(k > 0 && !strcmp(ifs[0], "GigabitEthernet2"),
+              "первый: %s", k ? ifs[0] : "-");
+        CHECK(k > 1 && !strcmp(ifs[1], "Wireguard0"),
+              "второй: %s", k > 1 ? ifs[1] : "-");
+
+        /* Отключённый и домашняя сеть попасть не должны. */
+        for (int i = 0; i < k; i++) {
+            CHECK(strcmp(ifs[i], "GigabitEthernet1") != 0, "уже отключённый попал");
+            CHECK(strcmp(ifs[i], "Home") != 0, "домашняя сеть попала");
+        }
+
+        /* Последняя секция без завершителя тоже обязана учитываться. */
+        static char tail[] =
+            "interface GigabitEthernet9\n"
+            "    ip dhcp client dns-routes\n";
+        char t2[sizeof(tail)];
+        memcpy(t2, tail, sizeof(tail));
+        CHECK(dns_isp_interfaces(t2, ifs, 8) == 1, "последняя секция учтена");
+    }
+
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);
         return 1;
