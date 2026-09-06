@@ -25,6 +25,9 @@ void config_defaults(config_t *cfg)
        изменение настроек устройства, а не наша внутренняя кухня.
        Молча так делать нельзя, поэтому по умолчанию выключено. */
     cfg->create_policy = 0;
+    /* Сутки. Домен, который перестали резолвить, выпадает сам, и набор
+       не копит адреса, давно переехавшие к другим сервисам. */
+    cfg->ipset_timeout = 86400;
 
     str_copy(cfg->policy, sizeof(cfg->policy), "ShadowFox");
     str_copy(cfg->proxy_iface, sizeof(cfg->proxy_iface), "Proxy1");
@@ -97,6 +100,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "xrayBin")) {
         str_copy(cfg->xray_bin, sizeof(cfg->xray_bin), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "ipsetTimeout")) {
+        cfg->ipset_timeout = atoi(value);
         return 0;
     }
 
@@ -238,6 +246,11 @@ int config_write_default(const char *path)
         "# сохранять его конфигурацию. Это изменение настроек устройства,\n"
         "# поэтому по умолчанию выключено: политику создаёт администратор.\n"
         "createPolicy=no\n"
+        "\n"
+        "# Сколько секунд живёт адрес в наборе. Домен, который перестали\n"
+        "# резолвить, выпадает сам, и набор не копит адреса, давно\n"
+        "# переехавшие к другим сервисам. 0 отключает старение.\n"
+        "ipsetTimeout=86400\n"
         "\n"
         "# Свой экземпляр Xray и своё прокси-подключение в Keenetic.\n"
         "# nodesFile — файл со ссылками vless:// либо подпиской. Пока его\n"

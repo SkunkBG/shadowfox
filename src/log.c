@@ -20,16 +20,43 @@ static void adopt_timezone(void)
 {
     if (getenv("TZ")) return;
 
-    FILE *f = fopen("/opt/etc/TZ", "r");
-    if (!f) return;
+    /* Порядок поиска: сначала файлы Entware и прошивки с текстовой
+       зоной, затем двоичная база. Ни того, ни другого может не быть —
+       тогда остаётся UTC, и это видно по смещению в метке времени. */
+    static const char *files[] = { "/opt/etc/TZ", "/etc/TZ", "/var/TZ", NULL };
 
-    char tz[64];
-    if (fgets(tz, sizeof(tz), f)) {
-        char *nl = strpbrk(tz, "\r\n");
-        if (nl) *nl = '\0';
-        if (tz[0]) setenv("TZ", tz, 1);
+    for (int i = 0; files[i]; i++) {
+        FILE *f = fopen(files[i], "r");
+        if (!f) continue;
+
+        char tz[64];
+        if (fgets(tz, sizeof(tz), f)) {
+            char *nl = strpbrk(tz, "\r\n");
+            if (nl) *nl = '\0';
+            if (tz[0]) {
+                setenv("TZ", tz, 1);
+                fclose(f);
+                tzset();
+                return;
+            }
+        }
+        fclose(f);
     }
-    fclose(f);
+
+    /* Двоичная база зон: её понимает сама libc, надо лишь указать путь. */
+    static const char *zones[] = {
+        "/opt/etc/localtime", "/etc/localtime", NULL
+    };
+    for (int i = 0; zones[i]; i++) {
+        if (access(zones[i], R_OK) != 0) continue;
+
+        char spec[80];
+        snprintf(spec, sizeof(spec), ":%s", zones[i]);
+        setenv("TZ", spec, 1);
+        tzset();
+        return;
+    }
+
     tzset();
 }
 

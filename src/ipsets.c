@@ -65,15 +65,44 @@ static void queue(ips_t *s, const char *fmt, ...)
     s->queued++;
 }
 
-void ips_queue_create(ips_t *s, const wl_t *w)
+void ips_queue_create(ips_t *s, const wl_t *w, int timeout)
 {
     if (!s || !w) return;
+
+    char tmo[32] = "";
+    if (timeout > 0) snprintf(tmo, sizeof(tmo), " timeout %d", timeout);
 
     for (int i = 0; i < w->group_count; i++) {
         /* -exist делает создание идемпотентным: после перезапуска демона
            наборы уже есть, и это нормальная ситуация, а не ошибка. */
-        queue(s, "create %s hash:net family inet -exist\n",  w->groups[i].ipset4);
-        queue(s, "create %s hash:net family inet6 -exist\n", w->groups[i].ipset6);
+        queue(s, "create %s hash:net family inet%s -exist\n",
+              w->groups[i].ipset4, tmo);
+        queue(s, "create %s hash:net family inet6%s -exist\n",
+              w->groups[i].ipset6, tmo);
+    }
+}
+
+void ips_destroy(ips_t *s, const wl_t *w)
+{
+    if (!s || !w || !s->bin[0]) return;
+
+    for (int i = 0; i < w->group_count; i++) {
+        for (int v = 0; v < 2; v++) {
+            char bin[IPS_BIN_MAX];
+            char cmd[]  = "destroy";
+            char name[WL_SETNAME_MAX];
+
+            str_copy(bin, sizeof(bin), s->bin);
+            str_copy(name, sizeof(name),
+                     v ? w->groups[i].ipset6 : w->groups[i].ipset4);
+
+            char *argv[] = { bin, cmd, name, NULL };
+            char  out[256];
+
+            /* Отсутствие набора и ссылки на него из правил — обе
+               ситуации штатные, ругаться не на что. */
+            proc_run(argv, out, sizeof(out), s->timeout);
+        }
     }
 }
 

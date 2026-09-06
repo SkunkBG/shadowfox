@@ -139,7 +139,7 @@ static void fetch_policy_marks(engine_t *e)
 
 /* Ставит наборы и правила. Наборы обязаны существовать до правил:
    iptables откажется ссылаться на несуществующий набор. */
-static int apply_all(engine_t *e, char *err, unsigned err_size)
+static int apply_all(engine_t *e, char *err, unsigned err_size, int recreate)
 {
     if (!e->wl.group_count) {
         log_info("групп нет, правила не ставятся");
@@ -148,7 +148,23 @@ static int apply_all(engine_t *e, char *err, unsigned err_size)
 
     fetch_policy_marks(e);
 
-    ips_queue_create(&e->ips, &e->wl);
+    if (recreate) {
+        /* Набор, созданный без времени жизни, не примет записи с ним, а
+           изменить это у существующего набора нельзя — только пересоздать.
+           Правила снимаем первыми: пока они ссылаются на набор, удалить
+           его невозможно.
+
+           При восстановлении по SIGUSR1 сюда не заходим: там пересоздание
+           стёрло бы все накопленные адреса. */
+        rt_plan_t rm;
+        rt_plan_remove(&rm, &e->rt, &e->wl);
+        char ignore[256];
+        rt_run(&rm, &e->rt, ignore, sizeof(ignore));
+
+        ips_destroy(&e->ips, &e->wl);
+    }
+
+    ips_queue_create(&e->ips, &e->wl, e->ipset_timeout);
     ips_queue_cidrs(&e->ips, &e->wl);
     if (ips_flush(&e->ips, err, err_size) != 0) return -1;
 
@@ -251,6 +267,7 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
     }
     e->rt.ipv6          = cfg->ipv6 && e->rt.ip6tables[0];
     e->may_create_policy = cfg->create_policy;
+    e->ipset_timeout     = cfg->ipset_timeout;
 
     /* Своё ядро поднимаем до правил: пока оно не слушает, заворачивать
        туда трафик бессмысленно. */
@@ -258,7 +275,7 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
 
     if (!load_lists(e, cfg)) return 0;
 
-    if (apply_all(e, err, err_size) != 0) return -1;
+    if (apply_all(e, err, err_size, 1) != 0) return -1;
 
     char cap_err[160] = "";
     if (dcap_open(&e->cap, cfg->capture_iface, cap_err, sizeof(cap_err)) == 0) {
@@ -318,7 +335,7 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
     }
 
     if (!load_lists(e, cfg)) return 0;
-    return apply_all(e, err, err_size);
+    return apply_all(e, err, err_size, 1);
 }
 
 void engine_request_restore(engine_t *e, time_t now)
@@ -334,9 +351,13 @@ int engine_restore(engine_t *e, char *err, unsigned err_size)
     if (!e->wl.group_count) return 0;
 
     /* Роутер переписал netfilter — наши правила исчезли. План
-       идемпотентен, поэтому его достаточно применить заново. */
+       идемпотентен, поэтому его достаточно применить заново.
+
+       Наборы при этом не трогаем: пересоздание стёрло бы все адреса,
+       накопленные перехватом, и маршрутизация замолчала бы до
+       следующего резолва каждого домена. */
     e->restores++;
-    return apply_all(e, err, err_size);
+    return apply_all(e, err, err_size, 0);
 }
 
 void engine_tick(engine_t *e, time_t now)
@@ -424,7 +445,7 @@ void engine_print_plan(const engine_t *e)
     printf("# наборы\n");
     ips_t preview;
     ips_init(&preview, "ipset");
-    ips_queue_create(&preview, &e->wl);
+    ips_queue_create(&preview, &e->wl, e->ipset_timeout);
     ips_queue_cidrs(&preview, &e->wl);
     fputs(ips_pending(&preview), stdout);
 

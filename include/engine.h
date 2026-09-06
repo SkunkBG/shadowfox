@@ -36,6 +36,7 @@ typedef struct engine {
     unsigned long restores;
     int           policies_pending;   /* политик без метки */
     int           may_create_policy;
+    int           ipset_timeout;
 } engine_t;
 
 void engine_init(engine_t *e);

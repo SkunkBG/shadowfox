@@ -32,6 +32,21 @@ if [ ! -f /opt/etc/shadowfox/domain.conf ]; then
 DOMAINS
 fi
 
+if [ ! -f /opt/etc/shadowfox/nodes.txt ]; then
+    cat > /opt/etc/shadowfox/nodes.txt <<'NODES'
+# Ссылки на серверы для своего экземпляра Xray, по одной в строке.
+# Принимаются vless:// либо целиком подписка в base64.
+#
+# При нескольких ссылках демон соберёт балансировщик и будет выбирать
+# самый быстрый узел.
+#
+# Пока файл без ссылок, свой Xray не запускается, и маршрутизация идёт
+# через то подключение, которое настроено вручную.
+NODES
+    # В ссылке лежит uuid, то есть ключ доступа к серверу.
+    chmod 600 /opt/etc/shadowfox/nodes.txt
+fi
+
 if [ ! -f /opt/etc/shadowfox/ip.list ]; then
     cat > /opt/etc/shadowfox/ip.list <<'CIDRS'
 # Статические подсети, которые нужно заворачивать в туннель.

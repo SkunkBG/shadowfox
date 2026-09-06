@@ -62,7 +62,7 @@ static void test_create_commands(void)
 
     ips_t s;
     ips_init(&s, "/не/важно");
-    ips_queue_create(&s, &w);
+    ips_queue_create(&s, &w, 0);
 
     const char *q = ips_pending(&s);
     /* hash:net, а не hash:ip: в наборы кладутся и подсети из ip.list. */
@@ -75,6 +75,16 @@ static void test_create_commands(void)
     /* -exist делает создание идемпотентным: после перезапуска демона
        наборы уже есть, и это норма. */
     CHECK(s.queued == 4, "четыре команды на две группы, получено %u", s.queued);
+
+    /* Со временем жизни записи стареют сами. Без него набор копит
+       адреса вечно, включая давно переехавшие к другим сервисам. */
+    ips_t t;
+    ips_init(&t, "/не/важно");
+    ips_queue_create(&t, &w, 3600);
+    CHECK(strstr(ips_pending(&t), "family inet timeout 3600 -exist") != NULL,
+          "время жизни попадает в создание: %s", ips_pending(&t));
+    CHECK(strstr(ips_pending(&t), "family inet6 timeout 3600 -exist") != NULL,
+          "и в набор v6 тоже");
 }
 
 static void test_add_commands(void)
@@ -133,7 +143,7 @@ static void test_flush_feeds_stdin(void)
 
     ips_t s;
     ips_init(&s, bin);
-    ips_queue_create(&s, &w);
+    ips_queue_create(&s, &w, 0);
 
     char err[256] = "";
     CHECK(ips_flush(&s, err, sizeof(err)) == 0, "пачка отдана: %s", err);
@@ -167,7 +177,7 @@ static void test_flush_reports_failure(void)
 
     ips_t s;
     ips_init(&s, bin);
-    ips_queue_create(&s, &w);
+    ips_queue_create(&s, &w, 0);
 
     char err[256] = "";
     CHECK(ips_flush(&s, err, sizeof(err)) == -1, "отказ замечен");
