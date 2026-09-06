@@ -148,7 +148,7 @@ const $=s=>document.querySelector(s);
 const tok=new URLSearchParams(location.search).get('token');
 const api=p=>tok?p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(tok):p;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let D=null, tab='rules', openRule=0, dnsShown=0;
+let D=null, tab='rules', openRule=0, dnsShown=0, nodesMode='masked';
 
 /* --- тема --- */
 const theme=localStorage.getItem('sf-theme')||'dark';
@@ -282,9 +282,18 @@ function viewConn(){
     применения: негодный не заменит рабочий.</p>
     <label>Ссылки</label>
     <textarea class="wide" id="nodes" spellcheck="false"
-      placeholder="vless://...">${esc(D.nodes)}</textarea>
-    <div class="bar"><button class="b" data-save="nodes">Сохранить и запустить</button>
+      placeholder="vless://..." ${nodesMode==='masked'?'readonly':''}
+      >${esc(nodesMode==='new' ? '' : D.nodes)}</textarea>
+    <div class="bar">
+      ${nodesMode==='masked'
+        ? `<button class="b ghost" id="nodes-show">Показать</button>
+           <button class="b" id="nodes-new">Заменить</button>`
+        : `<button class="b" data-save="nodes">Сохранить и запустить</button>
+           <button class="b ghost" id="nodes-hide">Скрыть</button>`}
       <span class="msg" id="m-nodes"></span></div>
+    ${nodesMode==='masked'
+      ? `<p style="margin:10px 0 0;font-size:13px">Ключ скрыт: он не
+         передаётся странице, пока не нажать «Показать».</p>` : ''}
   </div>
 
   <div class="card">
@@ -425,19 +434,31 @@ async function save(what,text,msgId){
     const t=(await r.text()).trim();
     m.className=r.ok?'msg ok':'msg bad';
     m.textContent=t||(r.ok?'готово':'ошибка');
-    if(r.ok) setTimeout(load,1500);
+    if(r.ok){ if(what==='nodes') nodesMode='masked'; setTimeout(load,1500); }
   }catch(e){ m.className='msg bad'; m.textContent=e.message; }
 }
 
 document.addEventListener('click',async ev=>{
   const nav=ev.target.closest('nav button');
-  if(nav){ tab=nav.dataset.tab;
+  if(nav){ tab=nav.dataset.tab; if(nodesMode!=='masked'){ nodesMode='masked'; load(); }
     document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b===nav));
     draw(); return; }
 
   const top=ev.target.closest('.rule>.top');
   if(top){ const r=top.parentElement;
     openRule=r.classList.contains('open')?-1:+r.dataset.i; draw(); return; }
+
+  if(ev.target.id==='nodes-show'){
+    /* Ключ запрашиваем отдельно и только сейчас. */
+    const r=await fetch(api('/data?reveal=1'));
+    if(r.ok){ D=await r.json(); nodesMode='shown'; draw(); }
+    return;
+  }
+
+  if(ev.target.id==='nodes-new'){ nodesMode='new'; draw();
+    const t=$('#nodes'); if(t) t.focus(); return; }
+
+  if(ev.target.id==='nodes-hide'){ nodesMode='masked'; load(); return; }
 
   if(ev.target.id==='reshow'){
     ev.preventDefault();

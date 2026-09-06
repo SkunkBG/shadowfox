@@ -116,6 +116,75 @@ static int file_for(const config_t *cfg, const char *what,
     return 0;
 }
 
+/* Маскировка ссылок. Ключ — учётные данные, и отдавать его странице на
+   каждом обновлении незачем: достаточно показать, куда ведёт ссылка.
+   Прятать в разметке было бы обманом — текст всё равно уехал бы в
+   браузер и осел в кеше. */
+#define MASK_MARK "\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2"   /* •••• */
+
+static void mask_link(const char *in, char *out, size_t size)
+{
+    const char *scheme = strstr(in, "://");
+    if (!scheme) { str_copy(out, size, in); return; }
+
+    const char *rest = scheme + 3;
+    const char *at   = strchr(rest, '@');
+    const char *hash = strchr(rest, '#');
+
+    /* Подписка целиком секрет: у неё вся ссылка — это доступ. */
+    if (!at || (hash && at > hash)) {
+        size_t head = (size_t)(rest - in);
+        const char *slash = strchr(rest, '/');
+        size_t host = slash ? (size_t)(slash - rest) : strlen(rest);
+        snprintf(out, size, "%.*s%.*s/" MASK_MARK,
+                 (int)head, in, (int)host, rest);
+        return;
+    }
+
+    /* Ссылка на узел: прячем uuid и sid, остальное полезно видеть. */
+    size_t head = (size_t)(rest - in);
+    char   tail[512];
+    str_copy(tail, sizeof(tail), at + 1);
+
+    char *sid = strstr(tail, "sid=");
+    if (sid) {
+        char *end = sid + 4;
+        while (*end && *end != '&' && *end != '#') end++;
+        memmove(sid + 4 + 4, end, strlen(end) + 1);
+        memcpy(sid + 4, "****", 4);
+    }
+
+    snprintf(out, size, "%.*s" MASK_MARK "@%s", (int)head, in, tail);
+}
+
+static void mask_nodes(const char *in, char *out, size_t size)
+{
+    size_t used = 0;
+    out[0] = '\0';
+
+    const char *p = in;
+    while (*p) {
+        const char *nl  = strchr(p, '\n');
+        size_t      len = nl ? (size_t)(nl - p) : strlen(p);
+
+        char line[1024];
+        if (len >= sizeof(line)) len = sizeof(line) - 1;
+        memcpy(line, p, len);
+        line[len] = '\0';
+
+        char shown[1024];
+        if (line[0]) mask_link(str_trim(line), shown, sizeof(shown));
+        else         shown[0] = '\0';
+
+        int n = snprintf(out + used, size - used, "%s\n", shown);
+        if (n < 0 || (size_t)n >= size - used) break;
+        used += (size_t)n;
+
+        if (!nl) break;
+        p = nl + 1;
+    }
+}
+
 static void send_data(const http_req_t *req, int fd, struct engine *ce,
                       const config_t *cfg)
 {
@@ -223,14 +292,31 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     }
     json_arr_close(&j);
 
-    /* Содержимое файлов отдаём как есть: страница их же и правит. */
+    /* Списки отдаём как есть: страница их же и правит. */
     static char text[64 * 1024];
-    const char *parts[] = { "domains", "cidrs", "nodes", NULL };
+    const char *parts[] = { "domains", "cidrs", NULL };
     for (int i = 0; parts[i]; i++) {
         char path[CFG_PATH_MAX + 32];
         file_for(cfg, parts[i], path, sizeof(path));
         if (slurp(path, text, sizeof(text)) < 0) text[0] = '\0';
         json_kv_str(&j, parts[i], text);
+    }
+
+    /* Ссылки — только по отдельной просьбе. Обычное обновление страницы
+       не должно таскать ключ в браузер и оставлять его в кеше. */
+    char npath[CFG_PATH_MAX + 32];
+    file_for(cfg, "nodes", npath, sizeof(npath));
+    if (slurp(npath, text, sizeof(text)) < 0) text[0] = '\0';
+
+    char reveal[8] = "";
+    if (http_query_get(req, "reveal", reveal, sizeof(reveal)) && reveal[0] == '1') {
+        json_kv_str(&j, "nodes", text);
+        json_kv_bool(&j, "nodes_shown", 1);
+    } else {
+        static char masked[64 * 1024];
+        mask_nodes(text, masked, sizeof(masked));
+        json_kv_str(&j, "nodes", masked);
+        json_kv_bool(&j, "nodes_shown", 0);
     }
 
     json_obj_close(&j);
@@ -265,6 +351,16 @@ static void save(const http_req_t *req, int fd, const config_t *cfg)
                  req->body_len, req->declared_len, path);
         http_send_text(fd, 400, "text/plain; charset=utf-8",
                        "запрос пришёл не целиком, ничего не изменено\n");
+        return;
+    }
+
+    /* Замаскированный текст сохранять нельзя: так ключ был бы затёрт
+       точками. Проверяем на сервере, а не только на странице — цена
+       ошибки тут потеря доступа к серверу. */
+    if (!strcmp(what, "nodes") && req->body_len &&
+        memmem(req->body, req->body_len, MASK_MARK, strlen(MASK_MARK))) {
+        http_send_text(fd, 400, "text/plain; charset=utf-8",
+                       "это скрытый вид ссылок, а не они сами — нажми «Показать»\n");
         return;
     }
 
