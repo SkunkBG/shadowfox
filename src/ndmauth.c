@@ -117,8 +117,12 @@ ndm_result_t ndm_check_password(const char *host, int port,
        сессии. Обрезанный запрос роутер отверг бы, а понять почему было
        бы неоткуда. */
     char req[1024];
+    /* User-Agent и Accept шлём намеренно: встроенные веб-серверы иногда
+       отвечают 400 на запрос без них, а curl их подставляет сам — из-за
+       чего проверка руками проходит, а наша нет. */
     int  n = snprintf(req, sizeof(req),
                       "GET /auth HTTP/1.1\r\nHost: %s\r\n"
+                      "User-Agent: ShadowFox\r\nAccept: */*\r\n"
                       "Connection: close\r\n\r\n", host);
     if (n < 0 || (size_t)n >= sizeof(req)) {
         if (err) str_copy(err, err_size, "слишком длинный адрес роутера");
@@ -183,6 +187,7 @@ ndm_result_t ndm_check_password(const char *host, int port,
 
     n = snprintf(req, sizeof(req),
                  "POST /auth HTTP/1.1\r\nHost: %s\r\n"
+                 "User-Agent: ShadowFox\r\nAccept: */*\r\n"
                  "X-NDM-Login: %s\r\nX-NDM-Password: %s\r\n"
                  "%s%s%s"
                  "Content-Length: 0\r\nConnection: close\r\n\r\n",
