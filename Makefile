@@ -37,7 +37,7 @@ CFLAGS_NATIVE  = $(COMMON_CFLAGS) $(NATIVE_EXTRA_CFLAGS)
 LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c
 
 BUILD = build
 
@@ -110,6 +110,10 @@ check:
 		src/ipsets.c src/watchlist.c src/proc.c src/util.c src/log.c \
 		-o $(BUILD)/check_ipsets
 	./$(BUILD)/check_ipsets
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_routing.c \
+		src/routing.c src/watchlist.c src/proc.c src/util.c src/log.c \
+		-o $(BUILD)/check_routing
+	./$(BUILD)/check_routing
 
 ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \

@@ -64,7 +64,7 @@ static int group_find_or_add(wl_t *w, const char *name)
     str_copy(g->name, sizeof(g->name), name);
     set_name(g->ipset4, sizeof(g->ipset4), "sf_",  name);
     set_name(g->ipset6, sizeof(g->ipset6), "sf6_", name);
-    g->mark  = WL_MARK_BASE + (unsigned)idx;
+    g->mark  = WL_MARK_OF(idx);
     g->table = WL_TABLE_BASE + (unsigned)idx;
     return idx;
 }

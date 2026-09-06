@@ -74,9 +74,17 @@ static void test_groups_and_naming(void)
 
     /* Метки и таблицы не должны пересекаться с hrneo: он берёт метки от
        12289 и таблицы от 301. */
-    CHECK(w.groups[0].mark == WL_MARK_BASE, "метка первой группы");
-    CHECK(w.groups[1].mark == WL_MARK_BASE + 1, "метки различаются");
-    CHECK(w.groups[0].mark > 12289 + 4096, "метка далеко от диапазона hrneo");
+    CHECK(w.groups[0].mark == 0x53460000u, "метка первой группы: %08x",
+          w.groups[0].mark);
+    CHECK(w.groups[1].mark == 0x53470000u, "метки различаются");
+    /* Младшая половина метки должна оставаться свободной: там живёт
+       hrneo со своими 12289 и всё, что ещё метит пакеты. */
+    CHECK((w.groups[0].mark & ~WL_MARK_MASK) == 0,
+          "младшая половина метки не занята");
+    CHECK((w.groups[1].mark & ~WL_MARK_MASK) == 0,
+          "и у второй группы тоже");
+    CHECK((12289u & WL_MARK_MASK) == 0,
+          "метки hrneo целиком вне нашей маски");
     CHECK(w.groups[0].table == WL_TABLE_BASE, "таблица первой группы");
     CHECK(w.groups[1].table == WL_TABLE_BASE + 1, "таблицы различаются");
     CHECK(w.groups[0].table > 301 + 256, "таблица далеко от диапазона hrneo");
