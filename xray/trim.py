@@ -33,19 +33,47 @@ VARIANTS = {
 # Файл infra/conf, который можно удалить, если ни один его протокол
 # не остался ни во входящих, ни в исходящих.
 #
-# dokodemo.go и fakedns.go сюда не входят намеренно: их типы используются
-# в самом xray.go и в init.go помимо карт протоколов, поэтому удаление
-# ломает сборку. Их код всё равно линкуется, и выигрыша бы не дало.
+# Одного отсутствия в картах мало: апстрим ссылается на некоторые типы и
+# в другом коде. Так, dokodemo и fakedns используются в самом xray.go, а в
+# v26.7.28 там же появилась проверка, ссылающаяся на TrojanClientConfig.
+# Держать такой список руками — значит чинить его после каждого обновления
+# Xray, поэтому ссылки проверяются автоматически, см. referenced_elsewhere.
 PROTOCOL_FILES = {
     "wireguard.go": {"wireguard"},
     "tun.go":       {"tun"},
+    "dokodemo.go":  {"tunnel", "dokodemo-door"},
     "http.go":      {"http"},
     "shadowsocks.go": {"shadowsocks"},
     "vmess.go":     {"vmess"},
     "trojan.go":    {"trojan"},
     "loopback.go":  {"loopback"},
     "hysteria.go":  {"hysteria"},
+    "fakedns.go":   {"fakedns"},
 }
+
+TYPE_RE = re.compile(r"^type\s+(\w+)\s", re.M)
+
+
+def referenced_elsewhere(conf_dir: pathlib.Path, victim: pathlib.Path) -> set[str]:
+    """Имена типов из victim, на которые ссылается остальной infra/conf.
+
+    Удалять файл, чьи типы используются в другом месте, нельзя: сборка
+    развалится с 'undefined'. Проверяем это сами, а не поддерживаем
+    список исключений вручную — апстрим меняется, список устаревает.
+    """
+    names = set(TYPE_RE.findall(victim.read_text()))
+    if not names:
+        return set()
+
+    used = set()
+    for other in conf_dir.glob("*.go"):
+        if other == victim or other.name.endswith("_test.go"):
+            continue
+        text = other.read_text()
+        for name in names:
+            if re.search(r"\b" + re.escape(name) + r"\b", text):
+                used.add(name)
+    return used
 
 MAP_RE = re.compile(
     r"(?P<head>(?P<name>inboundConfigLoader|outboundConfigLoader)"
@@ -89,18 +117,31 @@ def trim(src: pathlib.Path, variant: str) -> int:
 
     xray_go.write_text(new_text)
 
-    deleted = []
+    conf_dir = src / "infra" / "conf"
+    deleted, kept = [], []
+
     for name, keys in PROTOCOL_FILES.items():
         if keys & kept_keys:
             continue
-        for path in (src / "infra" / "conf").glob(name.replace(".go", "*.go")):
+
+        victim = conf_dir / name
+        if victim.exists():
+            used = referenced_elsewhere(conf_dir, victim)
+            if used:
+                kept.append(f"{name} ({', '.join(sorted(used))})")
+                continue
+
+        for path in conf_dir.glob(name.replace(".go", "*.go")):
             path.unlink()
             deleted.append(path.name)
 
     print(f"обрезка {variant}: убрано записей {removed}, "
           f"удалено файлов {len(deleted)}")
     if deleted:
-        print("  " + " ".join(sorted(deleted)))
+        print("  удалено: " + " ".join(sorted(deleted)))
+    if kept:
+        print("  оставлено, на типы ссылается остальной код: "
+              + "; ".join(sorted(kept)))
     return 0
 
 
