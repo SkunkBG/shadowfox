@@ -23,7 +23,9 @@ static int failures = 0;
         }                                                    \
     } while (0)
 
-static char g_dir[256];
+/* Заведомо короче полей apply_opts_t (256 байт): так gcc может
+   доказать, что snprintf ниже никогда не обрежет результат. */
+static char g_dir[96];
 
 /* Подставной xray: ведёт себя так, как велит имя, чтобы не тянуть в
    тесты настоящее ядро. */
@@ -54,7 +56,7 @@ static void test_proc_run(void)
 
     make_stub("say", "echo привет; echo беда >&2; exit 3");
 
-    char bin[512];
+    char bin[160];
     snprintf(bin, sizeof(bin), "%s/say", g_dir);
     char *argv[] = { bin, NULL };
 
@@ -79,7 +81,7 @@ static void test_proc_run(void)
 
 static void test_good_config_replaces(void)
 {
-    char cfg[512], out[512];
+    char cfg[160], out[512];
     snprintf(cfg, sizeof(cfg), "%s/config.json", g_dir);
 
     FILE *f = fopen(cfg, "w");
@@ -109,7 +111,7 @@ static void test_good_config_replaces(void)
 
 static void test_bad_config_keeps_old(void)
 {
-    char cfg[512], out[512], tmp[600];
+    char cfg[160], out[512], tmp[192];
     snprintf(cfg, sizeof(cfg), "%s/config2.json", g_dir);
     snprintf(tmp, sizeof(tmp), "%s.new", cfg);
 
@@ -162,7 +164,7 @@ int main(void)
     test_bad_config_keeps_old();
     test_missing_xray();
 
-    char cmd[512];
+    char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);
     if (system(cmd) != 0) printf("  (не удалось убрать %s)\n", g_dir);
 
