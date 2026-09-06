@@ -37,7 +37,7 @@ CFLAGS_NATIVE  = $(COMMON_CFLAGS) $(NATIVE_EXTRA_CFLAGS)
 LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c
 
 BUILD = build
 
@@ -103,6 +103,9 @@ check:
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_supervise.c \
 		src/supervise.c src/util.c src/log.c -o $(BUILD)/check_supervise
 	./$(BUILD)/check_supervise
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_watchlist.c \
+		src/watchlist.c src/util.c -o $(BUILD)/check_watchlist
+	./$(BUILD)/check_watchlist
 
 ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \
