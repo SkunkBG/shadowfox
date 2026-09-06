@@ -1,0 +1,3 @@
+Cinzel — шрифт Natanael Gama, распространяется по SIL Open Font License 1.1.
+В страницу встроено подмножество из девяти начертаний, нужных для надписи
+«Shadow Fox». Полный текст лицензии: https://openfontlicense.org

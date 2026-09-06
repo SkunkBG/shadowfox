@@ -3,185 +3,259 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Shadow Fox</title>
 <style>
+@font-face{font-family:Cinzel;font-style:normal;font-weight:600;font-display:swap;src:url(data:font/woff2;base64,d09GMgABAAAAAAX4AA8AAAAACjQAAAWhAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhYbIBwqBmA/U1RBVBwAbBEICopgiRIBNgIkAygLFgAEIAWDKAcgG0sIII7SHDKQqWQzTv4XbdbrnsH+DCQOceoq4mRFHQgR92XPYV0kcuIaePjn3t2/Kwt9Tcvq+KKlcYGGEmAnoE35+//vVb0/YywbUzQU8Yi8kXWzx/Gfj+32DdYK9QSoa2k3liYu0SFWIK7KdMy8aBB/90ZgABkAABzDqTAMQAIRDNaaON0MNREAVwAAQKRwRIJDptOts2rLYQAK2EtMp3IbFMDPUgcwbRq2QF8WC0pm2E8e74qrMKIxe9q7ELg7rBbmYX9+sQljoK2MWgK8AZrNjwWFtYwrJwCBcVmAWUW2GE+4Q/CTjJhoniy5ClVojABtaPgN8XRdiCOxPbbGplgTSzHUZ5gDh7gBGAIECUyz2R3gI4wGkUg4hcYuEk5JBSKBWqOkfN83Rkeizl8EsUy01NtdJFGj04kLXfbOEEmRB0oKICdJUr/9MrFEy54rLKc1sV7unClc362TOa8EZND6y2R3MCalSesuSXanBFo5b9065WMmezc5OgPXXoqynOsK7OwkR/f96PU7dgRIW7u6Jt3pYfbjQ63nu0O29PRYDMRKiijZtnafJDn/thcCSiyplLJmw5Yt+iTISZa07pxkdzLIieQ8UOLs6sL8zk6iYKfTyZw9zN5NdoeDmCSSIs2ZWUcCUmj9+SBig1FRjuRQTsyQ2ZLzAJOk+Q6TlygR2OWOs6CGfT85rBWLTmAQYFi3T7kU9sJ67jwNEF94PAlZmL1nkObsCRdLhl4n5iNOy5CSzBkWm33tRgNZM3zUmuQcy8aNfvNSEjbsJwrB2FBuDvWhWtB5b0YRFaetPfTmk+GSCwGJI2zWHMu6e5IEOaLFdMt7H/Szrr9PxMpsfRMTF+muwbzhsFu3/OPCxeaLqbPCvwj3nhXhE/F5jZWkkHUhfG6DdR7/SP6INLgni7ShD8OElAFBTeSrWNMxf8psgpb/eA2PEjTj/aFFs5rqTSMnt4d08+o3cXWNqp36TR42dOj4YWTQnbi62BE2PYSntJeUSb+M/M9L8wzvrdT0jZo7Oz7z2dQx/YN/8jr5xvvh5jiTaaY17luNWOiD8VtjofP606XLD1zyUNMtgprP+Q9YNM9/T5z4zV/Cg9+va4o2hwqhQc43PjjvDTWqkdrjEhrnRasmzX41PV0gw9MUves1NT0OebuFLS01C/Nhyp4ZOtdWb2O+YyYTtAw/KVg3V2kNkFEP8xNtdbZoyEP2BoSOCC38b9REgpToe31rBF+dHhLq+Gl76LV6n/5/PWttMSwXGH5QVAuKXj1k1AWry3AE7FN+b8CueDl3ekdM2py+1ZMnC0RKlDhdS5kqpO42bcaYnHGDW82WwS1SHDPGDGqxmAe1/ncQN2fBkmWR9+9VaW1njuLIEZVGn/8Wzb+2L+z2i4crluz8DUuXKDW+qWtdMQuLPdR0nqDif8mRjflYvykAaoRq7utx07rQ4nBYcgzXlnlCQg+Sg97/5crfobd1E1nNUAd/rg2SKZgg86xaHkuQeNqPvclfyIFaGsdemJ7u6X2DkTZQ7pzMt2d5QUYAoOMEBuDw28GGwxluw39XC8JXAPAgfbMBAN4d1Fd0fdG7UDFOeApAiQMABk1vXWwCwLgNGPqrKPkNffkYJHAj+nOH6zv+EyL594gS1IgUKl0/vsD1k38AMAAp545KWqeuJuAAtXwClmsAbAaUYSYYm8OczsWwoD/urxdhYQV/9IaUgpnhgYxDTgZinAqVmlQrUqBQLSP6IkHoG2HWFPJwHKBfrlmJpVv8bNUqFBdzrEhj1KntGmZWq2FEpFNkw0qN5UNhggkFikAUKmaLR8723WVMmGm8KeYZZxarCeYyebZZlNc4T4plmjh2Irc119yLCtQplaVaX8QjgROHYaZZ29YJhjmSOA6sPNg7FalQzvisxCok5pKsKaBUrqu+AA==) format('woff2')}
 :root{
-  --bg:#0d1014;--panel:#151a21;--card:#1b212a;--line:#28303b;
-  --fg:#e8ecf2;--dim:#8b95a5;--acc:#22b8d6;--ok:#3ddc84;--bad:#ff6b6b;--warn:#ffc861;
+  --bg:#f2f4f7;--panel:#fff;--card:#fff;--line:#e2e6ec;--soft:#f7f9fb;
+  --fg:#1a1f27;--dim:#6b7686;--acc:#0fb0cd;--ok:#12b76a;--bad:#e5484d;--warn:#f59f0b;
 }
-:root[data-theme=light]{
-  --bg:#f2f4f7;--panel:#fff;--card:#fff;--line:#dfe4ea;
-  --fg:#1a1f27;--dim:#6b7686;--acc:#0e9cba;
+:root[data-theme=dark]{
+  --bg:#0d1014;--panel:#151a21;--card:#1b212a;--line:#28303b;--soft:#12171d;
+  --fg:#e8ecf2;--dim:#8b95a5;--acc:#22b8d6;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --bg:#0d1014;--panel:#151a21;--card:#1b212a;--line:#28303b;--soft:#12171d;
+    --fg:#e8ecf2;--dim:#8b95a5;--acc:#22b8d6;
+  }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);
-    font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    min-height:100vh;display:flex;flex-direction:column}
+/* Свой display в классе перебивает атрибут hidden, и скрытое остаётся
+   видимым: полоса сохранения висела на пустом месте. */
+[hidden]{display:none!important}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;
+  background:var(--bg);color:var(--fg);
+  font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--acc)}
 
-header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
-.logo{display:flex;align-items:center;gap:13px}
-.logo svg,.logo .mark{width:50px;height:50px;flex:0 0 auto;display:block}
-.logo b{font:650 22px/1.1 "Avenir Next","Futura","Century Gothic",
-        "Segoe UI Semibold",Inter,system-ui,sans-serif;letter-spacing:.03em}
-.logo span{color:var(--dim);font-size:11.5px;display:block;line-height:1;
-        margin-top:4px;letter-spacing:.08em}
-.spacer{flex:1}
-.meters{display:flex;gap:16px;font:11px/1.5 ui-monospace,Menlo,monospace;color:var(--dim)}
-.meter b{color:var(--fg);font-weight:600}
-.tbtn{background:none;border:1px solid var(--line);color:var(--dim);
-    border-radius:7px;width:32px;height:32px;cursor:pointer;font-size:15px}
-a.tbtn{display:grid;place-items:center;text-decoration:none}
+/* ---- шапка ---- */
+header{display:flex;align-items:center;gap:18px;padding:10px 20px;
+  background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+.brand svg,.brand .mark{width:44px;height:44px;flex:0 0 auto;display:block}
+.brand b{font:600 25px/1 Cinzel,"Times New Roman",Georgia,serif;
+  color:var(--acc);letter-spacing:.04em}
+.brand span{color:var(--dim);font-size:13px;margin-left:2px}
+.tabs{display:flex;gap:4px;margin-left:18px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;
+  color:var(--dim);font:inherit;font-size:14.5px;padding:9px 14px;cursor:pointer}
+.tabs button:hover{color:var(--fg)}
+.tabs button.on{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;color:var(--dim);font-size:13.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+.tbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:9px;
+  width:38px;height:38px;cursor:pointer;font-size:16px;display:grid;place-items:center;
+  text-decoration:none}
+.tbtn:hover{color:var(--fg);border-color:var(--acc)}
 a.tbtn:hover{color:var(--bad);border-color:var(--bad)}
 
-/* Подвал прижат книзу колонкой, а не расчётом высоты: раньше .wrap
-   растягивался на весь экран и уводил подвал под нижний край. */
-.wrap{display:flex;flex:1;min-height:0}
-nav{width:96px;background:var(--panel);border-right:1px solid var(--line);
-    padding:12px 0;flex:0 0 auto}
-nav button{display:block;width:100%;padding:13px 4px 11px;background:none;border:0;
-    border-left:3px solid transparent;color:var(--dim);cursor:pointer;
-    font:inherit;font-size:11.5px;line-height:1.3}
-nav button svg{display:block;margin:0 auto 6px;width:26px;height:26px;
-    fill:none;stroke:currentColor;stroke-width:1.7;
-    stroke-linecap:round;stroke-linejoin:round}
-nav button:hover{color:var(--fg)}
-nav button.on{color:var(--acc);border-left-color:var(--acc);background:var(--card)}
-main{flex:1;padding:20px 24px 60px;min-width:0;max-width:1100px}
+main{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:26px 22px 40px}
+.htop{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+h2{margin:0;font-size:22px;font-weight:650}
 
-h2{margin:0 0 18px;font-size:19px;font-weight:650;border-left:3px solid var(--acc);padding-left:11px}
-.rule{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:10px;margin-bottom:14px;overflow:hidden}
-.rule.off{border-left-color:var(--dim)}
-.rule>.top{display:flex;align-items:center;gap:9px;padding:13px 15px;cursor:pointer}
-.rule>.top b{font-size:14.5px}
-.rule>.top .tgt{color:var(--dim);font-size:13px}
-.rule>.body{display:none;padding:0 15px 15px}
-.rule.open>.body{display:block}
-.groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-.grp{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px}
-.grp .gh{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.grp .gh input{flex:1;background:none;border:0;color:var(--fg);font:600 13.5px/1.4 inherit;padding:2px 0;min-width:0}
-.grp .gh input:focus{outline:0;border-bottom:1px solid var(--acc)}
-.grp.off{opacity:.55}
-.sw{flex:0 0 auto;width:36px;height:20px;border-radius:10px;border:0;padding:0;
-    background:var(--line);cursor:pointer;position:relative;transition:background .15s}
-.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;
-    border-radius:50%;background:var(--panel);transition:transform .15s}
+/* ---- кнопки ---- */
+.b{background:var(--acc);color:#04222a;border:0;border-radius:9px;
+  padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}
+.b.ghost{background:none;color:var(--fg);border:1px solid var(--line)}
+.b.ghost:hover{border-color:var(--acc)}
+.b.sm{padding:7px 13px;font-size:13.5px}
+.b:disabled{opacity:.45;cursor:default}
+
+/* ---- правило ---- */
+.rule{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:16px;margin-bottom:16px}
+.rule>.top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.rule>.top b{font-size:16px}
+.badge{background:var(--soft);border:1px solid var(--line);border-radius:20px;
+  padding:3px 11px;color:var(--dim);font-size:12.5px}
+
+/* ---- группа ---- */
+.grp{border:1px solid var(--line);border-radius:11px;margin-bottom:10px;
+  background:var(--card);overflow:hidden}
+.grp.off .gh .nm{color:var(--dim)}
+.gh{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.gh .ico{width:26px;height:26px;flex:0 0 auto;border-radius:6px;
+  display:grid;place-items:center}
+.gh .ico svg{width:22px;height:22px;display:block}
+.nm{font-size:15px;font-weight:600;background:none;border:0;color:inherit;
+  font-family:inherit;padding:2px 0;min-width:60px;flex:0 1 auto}
+.nm:focus{outline:0;border-bottom:1px solid var(--acc)}
+.chev{color:var(--dim);transition:transform .15s;flex:0 0 auto}
+.grp.open .chev{transform:rotate(180deg)}
+.gbody{display:none;padding:0 14px 14px;gap:14px}
+.grp.open .gbody{display:grid;grid-template-columns:1fr 300px}
+@media(max-width:820px){.grp.open .gbody{grid-template-columns:1fr}}
+
+.ed{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;
+  background:var(--soft)}
+.ed .gut{padding:9px 8px 9px 12px;color:var(--dim);text-align:right;
+  font:12.5px/1.6 ui-monospace,Menlo,monospace;user-select:none;overflow:hidden;
+  border-right:1px solid var(--line);min-width:38px;
+  white-space:pre}   /* иначе номера строк выстраиваются в строку */
+.ed textarea{flex:1;min-height:150px;border:0;outline:0;resize:vertical;
+  background:none;color:var(--fg);padding:9px 12px;
+  font:12.5px/1.6 ui-monospace,Menlo,monospace}
+.hint{background:var(--soft);border:1px solid var(--line);border-radius:9px;
+  padding:14px;color:var(--dim);font-size:13px;height:fit-content}
+.hint b{display:flex;align-items:center;gap:8px;color:var(--fg);
+  font-size:13.5px;margin-bottom:7px}
+.hint b svg{width:18px;height:18px;flex:0 0 auto}
+.hint code{background:var(--card)}
+.icon{background:none;border:0;color:var(--dim);cursor:pointer;font-size:15px;
+  padding:3px 6px;border-radius:6px}
+.icon:hover{color:var(--bad);background:var(--soft)}
+
+/* ---- переключатель ---- */
+.sw{flex:0 0 auto;width:40px;height:22px;border-radius:11px;border:0;padding:0;
+  background:var(--line);cursor:pointer;position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:transform .15s;
+  box-shadow:0 1px 2px rgba(0,0,0,.25)}
 .sw.on{background:var(--acc)}
-.sw.on::after{transform:translateX(16px)}
-.icon.del:hover{color:var(--bad)}
-.grp textarea{width:100%;height:120px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:8px;font:12.5px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
-.add{border:1px dashed var(--line);border-radius:9px;display:grid;place-items:center;min-height:120px;cursor:pointer;color:var(--dim);font-size:26px}
-.add:hover{color:var(--acc);border-color:var(--acc)}
-.icon{background:none;border:0;color:var(--dim);cursor:pointer;font-size:14px;padding:2px 4px}
-.icon:hover{color:var(--bad)}
+.sw.on::after{transform:translateX(18px)}
 
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 17px;margin-bottom:14px}
-.card h3{margin:0 0 6px;font-size:15.5px}
+/* ---- карточки прочих разделов ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:17px 19px;margin-bottom:16px}
+.card h3{margin:0 0 6px;font-size:16px}
 .card p{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.7}
-label{display:block;color:var(--dim);font-size:12.5px;margin:10px 0 5px}
-input[type=text],textarea.wide{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:9px 10px;font:13px/1.5 inherit}
-textarea.wide{min-height:130px;font-family:ui-monospace,Menlo,monospace;resize:vertical}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:11px;overflow-x:auto;font:12px/1.6 ui-monospace,Menlo,monospace;margin:0;color:var(--dim)}
-code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12.5px}
-
-button.b{background:var(--acc);color:#04222a;border:0;border-radius:8px;padding:9px 18px;font:inherit;font-weight:650;cursor:pointer}
-button.b.ghost{background:none;color:var(--fg);border:1px solid var(--line)}
-button.b:disabled{opacity:.45;cursor:default}
+label{display:block;color:var(--dim);font-size:12.5px;margin:12px 0 6px}
+textarea.wide{width:100%;min-height:130px;background:var(--soft);color:var(--fg);
+  border:1px solid var(--line);border-radius:9px;padding:10px;
+  font:12.5px/1.6 ui-monospace,Menlo,monospace;resize:vertical}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:12px;
+  overflow-x:auto;font:12px/1.6 ui-monospace,Menlo,monospace;margin:0;color:var(--dim)}
+code{background:var(--soft);padding:1px 6px;border-radius:5px;font-size:12.5px}
 .bar{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
 .msg{font-size:13px;color:var(--dim)}.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
-.st{display:inline-flex;align-items:center;gap:6px;font-size:13px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
-.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
-footer{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;
-    padding:14px 20px;border-top:1px solid var(--line);background:var(--panel);
-    color:var(--dim);font-size:12.5px}
-footer b{color:var(--fg);font-weight:600}
-footer .sp{flex:1}
-footer a{display:inline-flex;align-items:center;gap:6px;color:var(--dim);
-    text-decoration:none;border:1px solid var(--line);border-radius:8px;
-    padding:6px 12px}
-footer a:hover{color:var(--fg);border-color:var(--acc)}
-footer .ver{border:1px solid var(--line);border-radius:8px;padding:5px 12px;
-    line-height:1.3;text-align:center}
-
 .rows{display:grid;grid-template-columns:repeat(3,1fr);gap:0 26px}
-@media(max-width:820px){.rows{grid-template-columns:1fr}main{padding:16px 14px 60px}.groups{grid-template-columns:1fr}}
-.kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+@media(max-width:820px){.rows{grid-template-columns:1fr}main{padding:18px 14px 40px}
+  .tabs{margin-left:0}header{flex-wrap:wrap;gap:10px}}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--line);font-size:14px}
 .kv span:first-child{color:var(--dim)}
-.fine{max-width:760px}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:50;
-    display:grid;place-items:center;padding:22px}
-.modal .box{background:var(--panel);border:1px solid var(--line);
-    border-top:4px solid var(--warn);border-radius:14px;
-    width:min(720px,100%);max-height:86vh;overflow:auto;padding:24px 28px 22px;
-    box-shadow:0 18px 60px rgba(0,0,0,.45)}
-.modal h3{margin:0 0 4px;text-align:center;color:var(--warn);font-size:19px}
+
+/* ---- полоса сохранения ---- */
+.save{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;gap:14px;
+  background:var(--panel);border-top:1px solid var(--line);padding:14px 22px;
+  box-shadow:0 -6px 24px rgba(0,0,0,.10)}
+.save .t{font-weight:600}
+.save .s{color:var(--dim);font-size:13px}
+
+/* ---- подвал ---- */
+footer{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:10px 26px;
+  padding:14px 22px;border-top:1px solid var(--line);background:var(--panel);
+  color:var(--dim);font-size:12.5px}
+footer b{color:var(--fg);font-weight:600}
+footer a,footer .ver{display:inline-flex;align-items:center;gap:7px;color:var(--dim);
+  text-decoration:none;border:1px solid var(--line);border-radius:9px;padding:7px 13px}
+footer a:hover{color:var(--fg);border-color:var(--acc)}
+footer .ver{line-height:1.3;text-align:center;display:block}
+
+/* ---- окна ---- */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;
+  display:grid;place-items:center;padding:22px}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  width:min(720px,100%);max-height:86vh;overflow:auto;padding:24px 28px 22px;
+  box-shadow:0 18px 60px rgba(0,0,0,.35)}
+.modal .box.warn{border-top:4px solid var(--warn)}
+.modal h3{margin:0 0 4px;text-align:center;font-size:19px}
 .modal .sub{text-align:center;color:var(--dim);font-size:13px;margin:0 0 18px}
-.modal .ok{display:block;width:100%;margin-top:20px}
-.fine p{color:var(--fg);font-size:14.5px;line-height:1.8;margin:0 0 14px}
-.fine ul{color:var(--fg);font-size:14.5px;line-height:1.8;
-    margin:0 0 14px;padding-left:22px}
-.fine li{margin-bottom:8px}
-.fine p:last-child{margin-bottom:0}
-.fine h3{font-size:16px;margin-bottom:12px}
+.fine{max-width:none}
+.fine p,.fine ul{color:var(--fg);font-size:14.5px;line-height:1.8;margin:0 0 14px}
+.fine ul{padding-left:22px}.fine li{margin-bottom:8px}
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pick{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;
+  font:inherit;color:inherit;text-align:left}
+.pick:hover{border-color:var(--acc)}
+.pick svg{width:22px;height:22px;flex:0 0 auto}
+.pick i{font-style:normal;color:var(--dim);font-size:12px;display:block}
 </style>
 
 <header>
-  <div class="logo">
+  <a class="brand" href="/">
     <!--ЛОГОТИП-->
     <svg viewBox="0 0 64 64" aria-hidden="true">
       <path fill="var(--acc)" d="M10 6l9 10h26l9-10 3 18c0 6-3 11-8 15l-9 7-8 8-8-8-9-7c-5-4-8-9-8-15z"/>
       <path fill="var(--bg)" d="M22 27c0-3 3-5 7-5h6v4h-8v3h6c3 0 5 2 5 5s-2 5-5 5h-8v-4h8v-3h-5c-4 0-6-2-6-5zm18-5h11v4h-7v3h6v4h-6v7h-4z"/>
     </svg>
     <!--/ЛОГОТИП-->
-    <div><b>Shadow&nbsp;Fox</b><span id="ver"></span></div>
-  </div>
-  <div class="spacer"></div>
-  <div class="meters">
-    <div class="meter">ядро <b id="m-xray">—</b></div>
-    <div class="meter">адресов <b id="m-addr">—</b></div>
-    <div class="meter">помечено <b id="m-mark">—</b></div>
-  </div>
+    <b>Shadow&nbsp;Fox</b><span id="ver"></span>
+  </a>
+
+  <nav class="tabs">
+    <button data-tab="rules" class="on">Правила</button>
+    <button data-tab="conn">Подключения</button>
+    <button data-tab="info">Информация</button>
+  </nav>
+
+  <div class="sp"></div>
+  <span class="pill" id="core"></span>
   <button class="tbtn" id="theme" title="Тема">◐</button>
-  <a class="tbtn out" href="/logout" title="Выйти">⏻</a>
+  <a class="tbtn" href="/logout" title="Выйти">⏻</a>
 </header>
 
-<div id="gate" hidden></div>
-<div id="dns" hidden></div>
+<main id="view">загружаю…</main>
 
-<div class="wrap">
-  <nav>
-    <button data-tab="rules" class="on"><svg viewBox="0 0 24 24"
-      ><path d="M4 6h7M4 12h16M4 18h11"/><circle cx="15" cy="6" r="2.2"
-      /><circle cx="18.5" cy="18" r="2.2"/></svg>Правила</button>
-    <button data-tab="conn"><svg viewBox="0 0 24 24"
-      ><path d="M12 3v5M12 16v5M4.9 7.5l4.3 2.5M14.8 14l4.3 2.5M19.1 7.5l-4.3 2.5M9.2 14l-4.3 2.5"
-      /><circle cx="12" cy="12" r="2.6"/></svg>Подключения</button>
-    <button data-tab="info"><svg viewBox="0 0 24 24"
-      ><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.1"
-      /></svg>Информация</button>
-  </nav>
-  <main id="view">загружаю…</main>
+<div class="save" id="save" hidden>
+  <span style="color:var(--warn);font-size:18px">⚠</span>
+  <div><div class="t">Есть несохранённые изменения</div>
+       <div class="s" id="save-note">Не забывай сохранять.</div></div>
+  <div class="sp"></div>
+  <button class="b ghost" id="undo">Отменить</button>
+  <button class="b" id="apply">Сохранить и применить</button>
 </div>
 
 <footer id="foot"></footer>
 
+<div id="gate" hidden></div>
+<div id="dns" hidden></div>
+<div id="pick" hidden></div>
+
 <script>
+const PRESETS=[{"name":"YouTube","icon":"yt","lines":["googlevideo.com","ytimg.com","ggpht.com","youtube.com","youtu.be","youtubei.googleapis.com"]},{"name":"Discord","icon":"dc","lines":["discord.com","discordapp.com","discordapp.net","discord.gg","discord.media","discordcdn.com"]},{"name":"Telegram","icon":"tg","lines":["telegram.org","telegram.me","t.me","telesco.pe","cdn-telegram.org","tdesktop.com"]},{"name":"WhatsApp","icon":"wa","lines":["whatsapp.com","whatsapp.net","wa.me"]},{"name":"Facebook","icon":"fb","lines":["facebook.com","fbcdn.net","fbsbx.com","fb.com","messenger.com"]},{"name":"Instagram","icon":"ig","lines":["instagram.com","cdninstagram.com","ig.me"]},{"name":"TikTok","icon":"tt","lines":["tiktok.com","tiktokcdn.com","tiktokv.com","byteoversea.com","ibytedtos.com","muscdn.com"]},{"name":"Нейросети","icon":"ai","lines":["openai.com","chatgpt.com","oaistatic.com","oaiusercontent.com","anthropic.com","claude.ai","gemini.google.com","aistudio.google.com","perplexity.ai","x.ai","grok.com","mistral.ai","huggingface.co","copilot.microsoft.com"]},{"name":"Netflix","icon":"nf","lines":["netflix.com","nflxvideo.net","nflximg.net","nflxext.com","nflxso.net"]},{"name":"Canva","icon":"cv","lines":["canva.com","canvausercontent.com"]},{"name":"Figma","icon":"fg","lines":["figma.com","figma-alpha-api.s3.us-west-2.amazonaws.com"]},{"name":"Roblox","icon":"rb","lines":["roblox.com","rbxcdn.com"]},{"name":"Steam","icon":"st","lines":["steampowered.com","steamcommunity.com","steamstatic.com","steamcontent.com","steamusercontent.com","valvesoftware.com"]}];
 const $=s=>document.querySelector(s);
 const tok=new URLSearchParams(location.search).get('token');
 const api=p=>tok?p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(tok):p;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let D=null, tab='rules', openRule=0, dnsShown=0, nodesMode='masked';
 
-/* --- тема --- */
-const theme=localStorage.getItem('sf-theme')||'dark';
-document.documentElement.dataset.theme=theme;
-$('#theme').onclick=()=>{
-  const t=document.documentElement.dataset.theme==='light'?'dark':'light';
-  document.documentElement.dataset.theme=t;
-  localStorage.setItem('sf-theme',t);
+let D=null, tab='rules', open={}, dirty=false, dnsShown=0, nodesMode='masked';
+
+/* Значки нарисованы упрощённо: они опознают сервис в списке, а не
+   воспроизводят фирменный знак. */
+const ICONS={
+ yt:'<svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="5" fill="#ff0033"/><path d="M10 8.5l6 3.5-6 3.5z" fill="#fff"/></svg>',
+ dc:'<svg viewBox="0 0 24 24"><path d="M4 18c-2-4-2-8 0-12 2-1 4-1.6 6-1.7l.6 1.3h2.8l.6-1.3c2 .1 4 .7 6 1.7 2 4 2 8 0 12-2 1.2-4 1.8-6 2l-.8-1.6c-1.2.3-2.4.3-3.6 0L8.4 20c-2-.2-3.4-.8-4.4-2z" fill="#5865f2"/><circle cx="9" cy="12" r="1.6" fill="#fff"/><circle cx="15" cy="12" r="1.6" fill="#fff"/></svg>',
+ tg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#2aabee"/><path d="M6 12.4l11-4.3-1.8 9.2-3.2-2.4-1.7 1.6-.3-2.9z" fill="#fff"/></svg>',
+ wa:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#25d366"/><path d="M8.6 7.6c.4-.1.8 0 1 .4l.8 1.5c.2.4 0 .7-.3 1l-.5.4c.6 1.3 1.7 2.4 3 3l.4-.5c.3-.3.6-.4 1-.2l1.5.8c.4.2.5.6.4 1-.3.9-1.2 1.5-2.2 1.4-3-.3-5.7-3-6-6 0-1 .5-1.9 1.4-2.2z" fill="#fff"/></svg>',
+ fb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1877f2"/><path d="M13.3 19v-6h2l.3-2.4h-2.3V9.1c0-.7.2-1.1 1.2-1.1h1.2V5.9c-.2 0-.9-.1-1.8-.1-1.8 0-3 1.1-3 3.1v1.7H8.6V13h2.3v6z" fill="#fff"/></svg>',
+ ig:'<svg viewBox="0 0 24 24"><rect x="2.5" y="2.5" width="19" height="19" rx="6" fill="#d62976"/><circle cx="12" cy="12" r="4.6" fill="none" stroke="#fff" stroke-width="1.9"/><circle cx="17.2" cy="6.9" r="1.3" fill="#fff"/></svg>',
+ tt:'<svg viewBox="0 0 24 24"><path d="M14 3h2.6c.3 2 1.5 3.4 3.4 3.6V9c-1.3 0-2.5-.4-3.4-1v6c0 3.3-2.6 5.6-5.6 5.6S5.4 17.3 5.4 14c0-3.1 2.6-5.5 5.9-5.2v2.7c-1.7-.4-3.2.8-3.2 2.5 0 1.6 1.2 2.8 2.8 2.8s2.8-1.2 2.8-2.8z" fill="#25f4ee"/><path d="M15 3h2.6c.3 2 1.5 3.4 3.4 3.6V9c-1.3 0-2.5-.4-3.4-1v6c0 3.3-2.6 5.6-5.6 5.6-1 0-2-.3-2.8-.8 1 .8 2.2 1.2 3.5 1.2 3 0 5.6-2.3 5.6-5.6V8.4c.9.6 2.1 1 3.4 1V6.8C19.8 6.6 18.6 5 18.3 3z" fill="#fe2c55" opacity=".85"/></svg>',
+ ai:'<svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.6L19.5 9l-5.6 1.9L12 16.5l-1.9-5.6L4.5 9l5.6-1.4z" fill="#8b5cf6"/><path d="M18 15l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" fill="#a78bfa"/></svg>',
+ nf:'<svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2" fill="#111"/><path d="M8.5 4.5h3l4 10V4.5h3v15h-3l-4-10v10h-3z" fill="#e50914"/></svg>',
+ cv:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#00c4cc"/><path d="M15.6 14.6c-.9 1.5-2.3 2.5-3.9 2.5-2 0-3.3-1.6-3.3-3.9 0-3.1 2.1-6.3 4.7-6.3 1.4 0 2.2.9 2.2 2 0 .8-.4 1.4-1 1.4-.5 0-.8-.3-.8-.8 0-.6.4-.8.4-1.3 0-.3-.2-.5-.6-.5-1.4 0-2.9 2.6-2.9 5 0 1.3.6 2.2 1.6 2.2 1 0 1.9-.7 2.7-1.9z" fill="#fff"/></svg>',
+ fg:'<svg viewBox="0 0 24 24"><path d="M9 2h3v5H9a2.5 2.5 0 010-5z" fill="#f24e1e"/><path d="M12 2h3a2.5 2.5 0 010 5h-3z" fill="#ff7262"/><path d="M12 7h3a2.5 2.5 0 010 5h-3z" fill="#a259ff"/><path d="M9 7h3v5H9a2.5 2.5 0 010-5z" fill="#1abcfe"/><path d="M9 12h3v2.5A2.5 2.5 0 119 12z" fill="#0acf83"/></svg>',
+ rb:'<svg viewBox="0 0 24 24"><path d="M5.4 2.6l16 4.3-4.3 16-16-4.3z" fill="#e2231a"/><path d="M10.2 9.4l4.4 1.2-1.2 4.4-4.4-1.2z" fill="#fff"/></svg>',
+ st:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1b2838"/><circle cx="15" cy="9" r="3.2" fill="none" stroke="#66c0f4" stroke-width="1.6"/><circle cx="9" cy="15" r="2.6" fill="#66c0f4"/><path d="M2 13l5 2" stroke="#66c0f4" stroke-width="1.4" fill="none"/></svg>',
+ www:'<svg viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg>'
 };
 
-/* --- разбор domain.conf в правила --- */
+const KEYS=[['yt',['youtube','ютуб','ютьюб']],['dc',['discord','дискорд']],
+ ['tg',['telegram','телеграм']],['wa',['whatsapp','ватсап','вацап']],
+ ['fb',['facebook','фейсбук','фб']],['ig',['instagram','инстаграм','инста']],
+ ['tt',['tiktok','тикток']],['ai',['нейросет','openai','chatgpt','claude','gemini','ai']],
+ ['nf',['netflix','нетфликс']],['cv',['canva','канва']],['fg',['figma','фигма']],
+ ['rb',['roblox','роблокс']],['st',['steam','стим']]];
+
+function iconFor(name){
+  const n=String(name||'').toLowerCase();
+  for(const [k,words] of KEYS) if(words.some(w=>n.includes(w))) return ICONS[k];
+  return ICONS.www;
+}
+
+/* ---- разбор и сборка списка ---- */
 function parseDomains(text){
   const groups=[]; let g=null;
   for(const raw of String(text).split('\n')){
@@ -204,108 +278,121 @@ function parseDomains(text){
   return rules;
 }
 
-function freeName(rules){
-  const used=new Set();
-  for(const r of rules) for(const g of r.groups) used.add(g.name);
-  for(let i=1;;i++){ const n='группа '+i; if(!used.has(n)) return n; }
-}
-
 function buildDomains(rules){
   const out=[];
-  for(const r of rules)
-    for(const g of r.groups){
-      out.push('['+g.name+']','interface = '+r.target);
-      if(g.on===false) out.push('enabled = no');
-      out.push(...g.lines);
-      out.push('');
-    }
+  for(const r of rules) for(const g of r.groups){
+    out.push('['+g.name+']','interface = '+r.target);
+    if(g.on===false) out.push('enabled = no');
+    out.push(...g.lines,'');
+  }
   return out.join('\n');
 }
 
-/* --- отрисовка --- */
-function head(){
-  $('#ver').textContent=D.version;
-  $('#m-xray').textContent=D.xray_pid>0?'работает':'нет';
-  $('#m-addr').textContent=D.matched;
-  $('#m-mark').textContent=D.marked;
+function collect(drop){
+  const rules=parseDomains(D.domains);
+  document.querySelectorAll('.grp').forEach(el=>{
+    const r=+el.dataset.r, g=+el.dataset.g;
+    if(!rules[r]||!rules[r].groups[g]) return;
+    const t=rules[r].groups[g];
+    t.name=el.querySelector('[data-name]').value.trim()||'без имени';
+    t.on=el.querySelector('[data-toggle]').classList.contains('on');
+    t.lines=el.querySelector('[data-lines]').value.split('\n')
+      .map(s=>s.trim()).filter(Boolean);
+  });
+  if(drop) for(const r of rules) r.groups=r.groups.filter(g=>g.lines.length);
+  return rules.filter(r=>r.groups.length);
+}
+
+function sync(){ D.domains=buildDomains(collect()); }
+function touch(){ dirty=true; $('#save').hidden=false; }
+
+/* ---- отрисовка ---- */
+const plural=(n,a,b,c)=>{const m=n%100,k=n%10;
+  return n+' '+(m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c);};
+
+function gutter(text){
+  const n=Math.max(1,String(text).split('\n').length);
+  let s=''; for(let i=1;i<=n;i++) s+=i+'\n';
+  return s;
 }
 
 function viewRules(){
   const rules=parseDomains(D.domains);
+
+  const head=`<div class="htop"><h2>Правила маршрутизации</h2><div class="sp"></div>
+    <button class="b" id="newrule">+ Правило</button></div>`;
+
   if(!rules.length)
-    return `<h2>Правила маршрутизации</h2>
-      <div class="card"><h3>Правил пока нет</h3>
+    return head+`<div class="card"><h3>Правил пока нет</h3>
       <p>Правило — это цель, куда заворачивается трафик: политика Keenetic
       либо сетевой интерфейс. Внутри правила — группы: в каждой домены и
-      адреса, по одному в строке.</p>
-      <button class="b" id="newrule">Создать правило</button></div>`;
+      адреса, по одной записи в строке.</p></div>`;
 
-  return `<h2>Правила маршрутизации</h2>`
-   + rules.map((r,i)=>`
-    <div class="rule ${i===openRule?'open':''}" data-i="${i}">
+  return head + rules.map((r,i)=>`
+    <div class="rule">
       <div class="top"><b>${esc(r.target||'без цели')}</b>
-        <span class="tgt">— групп ${r.groups.length}${
-          r.groups.some(g=>g.on===false)
-            ? ', работают ' + r.groups.filter(g=>g.on!==false).length : ''
-        }</span></div>
-      <div class="body"><div class="groups">
-        ${r.groups.map((g,k)=>`
-          <div class="grp ${g.on===false?'off':''}" data-r="${i}" data-g="${k}">
-            <div class="gh">
-              <button class="sw ${g.on===false?'':'on'}" data-toggle
-                title="${g.on===false?'Включить группу':'Выключить группу'}"></button>
-              <input value="${esc(g.name)}" data-name>
-              <button class="icon del" data-del title="Удалить группу">✕</button>
+        <span class="badge">${plural(r.groups.length,'группа','группы','групп')}</span>
+        <div class="sp"></div>
+        <button class="b ghost sm" data-addgrp="${i}">+ Группа</button></div>
+      ${r.groups.map((g,k)=>{
+        const id=i+'.'+k, isOpen=!!open[id];
+        return `<div class="grp ${isOpen?'open':''} ${g.on===false?'off':''}"
+                     data-r="${i}" data-g="${k}" data-id="${id}">
+          <div class="gh">
+            <button class="sw ${g.on===false?'':'on'}" data-toggle
+              title="${g.on===false?'Включить':'Выключить'}"></button>
+            <span class="ico">${iconFor(g.name)}</span>
+            <input class="nm" value="${esc(g.name)}" data-name>
+            <span class="badge">${plural(g.lines.length,'запись','записи','записей')}</span>
+            <div class="sp"></div>
+            <button class="icon" data-del title="Удалить группу">✕</button>
+            <span class="chev">⌄</span>
+          </div>
+          <div class="gbody">
+            <div class="ed">
+              <div class="gut">${esc(gutter(g.lines.join('\n')))}</div>
+              <textarea spellcheck="false" data-lines
+                placeholder="example.com&#10;104.244.42.0/24">${esc(g.lines.join('\n'))}</textarea>
             </div>
-            <textarea spellcheck="false" data-lines
-              placeholder="домены и адреса, по одному в строке"
-              >${esc(g.lines.join('\n'))}</textarea>
-          </div>`).join('')}
-        <div class="add" data-addgrp="${i}">+</div>
-      </div>
-      <div class="bar"><button class="b" id="save-rules">Сохранить и применить</button>
-        <span class="msg" id="m-rules"></span></div>
-      </div>
-    </div>`).join('')
-   + `<div class="bar"><button class="b ghost" id="newrule">+ правило</button></div>`;
+            <div class="hint"><b>${ICONS.www} Домены и IP</b>
+              Одна запись в строке. Поддомены попадают сами:
+              <code>googlevideo.com</code> ловит и
+              <code>rr1.googlevideo.com</code>.<br><br>
+              Адрес или подсеть пишутся так же — они нужны сервисам,
+              которые DNS не спрашивают.</div>
+          </div>
+        </div>`;}).join('')}
+    </div>`).join('');
 }
 
 function viewConn(){
   const P=D.proxy_name, POL=D.policy_name, host=location.hostname;
-  const cmds=[
-   `ndmc -c "interface ${P}"`,
-   `ndmc -c "interface ${P} description Shadow-Fox"`,
-   `ndmc -c "interface ${P} security-level public"`,
-   `ndmc -c "interface ${P} ip global 1"`,
-   `ndmc -c "interface ${P} proxy protocol socks5"`,
-   `ndmc -c "interface ${P} proxy upstream ${host} ${D.socks_port}"`,
-   `ndmc -c "interface ${P} proxy socks5-udp"`,
-   `ndmc -c "interface ${P} up"`,
-   `ndmc -c "system configuration save"`].join('\n');
+  const cmds=[`interface ${P}`,`interface ${P} description Shadow-Fox`,
+    `interface ${P} security-level public`,`interface ${P} ip global 1`,
+    `interface ${P} proxy protocol socks5`,
+    `interface ${P} proxy upstream ${host} ${D.socks_port}`,
+    `interface ${P} proxy socks5-udp`,`interface ${P} up`,
+    `system configuration save`]
+    .map(c=>`ndmc -c "${c}"`).join('\n');
+  const dot=(v,t)=>`<span class="pill"><i class="dot ${v?'ok':'bad'}"></i>${t}</span>`;
 
-  const dot=(v,t)=>`<span class="st"><i class="dot ${v?'ok':'bad'}"></i>${t}</span>`;
+  return `<div class="htop"><h2>Подключения</h2></div>
 
-  return `<h2>Подключения</h2>
-
-  <div class="card">
-    <h3>Ядро Xray</h3>
+  <div class="card"><h3>Ядро Xray</h3>
     ${D.xray_bin
       ? `<p>${dot(1,'установлено')} &nbsp; <code>${esc(D.xray_bin)}</code></p>
-         <p>Устанавливать ничего не нужно. Shadow Fox поднимает свой отдельный
-         процесс на порту ${D.socks_port} и чужой не трогает.</p>`
-      : `<p>${dot(0,'не установлено')}</p>
-         <p>Выполни в консоли роутера:</p><pre>opkg install xray</pre>`}
-  </div>
+         <p>Shadow Fox поднимает свой процесс на порту ${D.socks_port} и чужой
+         не трогает.</p>`
+      : `<p>${dot(0,'не установлено')}</p><p>Выполни в консоли роутера:</p>
+         <pre>opkg install xray</pre>`}</div>
 
-  <div class="card">
-    <h3>Сервер</h3>
+  <div class="card"><h3>Сервер</h3>
     <p>Ссылки <code>vless://</code> по одной в строке либо подписка целиком.
     При нескольких выбирается самый быстрый. Конфиг проверяется ядром до
     применения: негодный не заменит рабочий.</p>
     <label>Ссылки</label>
-    <textarea class="wide" id="nodes" spellcheck="false"
-      placeholder="vless://..." ${nodesMode==='masked'?'readonly':''}
-      >${esc(nodesMode==='new' ? '' : D.nodes)}</textarea>
+    <textarea class="wide" id="nodes" spellcheck="false" placeholder="vless://..."
+      ${nodesMode==='masked'?'readonly':''}>${esc(nodesMode==='new'?'':D.nodes)}</textarea>
     <div class="bar">
       ${nodesMode==='masked'
         ? `<button class="b ghost" id="nodes-show">Показать</button>
@@ -313,41 +400,27 @@ function viewConn(){
         : `<button class="b" data-save="nodes">Сохранить и запустить</button>
            <button class="b ghost" id="nodes-hide">Скрыть</button>`}
       <span class="msg" id="m-nodes"></span></div>
-    ${nodesMode==='masked'
-      ? `<p style="margin:10px 0 0;font-size:13px">Ключ скрыт: он не
-         передаётся странице, пока не нажать «Показать».</p>` : ''}
-  </div>
+    ${nodesMode==='masked'?`<p style="margin:12px 0 0;font-size:13px">Ключ скрыт:
+      он не передаётся странице, пока не нажать «Показать».</p>`:''}</div>
 
-  <div class="card">
-    <h3>Подключение в роутере</h3>
+  <div class="card"><h3>Подключение в роутере</h3>
     <p>${dot(D.proxy_ready, D.proxy_ready?`${esc(P)} создано`:`${esc(P)} не создано`)}</p>
-    ${D.proxy_ready?'':`<p>Выполни в консоли роутера — эти команды меняют его
-      настройки, поэтому делаются вручную:</p><pre>${esc(cmds)}</pre>`}
-  </div>
+    ${D.proxy_ready?'':`<p>Выполни в консоли роутера по одной команде —
+      <code>ndmc</code> несколько сразу не принимает:</p><pre>${esc(cmds)}</pre>`}</div>
 
-  <div class="card">
-    <h3>Политика доступа</h3>
+  <div class="card"><h3>Политика доступа</h3>
     <p>${dot(D.policy_ready, D.policy_ready?`${esc(POL)} готова`:`${esc(POL)} не настроена`)}</p>
     <p>В панели роутера: <b>Приоритеты подключений → Политики доступа</b>.
     Политика <code>${esc(POL)}</code> должна содержать <b>только</b> подключение
     Shadow-Fox. Без этого шага метка будет, а заворачивать трафик станет
-    некуда — и молча себя это не проявит.</p>
-  </div>
-
-  <div class="card">
-    <h3>Подсети</h3>
-    <p>Отдельного списка больше нет: адреса и подсети пишутся в те же
-    группы, что и домены — <code>104.244.42.0/24</code> или
-    <code>8.8.8.8</code> отдельной строкой. Это нужно сервисам с
-    зашитыми адресами, которые DNS не спрашивают: там ловить нечего.</p>
-  </div>`;
+    некуда — и молча себя это не проявит.</p></div>`;
 }
 
+const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+
 function viewInfo(){
-  return `<h2>Информация</h2>
-  <div class="card">
-    <h3>Состояние</h3>
-    <div class="rows">
+  return `<div class="htop"><h2>Информация</h2></div>
+  <div class="card"><h3>Состояние</h3><div class="rows">
       ${kv('Версия',esc(D.version))}
       ${kv('Демон','работает, '+esc(D.uptime))}
       ${kv('Своё ядро',D.xray_pid>0?'работает':'не запущено')}
@@ -357,33 +430,26 @@ function viewInfo(){
       ${kv('Адресов',D.matched)}
       ${kv('Правила',D.rules?'установлены':'нет')}
       ${kv('Помечено',D.marked+' соединений')}
-      ${kv('DNS устройства', D.dns==='ok' ? 'через роутер'
-           : D.dns==='bypass' ? 'мимо роутера' : 'пока не видно')}
-    </div>
-  </div>
-  <div class="card">
-    <h3>Как это работает</h3>
-    <p style="line-height:1.9">
-    Домен из правила &rarr; перехват DNS-ответа &rarr; адрес в ipset &rarr;
-    метка на соединении &rarr; политика Keenetic &rarr; подключение &rarr;
-    свой Xray &rarr; сервер.<br>
-    Перехват пассивный: если демон упадёт, DNS у сети продолжит работать.
-    Адреса в наборах стареют, чтобы не копить давно переехавшие.</p>
-  </div>
+      ${kv('DNS устройства', D.dns==='ok'?'через роутер'
+           :D.dns==='bypass'?'мимо роутера':'пока не видно')}
+  </div></div>
 
-  <div class="card fine">
-    <h3>Отказ от ответственности</h3>${disclaimer()}
-    <p style="margin-top:14px"><a href="#" id="reshow">Показать при следующем входе</a></p>
-  </div>`;
+  <div class="card"><h3>Как это работает</h3>
+    <p>Домен из правила → перехват DNS-ответа → адрес в ipset → метка на
+    соединении → политика Keenetic → подключение → свой Xray → сервер.</p>
+    <p>Перехват пассивный: если демон упадёт, DNS у сети продолжит работать.
+    Адреса в наборах стареют, чтобы не копить давно переехавшие.</p></div>
+
+  <div class="card fine"><h3>Отказ от ответственности</h3>${disclaimer()}
+    <p style="margin-top:14px"><a href="#" id="reshow">Показать при следующем
+    входе</a></p></div>`;
 }
-const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
 
-/* Один текст на карточку и на плашку: две копии разойдутся при
-   первой же правке, а расхождение в таком тексте — не мелочь. */
-function disclaimer(){ return `<p>Shadow Fox распространяется «как есть», без каких-либо гарантий,
+/* ---- отказ от ответственности: один текст на плашку и на карточку ---- */
+function disclaimer(){ return `
+    <p>Shadow Fox распространяется «как есть», без каких-либо гарантий,
     обязательств или заверений, явных либо подразумеваемых. Использование
     осуществляется пользователем на собственный риск.</p>
-
     <p>Автор не несёт ответственности за любые последствия использования
     или невозможности использования программного продукта, включая, но не
     ограничиваясь:</p>
@@ -399,236 +465,260 @@ function disclaimer(){ return `<p>Shadow Fox распространяется «
       репутационным или иным ущербом, включая упущенную выгоду, вызванным
       использованием или невозможностью использования продукта.</li>
     </ul>
-
     <p>Автор не несёт ответственности перед пользователем или третьими
     лицами за любой ущерб, возникший вследствие действий, бездействия,
     ошибок или иных обстоятельств, связанных с использованием продукта,
     даже если Автор был уведомлён о возможности таких последствий.
     Настоящее ограничение ответственности применяется в максимально
     допустимой законом степени.</p>
-
     <p>Используя проект, пользователь подтверждает, что выполняет действия
     сознательно и добровольно, принимая все риски и возможные последствия.
     Пользователь несёт полную ответственность за результаты своей
     конфигурации, соблюдение требований законодательства, политик
     провайдера и правил сети.</p>`; }
 
+function head(){
+  $('#ver').textContent=D.version;
+  const on=D.xray_pid>0;
+  $('#core').innerHTML=`<i class="dot ${on?'ok':'bad'}"></i>${on?'Ядро работает':'Ядро не запущено'}`;
+}
+
 function foot(){
-  $('#foot').innerHTML = `
-    ${D.osver ? `<span>Версия ОС <b>${esc(D.osver)}</b></span>` : ''}
-    ${D.model ? `<span>Модель <b>${esc(D.model)}</b></span>` : ''}
+  $('#foot').innerHTML=`
+    ${D.osver?`<span>Версия ОС <b>${esc(D.osver)}</b></span>`:''}
+    ${D.model?`<span>Модель <b>${esc(D.model)}</b></span>`:''}
     <span class="sp"></span>
     <span class="ver">Shadow&nbsp;Fox<br><b>${esc(D.version)}</b></span>
-    <a href="https://github.com/SkunkBG/shadowfox" target="_blank"
-       rel="noopener">GitHub</a>`;
+    <a href="https://github.com/SkunkBG/shadowfox" target="_blank" rel="noopener">GitHub</a>`;
 }
 
 function draw(){
-  head();
-  foot();
+  head(); foot();
   $('#view').innerHTML = tab==='rules'?viewRules() : tab==='conn'?viewConn() : viewInfo();
+  $('#save').hidden = !(dirty && tab==='rules');
 }
 
 async function load(probed){
   try{
-    const r=await fetch(api('/data' + (probed ? '?probed=1' : '')));
+    const r=await fetch(api('/data'+(probed?'?probed=1':'')));
     if(!r.ok) throw new Error('код '+r.status);
     D=await r.json();
+    dirty=false;
     draw();
-
-    /* Не поверх согласия: две плашки разом читать невозможно. */
     if(D.dns==='bypass' && !dnsShown && $('#gate').hidden){ dnsShown=1; dnsWarn(); }
   }catch(e){
     $('#view').innerHTML='<p style="color:var(--bad)">Нет связи с демоном: '+esc(e.message)+'</p>';
   }
 }
 
-/* --- собрать правила со страницы --- */
-function collect(drop){
-  const rules=parseDomains(D.domains);
-  document.querySelectorAll('.grp').forEach(el=>{
-    const r=+el.dataset.r, g=+el.dataset.g;
-    if(!rules[r]||!rules[r].groups[g]) return;
-    rules[r].groups[g].name=el.querySelector('[data-name]').value.trim()||'без имени';
-    rules[r].groups[g].on=el.querySelector('[data-toggle]').classList.contains('on');
-    rules[r].groups[g].lines=el.querySelector('[data-lines]').value
-      .split('\n').map(s=>s.trim()).filter(Boolean);
-  });
-  if(drop) for(const r of rules) r.groups=r.groups.filter(g=>g.lines.length);
-  /* Счётчик в заголовке считает работающие группы, а не все подряд. */
-  return rules.filter(r=>r.groups.length);
-}
-
 async function save(what,text,msgId){
-  const m=$('#'+msgId);
-  m.className='msg'; m.textContent='сохраняю…';
+  /* Пустое имя раньше давало querySelector('#') — исключение до
+     отправки. Кнопка «Сохранить» тогда не делала ничего, а страница
+     выглядела так, будто сохранила. */
+  const m=msgId?$('#'+msgId):null;
+  if(m){ m.className='msg'; m.textContent='сохраняю…'; }
   try{
     const r=await fetch(api('/save?what='+what),{method:'POST',body:text});
     const t=(await r.text()).trim();
-    m.className=r.ok?'msg ok':'msg bad';
-    m.textContent=t||(r.ok?'готово':'ошибка');
-    if(r.ok){ if(what==='nodes') nodesMode='masked'; setTimeout(load,1500); }
-  }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    if(m){ m.className=r.ok?'msg ok':'msg bad'; m.textContent=t||(r.ok?'готово':'ошибка'); }
+    if(r.ok){ if(what==='nodes') nodesMode='masked'; dirty=false; setTimeout(load,1500); }
+    return r.ok;
+  }catch(e){ if(m){ m.className='msg bad'; m.textContent=e.message; } return false; }
 }
 
+/* ---- выбор готового набора ---- */
+function picker(ruleIdx){
+  const el=$('#pick');
+  el.className='modal'; el.hidden=false;
+  el.innerHTML=`<div class="box"><h3>Новая группа</h3>
+    <p class="sub">Готовый набор доменов или пустая группа</p>
+    <div class="picks">
+      ${PRESETS.map((p,i)=>`<button class="pick" data-preset="${i}">
+         ${ICONS[p.icon]||ICONS.www}<span>${esc(p.name)}
+         <i>${plural(p.lines.length,'запись','записи','записей')}</i></span></button>`).join('')}
+      <button class="pick" data-preset="-1">${ICONS.www}<span>Пустая<i>своя</i></span></button>
+    </div>
+    <div class="bar" style="margin-top:18px">
+      <button class="b ghost" id="pick-close">Отмена</button></div></div>`;
+
+  const close=()=>{ el.hidden=true; el.className=''; el.innerHTML=''; };
+  $('#pick-close').onclick=close;
+
+  el.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
+    const n=+b.dataset.preset;
+    const rules=collect();
+    const used=new Set();
+    for(const r of rules) for(const g of r.groups) used.add(g.name.toLowerCase());
+
+    let name, lines;
+    if(n<0){ let i=1; while(used.has(('группа '+i).toLowerCase())) i++;
+             name='группа '+i; lines=[]; }
+    else   { const p=PRESETS[n];
+             name=p.name; lines=p.lines.slice();
+             if(used.has(name.toLowerCase())){
+               let i=2; while(used.has((name+' '+i).toLowerCase())) i++;
+               name=name+' '+i;
+             } }
+
+    rules[ruleIdx].groups.push({name,on:true,lines});
+    open[ruleIdx+'.'+(rules[ruleIdx].groups.length-1)]=1;
+    D.domains=buildDomains(rules);
+    close(); touch(); draw();
+  });
+}
+
+/* ---- плашки ---- */
+function seen(){ try{ return localStorage.getItem('sf-disclaimer')==='1'; }catch(e){ return false; } }
+
+function gate(){
+  const el=$('#gate');
+  el.className='modal'; el.hidden=false;
+  el.innerHTML=`<div class="box warn"><h3>Отказ от ответственности</h3>
+    <p class="sub">Прочти перед тем, как настраивать маршрутизацию</p>
+    <div class="fine">${disclaimer()}</div>
+    <div class="bar" style="margin-top:18px">
+      <button class="b" id="accept" style="flex:1">Принимаю</button></div></div>`;
+  $('#accept').onclick=()=>{
+    try{ localStorage.setItem('sf-disclaimer','1'); }catch(e){}
+    el.hidden=true; el.className=''; el.innerHTML='';
+  };
+}
+
+/* Заставляем устройство разрешить случайное имя под доменом из своих же
+   списков: без этого «Проверить снова» перечитывала бы прежний ответ. */
+async function probe(){
+  const host=(D.domains||'').split('\n').map(s=>s.trim())
+    .find(s=>s && !/^[[#;]/.test(s) && !/=/.test(s) && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s));
+  if(!host) return;
+  const name='sf'+Math.random().toString(36).slice(2,10)+'.'+host.replace(/^[*.=]+/,'');
+  try{ await Promise.race([
+    fetch('http://'+name+'/',{mode:'no-cors',cache:'no-store'}).catch(()=>{}),
+    new Promise(r=>setTimeout(r,2500))]); }catch(e){}
+  await new Promise(r=>setTimeout(r,600));
+}
+
+function dnsWarn(){
+  const el=$('#dns');
+  el.className='modal'; el.hidden=false;
+  el.innerHTML=`<div class="box warn"><h3>Устройство не спрашивает роутер</h3>
+    <p class="sub">Адрес устройства: ${esc(D.peer||'неизвестен')}</p>
+    <div class="fine">
+      <p>Демон видит DNS-ответы другим устройствам сети, но этому — ни одного.
+      Значит имена оно разрешает мимо роутера, и <b>маршрутизация по доменам
+      для него работать не будет</b>: адреса брать неоткуда. Подсети в списках
+      при этом работают — они не зависят от DNS.</p>
+      <p>Что обычно включено:</p>
+      <ul>
+        <li>в браузере — «Безопасный DNS», «Защищённый DNS», DNS-over-HTTPS;</li>
+        <li>в Windows или macOS — DNS прописан вручную вместо получения от роутера;</li>
+        <li>в Android или iOS — «Частный DNS», «Персональный DNS», Private Relay;</li>
+        <li>на самом устройстве работает VPN или прокси.</li>
+      </ul>
+      <p>Выключи то, что найдёшь, и нажми «Проверить снова»: страница сама
+      заставит устройство разрешить случайное имя и посмотрит, прошёл ли
+      запрос через роутер. Никуда он не ведёт — такого имени не существует.</p>
+    </div>
+    <div class="bar" style="margin-top:18px">
+      <button class="b" id="dns-recheck">Проверить снова</button>
+      <button class="b ghost" id="dns-close">Закрыть</button></div></div>`;
+
+  const hide=()=>{ el.hidden=true; el.className=''; el.innerHTML=''; };
+  $('#dns-close').onclick=()=>{ hide(); dnsShown=2; };
+  $('#dns-recheck').onclick=async ev=>{
+    ev.target.disabled=true; ev.target.textContent='проверяю…';
+    await probe(); hide(); dnsShown=0; await load(1);
+  };
+}
+
+/* ---- тема ---- */
+try{ document.documentElement.dataset.theme=localStorage.getItem('sf-theme')||''; }catch(e){}
+$('#theme').onclick=()=>{
+  const cur=document.documentElement.dataset.theme
+    || (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+  const t=cur==='light'?'dark':'light';
+  document.documentElement.dataset.theme=t;
+  try{ localStorage.setItem('sf-theme',t); }catch(e){}
+};
+
+/* ---- события ---- */
+document.addEventListener('input',ev=>{
+  const ta=ev.target.closest('[data-lines]');
+  if(ta){ const g=ta.parentElement.querySelector('.gut');
+          if(g) g.textContent=gutter(ta.value); }
+  if(ev.target.closest('.grp')) touch();
+});
+
+document.addEventListener('scroll',ev=>{
+  const ta=ev.target.closest && ev.target.closest('[data-lines]');
+  if(ta){ const g=ta.parentElement.querySelector('.gut');
+          if(g) g.scrollTop=ta.scrollTop; }
+},true);
+
 document.addEventListener('click',async ev=>{
-  const nav=ev.target.closest('nav button');
-  if(nav){ tab=nav.dataset.tab; if(nodesMode!=='masked'){ nodesMode='masked'; load(); }
-    document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b===nav));
+  const nav=ev.target.closest('.tabs button');
+  if(nav){ tab=nav.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b===nav));
+    if(nodesMode!=='masked') nodesMode='masked';
     draw(); return; }
 
-  const top=ev.target.closest('.rule>.top');
-  if(top){ const r=top.parentElement;
-    openRule=r.classList.contains('open')?-1:+r.dataset.i; draw(); return; }
-
-  if(ev.target.id==='nodes-show'){
-    /* Ключ запрашиваем отдельно и только сейчас. */
-    const r=await fetch(api('/data?reveal=1'));
-    if(r.ok){ D=await r.json(); nodesMode='shown'; draw(); }
-    return;
-  }
-
-  if(ev.target.id==='nodes-new'){ nodesMode='new'; draw();
-    const t=$('#nodes'); if(t) t.focus(); return; }
-
-  if(ev.target.id==='nodes-hide'){ nodesMode='masked'; load(); return; }
-
-  if(ev.target.id==='reshow'){
-    ev.preventDefault();
-    try { localStorage.removeItem('sf-disclaimer'); } catch(e){}
-    gate(); return;
-  }
-
-  if(ev.target.id==='newrule'){
-    const t=prompt('Куда заворачивать? Имя политики Keenetic либо сетевого интерфейса:',D.policy_name);
-    if(!t) return;
-    const rules=parseDomains(D.domains);
-    rules.push({target:t.trim(),groups:[{name:freeName(rules),on:true,lines:[]}]});
-    openRule=rules.length-1;
-    D.domains=buildDomains(rules); draw(); return;
-  }
-
-  const addg=ev.target.closest('[data-addgrp]');
-  if(addg){ const rules=collect();
-    rules[+addg.dataset.addgrp].groups.push({name:freeName(rules),on:true,lines:[]});
-    D.domains=buildDomains(rules); draw(); return; }
+  if(ev.target.closest('.nm')||ev.target.closest('[data-toggle]')===null&&ev.target.closest('.icon')) {}
 
   const sw=ev.target.closest('[data-toggle]');
-  if(sw){ const rules=collect();
-    const el=sw.closest('.grp');
+  if(sw){ const el=sw.closest('.grp'), rules=collect();
     const g=rules[+el.dataset.r].groups[+el.dataset.g];
-    g.on=!g.on;
-    D.domains=buildDomains(rules); draw(); return; }
+    g.on=!g.on; D.domains=buildDomains(rules); touch(); draw(); return; }
 
   const del=ev.target.closest('[data-del]');
   if(del){ const el=del.closest('.grp'), rules=collect();
     rules[+el.dataset.r].groups.splice(+el.dataset.g,1);
-    D.domains=buildDomains(rules); draw(); return; }
+    D.domains=buildDomains(rules); touch(); draw(); return; }
 
-  if(ev.target.id==='save-rules'){
+  const gh=ev.target.closest('.gh');
+  if(gh && !ev.target.closest('.nm')){
+    const el=gh.parentElement, id=el.dataset.id;
+    sync(); open[id]=!open[id]; draw(); return; }
+
+  const addg=ev.target.closest('[data-addgrp]');
+  if(addg){ picker(+addg.dataset.addgrp); return; }
+
+  if(ev.target.id==='newrule'){
+    const t=prompt('Куда заворачивать? Имя политики Keenetic либо интерфейса:',
+                   D.policy_name);
+    if(!t) return;
+    const rules=collect();
+    rules.push({target:t.trim(),groups:[]});
+    D.domains=buildDomains(rules);
+    touch(); draw(); picker(rules.length-1); return; }
+
+  if(ev.target.id==='apply'){
+    const btn=ev.target; btn.disabled=true;
+    const note=$('#save-note'); note.textContent='сохраняю…';
     D.domains=buildDomains(collect(true));
-    return save('domains',D.domains,'m-rules');
-  }
+    const ok=await save('domains',D.domains,null);
+    btn.disabled=false;
+    if(ok){ dirty=false; $('#save').hidden=true; note.textContent='Не забывай сохранять.'; }
+    else   { note.textContent='не удалось сохранить'; }
+    return; }
+
+  if(ev.target.id==='undo'){ dirty=false; $('#save').hidden=true; load(); return; }
+
+  if(ev.target.id==='nodes-show'){
+    const r=await fetch(api('/data?reveal=1'));
+    if(r.ok){ D=await r.json(); nodesMode='shown'; draw(); } return; }
+  if(ev.target.id==='nodes-new'){ nodesMode='new'; draw(); $('#nodes')?.focus(); return; }
+  if(ev.target.id==='nodes-hide'){ nodesMode='masked'; load(); return; }
+
+  if(ev.target.id==='reshow'){ ev.preventDefault();
+    try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
+    gate(); return; }
 
   const b=ev.target.closest('[data-save]');
   if(b) return save(b.dataset.save,$('#'+b.dataset.save).value,'m-'+b.dataset.save);
 });
 
-/* Плашка при первом входе. Согласие помним в браузере: это отметка
-   «прочитал», а не настройка демона, и на роутере ей делать нечего.
-   Приватное окно или другой браузер покажут её снова — так и надо. */
-function seen(){
-  try { return localStorage.getItem('sf-disclaimer') === '1'; }
-  catch(e){ return false; }
-}
-
-/* Плашка о DNS. Показываем, только когда демон видит DNS-ответы другим
-   устройствам, но не этому: тогда утверждение «ходит мимо роутера»
-   опирается на наблюдение, а не на догадку. */
-function dnsWarn(){
-  const el=$('#dns');
-  el.className='modal';
-  el.hidden=false;
-  el.innerHTML=`<div class="box">
-    <h3>Устройство не спрашивает роутер</h3>
-    <p class="sub">Адрес устройства: ${esc(D.peer||'неизвестен')}</p>
-    <div class="fine" style="max-width:none">
-      <p>Демон видит DNS-ответы другим устройствам сети, но этому — ни
-      одного за последние десять минут. Значит имена оно разрешает мимо
-      роутера, и <b>маршрутизация по доменам для него работать не
-      будет</b>: адреса брать неоткуда. Подсети в списках при этом
-      работают — они не зависят от DNS.</p>
-
-      <p>Что обычно включено:</p>
-      <ul>
-        <li>в браузере — «Безопасный DNS», «Защищённый DNS», DNS-over-HTTPS;</li>
-        <li>в Windows или macOS — DNS прописан вручную вместо получения
-        от роутера;</li>
-        <li>в Android или iOS — «Частный DNS», «Персональный DNS»,
-        Private Relay;</li>
-        <li>на самом устройстве работает VPN или прокси.</li>
-      </ul>
-
-      <p>Выключи то, что найдёшь, и нажми «Проверить снова»: страница
-      сама заставит устройство разрешить случайное имя и посмотрит,
-      прошёл ли этот запрос через роутер. Никуда этот запрос не ведёт —
-      такого имени не существует.</p>
-    </div>
-    <div class="bar" style="margin-top:18px">
-      <button class="b" id="dns-recheck">Проверить снова</button>
-      <button class="b ghost" id="dns-close">Закрыть</button>
-    </div>
-  </div>`;
-
-  $('#dns-close').onclick=()=>{ el.hidden=true; el.className=''; el.innerHTML=''; dnsShown=2; };
-
-  $('#dns-recheck').onclick=async ev=>{
-    const b=ev.target; b.disabled=true; b.textContent='проверяю…';
-    await probe();
-    el.hidden=true; el.className=''; el.innerHTML='';
-    dnsShown=0; await load(1);
-  };
-}
-
-/* Заставляем устройство спросить имя, чтобы проверка не гадала.
-   Берём случайное имя под доменом из собственных списков: такой запрос
-   ничего не открывает и никуда не ведёт — он вернёт «нет такого», но
-   пройдёт через тот DNS, которым устройство пользуется. Именно это мы и
-   хотим увидеть. Без этого «Проверить снова» просто перечитывала бы
-   старый ответ. */
-async function probe(){
-  const host=(D.domains||'').split('\n').map(s=>s.trim())
-    .find(s=>s && !/^[[#;]/.test(s) && !/=/.test(s) && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s));
-  if(!host) return;
-
-  const name='sf'+Math.random().toString(36).slice(2,10)+'.'+host.replace(/^[*.=]+/,'');
-  try{
-    await Promise.race([
-      fetch('http://'+name+'/', {mode:'no-cors', cache:'no-store'}).catch(()=>{}),
-      new Promise(r=>setTimeout(r,2500))
-    ]);
-  }catch(e){}
-  await new Promise(r=>setTimeout(r,600));
-}
-
-function gate(){
-  const el=$('#gate');
-  el.className='modal';
-  el.hidden=false;
-  el.innerHTML=`<div class="box">
-    <h3>Отказ от ответственности</h3>
-    <p class="sub">Прочти перед тем, как настраивать маршрутизацию</p>
-    <div class="fine" style="max-width:none">${disclaimer()}</div>
-    <button class="b ok" id="accept">Принимаю</button>
-  </div>`;
-  $('#accept').onclick=()=>{
-    try { localStorage.setItem('sf-disclaimer','1'); } catch(e){}
-    el.hidden=true; el.className=''; el.innerHTML='';
-  };
-}
+addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
 
 if(!seen()) gate();
-
 load();
-setInterval(()=>{ if(!document.querySelector('textarea:focus,input:focus')) load(); },10000);
+setInterval(()=>{ if(!dirty && !document.querySelector('textarea:focus,input:focus')) load(); },10000);
 </script>
