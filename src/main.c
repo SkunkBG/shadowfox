@@ -28,6 +28,7 @@ static void usage(FILE *out)
         "      --link ССЫЛКА     собрать config.json из vless:// и вывести его\n"
         "      --sub ФАЙЛ        то же из файла: подписка base64 или список ссылок\n"
         "      --socks-port N    порт локального SOCKS для --link (по умолчанию 2080)\n"
+        "      --listen АДРЕС    адрес входа SOCKS (по умолчанию 127.0.0.1)\n"
         "      --no-fragment     не включать фрагментацию и шум в --link\n"
         "      --log УРОВЕНЬ     off | error | warn | info | debug\n"
         "      --КЛЮЧ ЗНАЧЕНИЕ   любой параметр из shadowfox.conf\n"
@@ -101,6 +102,8 @@ int main(int argc, char **argv)
                     opts.noise    = 0;
                 } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
                     opts.socks_port = atoi(argv[++k]);
+                } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {
+                    opts.listen = argv[++k];
                 }
             }
 
@@ -162,6 +165,8 @@ int main(int argc, char **argv)
                     opts.noise    = 0;
                 } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
                     opts.socks_port = atoi(argv[++k]);
+                } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {
+                    opts.listen = argv[++k];
                 }
             }
 

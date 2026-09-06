@@ -58,7 +58,8 @@ int config_apply_args(config_t *cfg, int argc, char **argv)
         /* Разобраны раньше, до чтения файла. */
         if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--config") ||
             !strcmp(argv[i], "--genconfig") || !strcmp(argv[i], "--link") ||
-            !strcmp(argv[i], "--sub") || !strcmp(argv[i], "--socks-port")) {
+            !strcmp(argv[i], "--sub") || !strcmp(argv[i], "--socks-port") ||
+            !strcmp(argv[i], "--listen")) {
             if (i + 1 < argc) i++;
             continue;
         }

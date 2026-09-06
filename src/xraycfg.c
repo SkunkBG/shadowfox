@@ -18,6 +18,7 @@
 void xraycfg_defaults(xraycfg_opts_t *o)
 {
     memset(o, 0, sizeof(*o));
+    o->listen     = "127.0.0.1";
     o->socks_port = 2080;
     o->fragment   = 1;
     o->noise      = 1;
@@ -32,10 +33,13 @@ static void build_inbound(json_t *j, const xraycfg_opts_t *o)
     json_obj_open(j);
     json_kv_str(j, "tag", TAG_SOCKS_IN);
 
-    /* Только петля. У Xray listen по умолчанию 0.0.0.0, и neofit его не
-       задавал — на роутере поднимался открытый SOCKS5 без авторизации
-       на всех интерфейсах. Proxy0 ходит сюда через localhost. */
-    json_kv_str(j, "listen", "127.0.0.1");
+    /* Адрес входа задаётся явно. У Xray listen по умолчанию 0.0.0.0, и
+       neofit его не задавал — на роутере поднимался открытый SOCKS5 без
+       авторизации на всех интерфейсах.
+       По умолчанию петля, но штатный прокси-клиент Keenetic может ходить
+       на LAN-адрес роутера, а не на localhost. Тогда сюда подставляется
+       этот адрес: он всё равно уже не 0.0.0.0. */
+    json_kv_str(j, "listen", o->listen && o->listen[0] ? o->listen : "127.0.0.1");
     json_kv_int(j, "port", o->socks_port);
     json_kv_str(j, "protocol", "socks");
 

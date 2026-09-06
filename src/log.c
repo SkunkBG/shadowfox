@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
@@ -11,6 +12,26 @@
 static FILE       *g_fp    = NULL;    /* NULL — пишем в stderr */
 static log_level_t g_level = LOG_INFO;
 static char        g_path[256];
+
+/* init.d не подхватывает окружение профиля, поэтому TZ демону не
+   достаётся и метки времени уходят в UTC, расходясь с часами роутера.
+   Entware держит зону в /opt/etc/TZ — читаем оттуда. */
+static void adopt_timezone(void)
+{
+    if (getenv("TZ")) return;
+
+    FILE *f = fopen("/opt/etc/TZ", "r");
+    if (!f) return;
+
+    char tz[64];
+    if (fgets(tz, sizeof(tz), f)) {
+        char *nl = strpbrk(tz, "\r\n");
+        if (nl) *nl = '\0';
+        if (tz[0]) setenv("TZ", tz, 1);
+    }
+    fclose(f);
+    tzset();
+}
 
 static const char *level_name(log_level_t l)
 {
@@ -36,6 +57,7 @@ log_level_t log_level_from_string(const char *s)
 
 int log_open(const char *path, log_level_t level)
 {
+    adopt_timezone();
     g_level = level;
     log_close();
 
@@ -85,7 +107,7 @@ void log_msg(log_level_t level, const char *fmt, ...)
     time_t    now    = time(NULL);
     struct tm tm;
     if (localtime_r(&now, &tm))
-        strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm);
+        strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S%z", &tm);
 
     fprintf(out, "%s [%s] ", ts, level_name(level));
 

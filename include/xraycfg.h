@@ -7,6 +7,7 @@
 #include <stddef.h>
 
 typedef struct {
+    const char *listen;   /* адрес входа; см. комментарий в xraycfg.c */
     int  socks_port;      /* локальный вход, к которому цепляется Proxy0 */
     int  fragment;        /* резать TLS ClientHello */
     int  noise;           /* добавлять шум в UDP */
