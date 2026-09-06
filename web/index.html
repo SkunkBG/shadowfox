@@ -78,7 +78,7 @@ header{display:flex;align-items:center;justify-content:flex-end;gap:12px;
   display:grid;place-items:center}
 .tbtn svg{width:20px;height:20px}
 .tbtn:hover{color:var(--acc);border-color:var(--acc)}
-main{padding:22px 30px 40px;flex:1}
+main{padding:22px 30px 40px;flex:1;min-width:0}
 
 h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
 .sub{margin:5px 0 0;color:var(--dim);font-size:14.5px}
@@ -106,7 +106,7 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
 
 /* ---- карточки ---- */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;
-  padding:20px 22px;margin-bottom:16px}
+  padding:20px 22px;margin-bottom:16px;min-width:0}
 .card h3{margin:0 0 8px;font-size:18px}
 .card p{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.7}
 .rule{background:var(--panel);border:1px solid var(--line);border-radius:18px;
@@ -118,22 +118,27 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
 .badge.ok{color:var(--ok);border-color:#3ddc8455}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
 .g{background:var(--card);border:1px solid var(--line);border-radius:14px;
-  padding:16px;display:flex;flex-direction:column}
+  padding:16px;display:flex;flex-direction:column;min-width:0}
 .g.off{opacity:.55}
 .g .gh{display:flex;align-items:flex-start;gap:12px;margin-bottom:13px}
 .g .ico{width:38px;height:38px;flex:0 0 auto;border-radius:11px;background:var(--soft);
   display:grid;place-items:center}
 .g .ico svg{width:23px;height:23px}
 .g .nm{font-size:17px;font-weight:650;background:none;border:0;color:inherit;
-  font-family:inherit;padding:0;width:100%}
+  font-family:inherit;padding:0;width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
 .g .nm:focus{outline:0;border-bottom:1px solid var(--acc)}
 .g .cnt{color:var(--dim);font-size:13px;margin-top:2px}
+/* Окно списка невысокое и прокручивается. Раньше стояло flex:1, а у
+   элемента флекса min-height по умолчанию auto — высота 150px не
+   держала, и карточка вытягивалась под все записи: при полутора сотнях
+   доменов это полотно во весь экран. */
 .g .list{background:var(--soft);border:1px solid var(--line);border-radius:10px;
   padding:11px 13px;font:13px/1.85 ui-monospace,Menlo,monospace;color:var(--fg);
-  height:150px;overflow:auto;white-space:pre;flex:1}
+  height:170px;min-height:0;flex:none;overflow:auto;white-space:pre}
 .g textarea{background:var(--soft);border:1px solid var(--acc);border-radius:10px;
   padding:11px 13px;font:13px/1.85 ui-monospace,Menlo,monospace;color:var(--fg);
-  height:150px;resize:vertical;outline:0;flex:1;width:100%}
+  height:170px;min-height:0;flex:none;resize:vertical;outline:0;width:100%}
 .g .gf{display:flex;align-items:center;gap:10px;margin-top:13px;
   border-top:1px solid var(--line);padding-top:12px}
 .lnk{display:inline-flex;align-items:center;gap:8px;background:none;border:0;
@@ -162,7 +167,11 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
 .tile .t{color:var(--dim);font-size:13.5px}
 .tile .v{font-size:24px;font-weight:650;margin-top:2px}
 .tile .v.sm{font-size:16px}
+/* min-width:0 обязателен: элемент сетки по умолчанию не уже своего
+   содержимого, и одна длинная ссылка выносила соседнюю колонку за
+   пределы экрана. */
 .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.two>*{min-width:0}
 @media(max-width:1040px){.two{grid-template-columns:1fr}}
 
 .kv{display:flex;justify-content:space-between;gap:14px;padding:10px 0;
@@ -190,9 +199,11 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
 
 label{display:block;color:var(--dim);font-size:13px;margin:14px 0 7px}
 .field{display:flex;align-items:center;gap:10px;background:var(--soft);
-  border:1px solid var(--line);border-radius:11px;padding:4px 6px 4px 14px}
-.field code{flex:1;font:13.5px/2.4 ui-monospace,Menlo,monospace;color:var(--fg);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;padding:0}
+  border:1px solid var(--line);border-radius:11px;padding:4px 6px 4px 14px;
+  min-width:0}
+.field code{flex:1;min-width:0;font:13.5px/2.4 ui-monospace,Menlo,monospace;
+  color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:none;padding:0}
 textarea.wide{width:100%;min-height:130px;background:var(--soft);color:var(--fg);
   border:1px solid var(--line);border-radius:11px;padding:12px;
   font:13px/1.7 ui-monospace,Menlo,monospace;resize:vertical;outline:0}
@@ -245,13 +256,22 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
 @media(max-width:880px){
   .app{flex-direction:column}
   aside{width:auto;height:auto;position:static;flex-direction:row;flex-wrap:wrap;
-    align-items:center;gap:10px;padding:14px}
-  .brand{margin:0 12px 0 0}
-  aside nav{flex-direction:row;flex-wrap:wrap}
+    align-items:center;gap:8px;padding:12px 14px}
+  .brand{margin:0 8px 0 0}
+  .brand svg,.brand .mark{width:38px;height:38px}
+  .brand b{font-size:18px}
+  aside nav{flex-direction:row;flex-wrap:wrap;gap:6px}
+  /* Кнопки во всю ширину раскладывали панель в столбец. */
+  aside nav button,.srow{width:auto;padding:9px 13px;font-size:14px}
+  .srow .sp{display:none}
   .grow,.sep{display:none}
-  .core{width:auto;padding:11px 16px}
-  main{padding:18px 14px 34px}
-  header{padding:14px 14px 0}
+  .core{width:auto;padding:9px 14px;font-size:14px}
+  main{padding:16px 14px 34px}
+  header{padding:12px 14px 0}
+  h2{font-size:22px}
+  /* Заголовок раздела обязан переноситься, иначе кнопка уезжает. */
+  .htop{flex-wrap:wrap}
+  .htop .sp{display:none}
 }
 </style>
 
