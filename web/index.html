@@ -107,6 +107,7 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;
   padding:20px 22px;margin-bottom:16px;min-width:0}
 .card h3{margin:0 0 8px;font-size:18px}
+.card h4{margin:0 0 6px;font-size:15px;color:var(--acc)}
 .card p{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.7}
 .rule{background:var(--panel);border:1px solid var(--line);border-radius:18px;
   padding:20px 22px;margin-bottom:18px}
@@ -610,18 +611,6 @@ function viewConn(){
     идёт по HTTPS, и его не видит никто.</p>
   </div>
 
-  ${fold('pol','Подключение и политика доступа',
-    `<p>Цепочка такая: правило указывает на политику, политика разрешает
-     подключение, подключение ведёт на порт нашего ядра. Без любого звена
-     метка ставится, а заворачивать некуда — и молча себя это не проявит.</p>
-     <p>Кнопка «Настроить» на карточке справа делает вторую часть сама:
-     создаёт политику <code>${esc(POL)}</code>, разрешает в ней
-     <code>${esc(P)}</code> и запрещает остальные подключения. Список
-     подключений берётся у роутера, а не выдумывается.</p>
-     <p>Само подключение создаётся в консоли роутера по одной команде —
-     <code>ndmc</code> несколько сразу не принимает:</p>
-     <pre>${esc(cmds)}</pre>`)}
-
   ${fold('dom','Домены, IP и подсети',
     `<p>В группах правил пишется по одной записи в строке. Поддомены попадают
      сами: <code>googlevideo.com</code> ловит и <code>rr1.googlevideo.com</code>.</p>
@@ -641,25 +630,51 @@ function viewConn(){
              id="mkpolicy">Настроить</button>`)}
     <div class="msg" id="m-policy" style="margin:-6px 0 14px 60px"></div>
 
-    ${fold('dnscmd','Поставить чистые серверы',
-    `<p>Cloudflare, Google и Quad9 по DNS-over-TLS и DNS-over-HTTPS,
-     выбери нужные. Серверы <b>добавляются</b>, существующие не трогаются.</p>
-     <div class="picks" style="margin-bottom:14px">
-       ${DNSSETS.map(x=>`<button class="pick ${dnsPick[x.key]?'sel':''}"
-          data-dnsset="${x.key}"><span class="box">${dnsPick[x.key]?'✓':''}</span>
-          <span>${x.name}<i>DoT и DoH</i></span></button>`).join('')}
-     </div>
-     <p>Это меняет настройки роутера, поэтому сначала посмотри, что именно
-     будет выполнено:</p>
-     <pre>${esc(dnsCmds()||'ничего не выбрано')}</pre>
-     <div class="bar"><button class="b" id="dns-apply">Установить</button>
-       <span class="msg" id="m-dns"></span></div>
-     <p style="margin-top:14px">Если провайдерский DNS останется включён,
-     роутер будет спрашивать и его — а он обычно ближе и быстрее наших,
-     значит отвечать будет чаще, и толку от чистых серверов немного.</p>
-     ${dnsIspBox()}
-     <p style="margin-top:14px">Проверить, что получилось:</p>
-     <pre>ndmc -c "show running-config" | grep upstream</pre>`)}`;
+  <div class="card"><h3>Настройка роутера</h3>
+    <p>Всё, что Shadow Fox может сделать за тебя. Каждая кнопка меняет
+    настройки роутера и сначала показывает, что именно выполнит.</p>
+
+    <h4>Чистые серверы DNS</h4>
+    <p style="margin-bottom:10px">Cloudflare, Google и Quad9 по DNS-over-TLS
+    и DNS-over-HTTPS. Серверы <b>добавляются</b>, существующие не трогаются.</p>
+
+    <div class="bar" style="margin:0 0 12px">
+      <button class="b ghost sm" id="dns-all">Выбрать всё</button>
+      <button class="b ghost sm" id="dns-none">Снять всё</button>
+    </div>
+
+    <div class="picks" style="margin-bottom:12px">
+      ${DNSSETS.map(x=>`<button class="pick ${dnsPick[x.key]?'sel':''}"
+         data-dnsset="${x.key}"><span class="box">${dnsPick[x.key]?'✓':''}</span>
+         <span>${x.name}<i>DoT и DoH</i></span></button>`).join('')}
+    </div>
+
+    ${dnsIspBox()}
+
+    <pre style="margin-top:12px">${esc(dnsCmds()||'ничего не выбрано')}</pre>
+    <div class="bar"><button class="b" id="dns-apply">Установить</button>
+      <span class="msg" id="m-dns"></span></div>
+
+    <p style="margin-top:14px">Если провайдерский DNS останется включён,
+    роутер будет спрашивать и его — а он обычно ближе и быстрее наших,
+    значит отвечать будет чаще, и толку от чистых серверов немного.</p>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+
+    <h4>Подключение и политика доступа</h4>
+    <p>Цепочка такая: правило указывает на политику, политика разрешает
+    подключение, подключение ведёт на порт нашего ядра. Без любого звена
+    метка ставится, а заворачивать некуда — и молча себя это не проявит.</p>
+    <p>Кнопка <b>«Настроить»</b> на карточке политики выше делает вторую
+    часть сама: создаёт политику <code>${esc(POL)}</code>, разрешает в ней
+    <code>${esc(P)}</code> и запрещает остальные подключения. Список
+    подключений берётся у роутера, а не выдумывается.</p>
+    <p>Само подключение создаётся в консоли роутера по одной команде —
+    <code>ndmc</code> несколько сразу не принимает:</p>
+    <pre>${esc(cmds)}</pre>
+  </div>
+`;
+
 
   return `<div class="htop"><div><h2>Подключения</h2>
       <p class="sub">Настройка сервера и проверка готовности</p></div></div>
@@ -785,16 +800,17 @@ function draw(){
    где он ещё включён, и показываем их поимённо: команда меняет
    настройки роутера, и человек должен видеть, чего именно она коснётся. */
 function dnsIspBox(){
-  if(!dnsInfo || !dnsInfo.ok) return '';
+  if(!dnsInfo || !dnsInfo.ok)
+    return `<div class="note" style="margin:0">${UI.i}Настройки роутера
+      прочитать не удалось, про провайдерский DNS сказать нечего</div>`;
   const isp=dnsInfo.isp||[];
   if(!isp.length)
     return `<div class="note" style="margin:0">${UI.ok}Провайдерский DNS уже
       отключён на всех внешних подключениях</div>`;
-  return `<div class="note" style="margin:0 0 10px">${UI.i}Ещё берут DNS у
-      провайдера: <b>${isp.map(esc).join(', ')}</b></div>
-    <button class="pick ${dnsIsp?'sel':''}" data-dnsisp style="max-width:340px">
+  return `<button class="pick ${dnsIsp?'sel':''}" data-dnsisp>
       <span class="box">${dnsIsp?'✓':''}</span>
-      <span>Отключить провайдерский DNS<i>на этих подключениях</i></span></button>`;
+      <span>Отключить DNS провайдера<i>${isp.map(esc).join(', ')}</i></span>
+    </button>`;
 }
 
 function dnsBox(){
@@ -1064,11 +1080,17 @@ document.addEventListener('click',async ev=>{
     btn.disabled=false; return; }
 
   const dset=ev.target.closest('[data-dnsset]');
-  if(dset){ const k=dset.dataset.dnsset; dnsPick[k]=!dnsPick[k];
-    folds.dnscmd=1; draw(); return; }
+  if(dset){ const k=dset.dataset.dnsset; dnsPick[k]=!dnsPick[k]; draw(); return; }
 
-  if(ev.target.closest('[data-dnsisp]')){ dnsIsp=!dnsIsp;
-    folds.dnscmd=1; draw(); return; }
+  if(ev.target.closest('[data-dnsisp]')){ dnsIsp=!dnsIsp; draw(); return; }
+
+  if(ev.target.id==='dns-all'){
+    for(const x of DNSSETS) dnsPick[x.key]=1;
+    dnsIsp=1; draw(); return; }
+
+  if(ev.target.id==='dns-none'){
+    for(const x of DNSSETS) dnsPick[x.key]=0;
+    dnsIsp=0; draw(); return; }
 
   if(ev.target.id==='dns-apply'){
     const btn=ev.target, m=$('#m-dns');
