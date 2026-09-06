@@ -577,8 +577,31 @@ static void send_login(int fd, const char *message)
     http_send(fd, 200, "text/html; charset=utf-8", page, strlen(page));
 }
 
+/* Свой ограничитель попыток. У роутера есть защита от перебора, и она
+   заносит в чёрный список адрес, с которого идут попытки, — а идут они
+   с самого роутера. Дойдя до его порога, мы закрываем себе не только
+   вход в Shadow Fox, но и обычный вход в роутер с этого адреса. Поэтому
+   останавливаемся раньше, чем он. */
+#define LOGIN_TRIES     3
+#define LOGIN_COOLDOWN  60
+
+static int  g_bad_tries;
+static long g_bad_until;
+
 static void do_login(const http_req_t *req, int fd, const config_t *cfg)
 {
+    long now = (long)time(NULL);
+
+    if (g_bad_until > now) {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "Слишком много неудачных попыток. Подожди %ld секунд — "
+                 "иначе роутер заблокирует адрес сам",
+                 g_bad_until - now);
+        send_login(fd, msg);
+        return;
+    }
+
     char login[128] = "", password[128] = "";
     form_field(req->body, req->body_len, "login", login, sizeof(login));
     form_field(req->body, req->body_len, "password", password, sizeof(password));
@@ -604,11 +627,18 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
     memset(password, 0, sizeof(password));
 
     if (r != NDM_OK) {
+        if (r == NDM_DENIED && ++g_bad_tries >= LOGIN_TRIES) {
+            g_bad_tries = 0;
+            g_bad_until = now + LOGIN_COOLDOWN;
+        }
         log_warn("веб: вход отклонён (%s), запрос с %s",
                  err[0] ? err : "не подошло", req->peer);
         send_login(fd, err[0] ? err : "Неверный логин или пароль");
         return;
     }
+
+    g_bad_tries = 0;
+    g_bad_until = 0;
 
     char tok[64];
     session_new(tok, sizeof(tok));
