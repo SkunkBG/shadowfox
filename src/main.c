@@ -384,6 +384,9 @@ int main(int argc, char **argv)
             log_warn("веб-интерфейс не поднят: %s", werr);
     }
 
+    time_t web_retry  = 0;
+    int    web_warned = 0;
+
     while (!g_shutdown) {
         if (g_reload) {
             g_reload = 0;
@@ -405,9 +408,14 @@ int main(int argc, char **argv)
                 else
                     log_info("конфиг перечитан");
 
-                /* Адрес, порт или токен могли смениться. */
-                http_close(&web);
-                if (cfg.web_enabled) {
+                /* Пересоздаём слушателя только если он и правда стал
+                   другим. Иначе порт остаётся занят только что закрытыми
+                   соединениями, повторный bind падает — и интерфейс лежит
+                   до перезапуска демона. Так и вышло после сохранения. */
+                if (!cfg.web_enabled) {
+                    http_close(&web);
+                } else if (webui_needs_rebind(&web, &cfg)) {
+                    http_close(&web);
                     char werr[192] = "";
                     if (webui_open(&web, &cfg, werr, sizeof(werr)) != 0)
                         log_warn("веб-интерфейс не поднят: %s", werr);
@@ -415,6 +423,23 @@ int main(int argc, char **argv)
             } else {
                 log_error("конфиг с ошибками, оставляю прежний");
             }
+        }
+
+        /* Если поднять интерфейс не вышло, пробуем снова: занятый порт
+           освобождается сам, а лежащий до перезапуска веб — не вариант. */
+        if (cfg.web_enabled && web.fd < 0) {
+            time_t now = time(NULL);
+            if (now - web_retry >= 10) {
+                web_retry = now;
+                char werr[192] = "";
+                if (webui_open(&web, &cfg, werr, sizeof(werr)) == 0)
+                    log_info("веб-интерфейс поднят: http://%s:%d",
+                             web.bind_addr, web.port);
+                else if (!web_warned)
+                    log_warn("веб-интерфейс не поднят: %s", werr), web_warned = 1;
+            }
+        } else {
+            web_warned = 0;
         }
 
         if (g_restore) {

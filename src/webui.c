@@ -26,19 +26,48 @@ typedef struct {
     const config_t *cfg;
 } webctx_t;
 
+/* Адрес, на котором должен слушать интерфейс: либо задан явно, либо
+   берётся с интерфейса захвата. Вынесено, чтобы перечитывание конфига
+   могло сравнить желаемое с текущим, не открывая сокет. */
+int webui_addr(const config_t *cfg, char *out, unsigned size,
+               char *err, unsigned err_size)
+{
+    if (!cfg || !out) return -1;
+
+    if (cfg->web_bind[0]) {
+        str_copy(out, size, cfg->web_bind);
+        return 0;
+    }
+    if (iface_ipv4(cfg->capture_iface, out, size)) return 0;
+
+    if (err)
+        snprintf(err, err_size,
+                 "не узнать адрес на %s, задай webBind", cfg->capture_iface);
+    return -1;
+}
+
+/* Нужно ли пересоздавать слушателя. Пересоздание не бесплатно: порт
+   какое-то время занят прежними соединениями, и повторный bind падает
+   с «Address in use» — после чего интерфейс лежал до перезапуска. */
+int webui_needs_rebind(const http_t *h, const config_t *cfg)
+{
+    if (!h || !cfg) return 1;
+    if (h->fd < 0) return 1;
+
+    char addr[64];
+    if (webui_addr(cfg, addr, sizeof(addr), NULL, 0) != 0) return 1;
+
+    return strcmp(h->bind_addr, addr) != 0 ||
+           h->port != cfg->web_port ||
+           strcmp(h->token, cfg->web_token) != 0;
+}
+
 int webui_open(http_t *h, const config_t *cfg, char *err, unsigned err_size)
 {
     if (!h || !cfg) return -1;
 
     char addr[64];
-    if (cfg->web_bind[0]) {
-        str_copy(addr, sizeof(addr), cfg->web_bind);
-    } else if (!iface_ipv4(cfg->capture_iface, addr, sizeof(addr))) {
-        if (err)
-            snprintf(err, err_size,
-                     "не узнать адрес на %s, задай webBind", cfg->capture_iface);
-        return -1;
-    }
+    if (webui_addr(cfg, addr, sizeof(addr), err, err_size) != 0) return -1;
 
     http_init(h);
     str_copy(h->token, sizeof(h->token), cfg->web_token);
