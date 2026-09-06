@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -24,6 +25,15 @@ void config_defaults(config_t *cfg)
        изменение настроек устройства, а не наша внутренняя кухня.
        Молча так делать нельзя, поэтому по умолчанию выключено. */
     cfg->create_policy = 0;
+
+    str_copy(cfg->policy, sizeof(cfg->policy), "ShadowFox");
+    str_copy(cfg->proxy_iface, sizeof(cfg->proxy_iface), "Proxy1");
+    /* 1300 у HydraRoute — берём соседний, чтобы не столкнуться. */
+    cfg->socks_port = 1301;
+    str_copy(cfg->nodes_file, sizeof(cfg->nodes_file),
+             DEFAULT_CONF_DIR "/nodes.txt");
+    str_copy(cfg->xray_config, sizeof(cfg->xray_config),
+             DEFAULT_CONF_DIR "/xray.json");
 }
 
 int config_set(config_t *cfg, const char *key, const char *value)
@@ -60,6 +70,36 @@ int config_set(config_t *cfg, const char *key, const char *value)
         return 0;
     }
 
+    if (!strcasecmp(key, "policy")) {
+        str_copy(cfg->policy, sizeof(cfg->policy), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "proxyInterface")) {
+        str_copy(cfg->proxy_iface, sizeof(cfg->proxy_iface), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "socksPort")) {
+        cfg->socks_port = atoi(value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "nodesFile")) {
+        str_copy(cfg->nodes_file, sizeof(cfg->nodes_file), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "xrayConfig")) {
+        str_copy(cfg->xray_config, sizeof(cfg->xray_config), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "xrayBin")) {
+        str_copy(cfg->xray_bin, sizeof(cfg->xray_bin), value);
+        return 0;
+    }
+
     if (!strcasecmp(key, "createPolicy")) {
         cfg->create_policy = parse_bool(value, cfg->create_policy);
         return 0;
@@ -93,7 +133,8 @@ int config_apply_args(config_t *cfg, int argc, char **argv)
         }
         if (!strcmp(argv[i], "--no-fragment") ||
             !strcmp(argv[i], "--fragment") ||
-            !strcmp(argv[i], "--dry-run")) continue;
+            !strcmp(argv[i], "--dry-run") ||
+            !strcmp(argv[i], "--setup-proxy")) continue;
 
         if (!strncmp(argv[i], "--", 2) && i + 1 < argc &&
             config_set(cfg, argv[i] + 2, argv[i + 1]) == 0) {
@@ -195,8 +236,20 @@ int config_write_default(const char *path)
         "# Разрешить демону заводить недостающие политики на роутере и\n"
         "# сохранять его конфигурацию. Это изменение настроек устройства,\n"
         "# поэтому по умолчанию выключено: политику создаёт администратор.\n"
-        "createPolicy=no\n",
-        cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface);
+        "createPolicy=no\n"
+        "\n"
+        "# Свой экземпляр Xray и своё прокси-подключение в Keenetic.\n"
+        "# nodesFile — файл со ссылками vless:// либо подпиской. Пока его\n"
+        "# нет, свой Xray не запускается, и маршрутизация работает через\n"
+        "# то подключение, которое настроено вручную.\n"
+        "nodesFile=%s\n"
+        "xrayConfig=%s\n"
+        "socksPort=%d\n"
+        "proxyInterface=%s\n"
+        "policy=%s\n",
+        cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
+        cfg.nodes_file, cfg.xray_config, cfg.socks_port,
+        cfg.proxy_iface, cfg.policy);
 
     fclose(f);
     return 0;

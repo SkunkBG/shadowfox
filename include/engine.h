@@ -5,6 +5,7 @@
 #include "dnscap.h"
 #include "ipsets.h"
 #include "rci.h"
+#include "supervise.h"
 #include "routing.h"
 #include "watchlist.h"
 
@@ -18,6 +19,8 @@ typedef struct {
     rt_t   rt;
     dcap_t cap;
     rci_t  rci;
+    sv_t   xray;           /* свой экземпляр ядра */
+    int    xray_managed;   /* мы его подняли и следим за ним */
 
     int    rules_applied;
     int    capturing;

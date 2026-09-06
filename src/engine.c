@@ -1,6 +1,11 @@
 #include "engine.h"
+#include "apply.h"
 #include "log.h"
+#include "nodelist.h"
+#include "xraycfg.h"
 #include "util.h"
+
+#include <stdio.h>
 
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -26,6 +31,7 @@ void engine_init(engine_t *e)
     rt_init(&e->rt);
     dcap_init(&e->cap);
     rci_init(&e->rci);
+    sv_init(&e->xray, "", "");
 }
 
 int engine_fd(const engine_t *e)
@@ -153,6 +159,80 @@ static int apply_all(engine_t *e, char *err, unsigned err_size)
     return 0;
 }
 
+/* Поднимает собственный Xray: читает ссылки, собирает конфиг, проверяет
+   его тем же ядром и только потом запускает.
+
+   Отсутствие файла со ссылками — не ошибка: тогда своего ядра просто
+   нет, а маршрутизация продолжает работать через то подключение,
+   которое настроено вручную. */
+static void start_own_xray(engine_t *e, const config_t *cfg)
+{
+    FILE *f = fopen(cfg->nodes_file, "r");
+    if (!f) {
+        log_info("файла %s нет, свой Xray не запускается", cfg->nodes_file);
+        return;
+    }
+
+    static char body[256 * 1024];
+    size_t got       = fread(body, 1, sizeof(body) - 1, f);
+    int    truncated = !feof(f);
+    fclose(f);
+    body[got] = '\0';
+
+    if (truncated) {
+        log_error("%s больше %zu байт", cfg->nodes_file, sizeof(body) - 1);
+        return;
+    }
+
+    static nodelist_t list;
+    nodelist_init(&list);
+    int added = nodelist_from_subscription(&list, body);
+    if (added <= 0) {
+        log_error("в %s нет ни одной понятной ссылки", cfg->nodes_file);
+        return;
+    }
+    if (list.skipped)
+        log_warn("в %s пропущено строк: %d", cfg->nodes_file, list.skipped);
+
+    /* Прокси-клиент Keenetic приходит на LAN-адрес роутера, а не на
+       петлю, поэтому и слушать надо там. */
+    char lan[64] = "";
+    if (!iface_ipv4(cfg->capture_iface, lan, sizeof(lan))) {
+        log_error("не узнать адрес на %s, свой Xray не запускается",
+                  cfg->capture_iface);
+        return;
+    }
+
+    xraycfg_opts_t o;
+    xraycfg_defaults(&o);
+    o.listen     = lan;
+    o.socks_port = cfg->socks_port;
+
+    static char json[256 * 1024];
+    if (xraycfg_build_list(&list, &o, json, sizeof(json)) != 0) {
+        log_error("не удалось собрать конфиг Xray");
+        return;
+    }
+
+    apply_opts_t ao;
+    apply_defaults(&ao);
+    str_copy(ao.config_path, sizeof(ao.config_path), cfg->xray_config);
+    if (cfg->xray_bin[0]) str_copy(ao.xray_bin, sizeof(ao.xray_bin), cfg->xray_bin);
+
+    char aerr[512] = "";
+    if (apply_config(&ao, json, aerr, sizeof(aerr)) != 0) {
+        /* Конфиг не принят — запускать ядро с ним нельзя. */
+        log_error("Xray отверг конфиг: %s", aerr);
+        return;
+    }
+
+    log_info("конфиг Xray записан: узлов %d, socks %s:%d",
+             list.count, lan, cfg->socks_port);
+
+    sv_init(&e->xray, ao.xray_bin, cfg->xray_config);
+    if (sv_start(&e->xray) == 0) e->xray_managed = 1;
+}
+
 int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
 {
     if (!e || !cfg) return -1;
@@ -167,6 +247,10 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
     }
     e->rt.ipv6          = cfg->ipv6 && e->rt.ip6tables[0];
     e->may_create_policy = cfg->create_policy;
+
+    /* Своё ядро поднимаем до правил: пока оно не слушает, заворачивать
+       туда трафик бессмысленно. */
+    start_own_xray(e, cfg);
 
     if (!load_lists(e, cfg)) return 0;
 
@@ -191,6 +275,11 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
 void engine_stop(engine_t *e)
 {
     if (!e) return;
+
+    if (e->xray_managed) {
+        sv_stop(&e->xray);
+        e->xray_managed = 0;
+    }
 
     if (e->capturing) {
         dcap_close(&e->cap);
@@ -250,6 +339,9 @@ void engine_tick(engine_t *e, time_t now)
     if (!e) return;
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
+
+    /* Подхватываем падение своего ядра и перезапускаем с паузой. */
+    if (e->xray_managed) sv_tick(&e->xray, now);
 
     if (e->restore_due && now >= e->restore_due) {
         e->restore_due = 0;

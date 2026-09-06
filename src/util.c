@@ -8,6 +8,10 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 char *str_trim(char *s)
@@ -109,4 +113,28 @@ int pidfile_read_alive(const char *path)
     if (got != 1 || pid <= 0) return 0;
     if (kill((pid_t)pid, 0) != 0 && errno == ESRCH) return 0;
     return (int)pid;
+}
+
+int iface_ipv4(const char *iface, char *dst, size_t dst_size)
+{
+    if (!iface || !*iface || !dst || dst_size < INET_ADDRSTRLEN) return 0;
+    dst[0] = '\0';
+
+    struct ifaddrs *list = NULL;
+    if (getifaddrs(&list) != 0) return 0;
+
+    int found = 0;
+    for (struct ifaddrs *a = list; a; a = a->ifa_next) {
+        if (!a->ifa_addr || a->ifa_addr->sa_family != AF_INET) continue;
+        if (!a->ifa_name || strcmp(a->ifa_name, iface) != 0) continue;
+
+        const struct sockaddr_in *sin = (const struct sockaddr_in *)(const void *)a->ifa_addr;
+        if (inet_ntop(AF_INET, &sin->sin_addr, dst, (socklen_t)dst_size)) {
+            found = 1;
+            break;
+        }
+    }
+
+    freeifaddrs(list);
+    return found;
 }

@@ -4,6 +4,7 @@
 #include "log.h"
 
 #define CFG_PATH_MAX 256
+#define WL_NAME_MAX_CFG 64
 
 typedef struct {
     char        conf_file[CFG_PATH_MAX];
@@ -16,6 +17,14 @@ typedef struct {
     int         auto_start;      /* ставить правила сразу при старте */
     int         ipv6;            /* обслуживать ли IPv6 */
     int         create_policy;   /* можно ли заводить политики на роутере */
+
+    /* Свой экземпляр Xray и своё прокси-подключение в Keenetic. */
+    char        policy[WL_NAME_MAX_CFG];      /* политика для своего прокси */
+    char        proxy_iface[32];              /* Proxy1 и т.п. */
+    int         socks_port;                   /* порт своего socks */
+    char        nodes_file[CFG_PATH_MAX];     /* ссылки или подписка */
+    char        xray_config[CFG_PATH_MAX];    /* куда писать конфиг */
+    char        xray_bin[CFG_PATH_MAX];       /* пусто — искать самим */
 } config_t;
 
 /* Заполняет cfg встроенными значениями по умолчанию. */

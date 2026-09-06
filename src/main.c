@@ -35,6 +35,7 @@ static void usage(FILE *out)
         "      --socks-port N    порт локального SOCKS для --link (по умолчанию 2080)\n"
         "      --listen АДРЕС    адрес входа SOCKS (по умолчанию 127.0.0.1)\n"
         "      --dry-run         показать план правил и выйти, ничего не меняя\n"
+        "      --setup-proxy     напечатать команды для своего прокси в Keenetic\n"
         "      --fragment        включить фрагментацию TLS и шум UDP\n"
         "      --no-fragment     выключить их явно (и так выключены)\n"
         "      --log УРОВЕНЬ     off | error | warn | info | debug\n"
@@ -191,6 +192,46 @@ int main(int argc, char **argv)
 
             fprintf(stderr, "узлов: %d\n", list.count);
             printf("%s\n", out);
+            return 0;
+        } else if (!strcmp(argv[i], "--setup-proxy")) {
+            config_t sp;
+            config_defaults(&sp);
+            str_copy(sp.conf_file, sizeof(sp.conf_file), conf_path);
+            config_load_file(&sp, sp.conf_file);
+            config_apply_args(&sp, argc, argv);
+
+            /* Прокси-клиент Keenetic ходит на LAN-адрес роутера, а не на
+               петлю — это видно в рабочей настройке. Поэтому адрес берём
+               с интерфейса, а не подставляем 127.0.0.1. */
+            char lan[64] = "";
+            if (!iface_ipv4(sp.capture_iface, lan, sizeof(lan))) {
+                fprintf(stderr,
+                        "не удалось узнать адрес на %s. Укажи интерфейс "
+                        "локальной сети параметром interface\n",
+                        sp.capture_iface);
+                return 1;
+            }
+
+            printf("# Команды выполняются на роутере. Посмотри их глазами:\n"
+                   "# они меняют настройки устройства, а не наши файлы.\n\n");
+
+            printf("ndmc -c \"interface %s\"\n", sp.proxy_iface);
+            printf("ndmc -c \"interface %s description Shadow-Fox\"\n", sp.proxy_iface);
+            printf("ndmc -c \"interface %s security-level public\"\n", sp.proxy_iface);
+            printf("ndmc -c \"interface %s ip global 1\"\n", sp.proxy_iface);
+            printf("ndmc -c \"interface %s proxy protocol socks5\"\n", sp.proxy_iface);
+            printf("ndmc -c \"interface %s proxy upstream %s %d\"\n",
+                   sp.proxy_iface, lan, sp.socks_port);
+            printf("ndmc -c \"interface %s proxy socks5-udp\"\n", sp.proxy_iface);
+            printf("ndmc -c \"interface %s up\"\n", sp.proxy_iface);
+            printf("ndmc -c \"system configuration save\"\n");
+
+            printf("\n# Затем в панели роутера:\n"
+                   "#   Приоритеты подключений -> Политики доступа -> %s\n"
+                   "#   отметить подключение Shadow-Fox и снять остальные.\n",
+                   sp.policy);
+            printf("# Без этого шага политика получит метку, но заворачивать\n"
+                   "# трафик будет некуда.\n");
             return 0;
         } else if (!strcmp(argv[i], "--dry-run")) {
             config_t dry;

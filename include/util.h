@@ -22,4 +22,9 @@ void  pidfile_remove(const char *path);
 /* Читает pid из файла. Возвращает 0, если файла нет или процесс мёртв. */
 int   pidfile_read_alive(const char *path);
 
+/* Первый адрес IPv4 на интерфейсе. Нужен, чтобы знать, куда придёт
+   прокси-клиент Keenetic: он ходит на LAN-адрес роутера, а не на петлю.
+   Возвращает 1 при успехе. */
+int   iface_ipv4(const char *iface, char *dst, size_t dst_size);
+
 #endif /* SHADOWFOX_UTIL_H */
