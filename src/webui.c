@@ -456,15 +456,35 @@ static void send_dns(int fd)
    существующего не трогаем, и провайдерский DNS не отключаем: точной
    формы этой команды я не знаю, а угадывать то, что меняет настройки
    роутера, нельзя. */
-static const char *DNS_SETUP[] = {
-    "dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com",
-    "dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com",
-    "dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net",
-    "dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net",
-    "service dns-proxy",
-    "system configuration save",
-    NULL
+static const struct {
+    const char *key;
+    const char *cmds[3];
+} DNS_SETS[] = {
+    { "cf", {
+        "dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com",
+        "dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com", NULL } },
+    { "google", {
+        "dns-proxy tls upstream 8.8.8.8 sni dns.google",
+        "dns-proxy tls upstream 8.8.4.4 sni dns.google", NULL } },
+    { "quad9", {
+        "dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net",
+        "dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net", NULL } },
+    { NULL, { NULL } }
 };
+
+/* Есть ли ключ в списке через запятую. Сравниваем по границам, иначе
+   «cf» нашлось бы внутри чужого слова. */
+static int chosen(const char *list, const char *key)
+{
+    size_t klen = strlen(key);
+
+    for (const char *p = list; *p; p++) {
+        if (p != list && p[-1] != ',') continue;
+        if (strncmp(p, key, klen) != 0) continue;
+        if (p[klen] == '\0' || p[klen] == ',') return 1;
+    }
+    return 0;
+}
 
 static void apply_dns(const http_req_t *req, int fd)
 {
@@ -475,23 +495,50 @@ static void apply_dns(const http_req_t *req, int fd)
         return;
     }
 
+    char sets[128] = "";
+    http_query_get(req, "sets", sets, sizeof(sets));
+    if (!sets[0]) {
+        http_send_text(fd, 400, "text/plain; charset=utf-8",
+                       "не выбрано ни одного набора\n");
+        return;
+    }
+
+    /* Собираем список выбранного, а в конце — включение службы и
+       сохранение конфигурации, иначе после перезагрузки всё пропадёт. */
+    const char *plan[16];
+    int         count = 0;
+
+    for (int i = 0; DNS_SETS[i].key && count < 12; i++) {
+        if (!chosen(sets, DNS_SETS[i].key)) continue;
+        for (int k = 0; DNS_SETS[i].cmds[k]; k++) plan[count++] = DNS_SETS[i].cmds[k];
+    }
+
+    if (!count) {
+        http_send_text(fd, 400, "text/plain; charset=utf-8",
+                       "выбранных наборов нет\n");
+        return;
+    }
+
+    plan[count++] = "service dns-proxy";
+    plan[count++] = "system configuration save";
+
     static char report[8 * 1024];
     int  used = 0, failed = 0;
 
-    for (int i = 0; DNS_SETUP[i]; i++) {
+    for (int i = 0; i < count; i++) {
         char arg[] = "-c";
         char cmd[128];
-        str_copy(cmd, sizeof(cmd), DNS_SETUP[i]);
+        str_copy(cmd, sizeof(cmd), plan[i]);
 
         char *argv[] = { bin, arg, cmd, NULL };
         char  out[512] = "";
         int   rc = proc_run(argv, out, sizeof(out), 15);
 
         if (rc != 0) failed++;
-        log_info("веб: ndmc «%s» -> %d", DNS_SETUP[i], rc);
+        log_info("веб: ndmc «%s» -> %d", plan[i], rc);
 
         int n = snprintf(report + used, sizeof(report) - (size_t)used,
-                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", DNS_SETUP[i]);
+                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", plan[i]);
         if (n < 0 || (size_t)n >= sizeof(report) - (size_t)used) break;
         used += n;
     }

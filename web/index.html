@@ -251,6 +251,11 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
 .pick:hover{border-color:var(--acc)}
 .pick svg{width:23px;height:23px;flex:0 0 auto}
 .pick i{font-style:normal;color:var(--dim);font-size:12px;display:block}
+.pick.sel{border-color:var(--acc);background:var(--acc-soft)}
+.pick .box{width:20px;height:20px;flex:0 0 auto;border:1px solid var(--line);
+  border-radius:6px;display:grid;place-items:center;color:var(--acc);
+  font-size:13px;font-weight:700}
+.pick.sel .box{border-color:var(--acc)}
 
 @media(max-width:880px){
   .app{flex-direction:column}
@@ -331,7 +336,7 @@ const plural=(n,a,b,c)=>{const m=n%100,k=n%10;
   return n+' '+(m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c);};
 
 let D=null, tab='rules', edit={}, dirty=false, dnsShown=0,
-    nodesMode='masked', query='', folds={};
+    nodesMode='masked', query='', folds={}, dnsLoaded=0, dnsInfo=null;
 
 /* Значки интерфейса. Обводкой, чтобы одинаково читались в обеих темах. */
 const UI={
@@ -526,14 +531,26 @@ function fold(id,title,inner){
 
 /* Форма команд взята из running-config настоящего роутера, а не
    придумана: серверы там записаны ровно так. */
-const DNSCMDS=[
-  'dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com',
-  'dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com',
-  'dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net',
-  'dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net',
-  'service dns-proxy',
-  'system configuration save'
-].map(c=>`ndmc -c "${c}"`).join('\n');
+const DNSSETS=[
+  {key:'cf',    name:'Cloudflare', cmds:[
+    'dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com',
+    'dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com']},
+  {key:'google',name:'Google', cmds:[
+    'dns-proxy tls upstream 8.8.8.8 sni dns.google',
+    'dns-proxy tls upstream 8.8.4.4 sni dns.google']},
+  {key:'quad9', name:'Quad9', cmds:[
+    'dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net',
+    'dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net']}
+];
+let dnsPick={cf:1,google:0,quad9:1};
+
+function dnsCmds(){
+  const c=[];
+  for(const s of DNSSETS) if(dnsPick[s.key]) c.push(...s.cmds);
+  if(!c.length) return '';
+  c.push('service dns-proxy','system configuration save');
+  return c.map(x=>`ndmc -c "${x}"`).join('\n');
+}
 
 function viewConn(){
   const P=D.proxy_name, POL=D.policy_name, host=location.hostname;
@@ -575,7 +592,7 @@ function viewConn(){
     отдаёт сети. Если провайдерский резолвер подменяет адреса, в наборы
     попадёт подделка, и заворачивать будет нечего. Поэтому вышестоящие
     серверы лучше держать свои.</p>
-    <div id="dnsbox" class="note">${UI.i}читаю настройки роутера…</div>
+    <div id="dnsbox">${dnsBox()}</div>
     <p style="margin:14px 0 0">Меняются они в панели роутера:
     <b>Параметры системы → Профили DNS</b>. Там же включается DNS-over-TLS
     и DNS-over-HTTPS, чтобы запросы самого роутера наружу шли закрыто.</p>
@@ -586,10 +603,16 @@ function viewConn(){
   </div>
 
   ${fold('dnscmd','Поставить чистые серверы',
-    `<p>Cloudflare и Quad9 по DNS-over-TLS. Серверы <b>добавляются</b>,
-     существующие не трогаются. Это меняет настройки роутера, поэтому
-     сначала посмотри, что именно будет выполнено:</p>
-     <pre>${esc(DNSCMDS)}</pre>
+    `<p>Все три по DNS-over-TLS, выбери нужные. Серверы <b>добавляются</b>,
+     существующие не трогаются.</p>
+     <div class="picks" style="margin-bottom:14px">
+       ${DNSSETS.map(x=>`<button class="pick ${dnsPick[x.key]?'sel':''}"
+          data-dnsset="${x.key}"><span class="box">${dnsPick[x.key]?'✓':''}</span>
+          <span>${x.name}<i>${x.cmds.length} сервера</i></span></button>`).join('')}
+     </div>
+     <p>Это меняет настройки роутера, поэтому сначала посмотри, что именно
+     будет выполнено:</p>
+     <pre>${esc(dnsCmds()||'ничего не выбрано')}</pre>
      <div class="bar"><button class="b" id="dns-apply">Установить</button>
        <span class="msg" id="m-dns"></span></div>
      <p style="margin-top:14px"><b>Провайдерский DNS отключить придётся
@@ -647,10 +670,11 @@ function viewInfo(){
   <div class="tiles">
     ${tile(UI.gear,'Демон',
       `<span style="color:var(--ok)">Работает</span>
-       <div style="font-size:13.5px;color:var(--dim);font-weight:400">${esc(D.uptime)}</div>`,1)}
-    ${tile(UI.globe,'Адресов',D.matched)}
-    ${tile(UI.pkt,'Пакетов',D.seen)}
-    ${tile(UI.back,'Ответов',D.parsed)}
+       <div style="font-size:13.5px;color:var(--dim);font-weight:400"
+            data-live="uptime">${esc(D.uptime)}</div>`,1)}
+    ${tile(UI.globe,'Адресов','<span data-live="matched">'+D.matched+'</span>')}
+    ${tile(UI.pkt,'Пакетов','<span data-live="seen">'+D.seen+'</span>')}
+    ${tile(UI.back,'Ответов','<span data-live="parsed">'+D.parsed+'</span>')}
   </div>
 
   <div class="two">
@@ -660,7 +684,7 @@ function viewInfo(){
       ${kv('DNS устройства', D.dns==='ok'?'Через роутер'
            :D.dns==='bypass'?'Мимо роутера':'Пока не видно')}
       ${kv('Правила',D.rules?'Установлены':'Нет')}
-      ${kv('Помечено',D.marked+' соединений')}
+      ${kv('Помечено','<span data-live="marked">'+D.marked+'</span> соединений')}
       ${D.model?kv('Модель',esc(D.model)):''}
       ${D.osver?kv('Прошивка',esc(D.osver)):''}
     </div>
@@ -740,34 +764,62 @@ function draw(){
   chrome();
   $('#view').innerHTML = tab==='rules'?viewRules() : tab==='conn'?viewConn() : viewInfo();
   showBar();
-  if(tab==='conn') loadDns();
+  if(tab==='conn' && !dnsLoaded){ dnsLoaded=1; loadDns(); }
+  else if(tab==='conn'){ const box=$('#dnsbox'); if(box) box.innerHTML=dnsBox(); }
 }
 
 /* Настройки DNS спрашиваем отдельно и только когда открыт этот раздел:
    для них демон запускает ndmc, и делать это каждые десять секунд ради
-   строчки в карточке незачем. */
-async function loadDns(){
-  const box=$('#dnsbox'); if(!box) return;
-  try{
-    const r=await fetch(api('/dns'));
-    const d=await r.json();
-    if(!d.ok || !d.servers.length){
-      box.innerHTML=UI.i+'Не прочитать настройки DNS роутера'+
-        (d.why?' — '+esc(d.why):'')+
-        '. Покажи вывод: <code>command -v ndmc</code>';
-      return;
-    }
-    box.className='';
-    box.innerHTML='<label style="margin-top:0">Сейчас у роутера</label><pre>'+
-      d.servers.map(esc).join('\n')+'</pre>';
-  }catch(e){ box.innerHTML=UI.i+'Не удалось прочитать настройки DNS роутера'; }
+   строчки в карточке незачем. Ответ храним: иначе перерисовка возвращала
+   бы надпись «читаю» и повторный запрос уже не шёл. */
+function dnsBox(){
+  if(!dnsInfo) return `<div class="note">${UI.i}читаю настройки роутера…</div>`;
+  if(dnsInfo.report)
+    return '<label style="margin-top:0">Что выполнено</label><pre>'+
+           esc(dnsInfo.report)+'</pre>';
+  if(dnsInfo.servers && dnsInfo.servers.length)
+    return '<label style="margin-top:0">Сейчас у роутера</label><pre>'+
+           dnsInfo.servers.map(esc).join('\n')+'</pre>';
+  return `<div class="note">${UI.i}Не прочитать настройки DNS роутера`+
+         (dnsInfo.why?' — '+esc(dnsInfo.why):'')+'</div>';
 }
 
-async function load(probed){
+async function loadDns(){
+  try{
+    const r=await fetch(api('/dns'));
+    dnsInfo=await r.json();
+  }catch(e){ dnsInfo={ok:false,why:e.message}; }
+  const box=$('#dnsbox'); if(box) box.innerHTML=dnsBox();
+}
+
+/* Раз в десять секунд меняются только счётчики, а перерисовка заменяла
+   всю разметку целиком — отсюда постоянное дёрганье и потеря прокрутки.
+   Сравниваем то, от чего зависит сама разметка; если оно прежнее, правим
+   только числа. */
+function sig(){
+  return JSON.stringify([D.domains,D.nodes,D.nodes_shown,D.xray_bin,D.proxy_ready,
+    D.policy_ready,D.have_link,D.model,D.osver,D.version,D.dns,D.capture,D.iface,
+    D.rules,D.socks_port,D.policy_name,D.proxy_name,D.xray_pid>0]);
+}
+
+function live(){
+  document.querySelectorAll('[data-live]').forEach(el=>{
+    const v=D[el.dataset.live];
+    if(v!==undefined && v!==null) el.textContent=v;
+  });
+}
+
+async function load(probed,quiet){
   try{
     const r=await fetch(api('/data'+(probed?'?probed=1':'')));
     if(!r.ok) throw new Error('код '+r.status);
+    const was = D ? sig() : null;
     D=await r.json();
+
+    /* Тихое обновление не трогает разметку, если она не изменилась:
+       иначе пропадает выделение, прокрутка и открытые разделы. */
+    if(quiet && was!==null && was===sig()){ chrome(); live(); return; }
+
     dirty=false; edit={};
     draw();
     const msg=$('#m-rules'); if(msg) msg.textContent='';
@@ -914,6 +966,7 @@ document.addEventListener('input',ev=>{
 document.addEventListener('click',async ev=>{
   const nav=ev.target.closest('aside nav button');
   if(nav){ tab=nav.dataset.tab; if(nodesMode!=='masked') nodesMode='masked';
+           if(tab!=='conn'){ dnsLoaded=0; dnsInfo=null; }
            draw(); return; }
 
   if(ev.target.closest('#theme')||ev.target.closest('#theme2')) return flipTheme();
@@ -970,19 +1023,26 @@ document.addEventListener('click',async ev=>{
     try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
     gate(); return; }
 
+  const dset=ev.target.closest('[data-dnsset]');
+  if(dset){ const k=dset.dataset.dnsset; dnsPick[k]=!dnsPick[k]; draw();
+    folds.dnscmd=1; draw(); return; }
+
   if(ev.target.id==='dns-apply'){
     const btn=ev.target, m=$('#m-dns');
-    if(!confirm('Добавить серверы Cloudflare и Quad9 в настройки роутера?\n'+
-                'Существующие не удаляются.')) return;
+    const picked=DNSSETS.filter(x=>dnsPick[x.key]);
+    if(!picked.length){ m.className='msg bad'; m.textContent='ничего не выбрано'; return; }
+    if(!confirm('Добавить в настройки роутера: '+picked.map(x=>x.name).join(', ')+
+                '?\nСуществующие серверы не удаляются.')) return;
     btn.disabled=true; m.className='msg'; m.textContent='выполняю…';
     try{
-      const r=await fetch(api('/dns'),{method:'POST'});
+      const r=await fetch(api('/dns?sets='+picked.map(x=>x.key).join(',')),
+                          {method:'POST'});
       const t=await r.text();
       m.className=r.ok?'msg ok':'msg bad';
       m.textContent=r.ok?'готово':'были сбои';
-      $('#dnsbox').innerHTML='<label style="margin-top:0">Что выполнено</label>'+
-        '<pre>'+esc(t)+'</pre>';
-      setTimeout(loadDns,1500);
+      dnsInfo={report:t};
+      $('#dnsbox').innerHTML=dnsBox();
+      setTimeout(loadDns,2000);
     }catch(e){ m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 
@@ -994,5 +1054,9 @@ addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValu
 
 if(!seen()) gate();
 load();
-setInterval(()=>{ if(!dirty && !document.querySelector('textarea:focus,input:focus')) load(); },10000);
+setInterval(()=>{
+  if(dirty || document.querySelector('textarea:focus,input:focus')) return;
+  if(document.querySelector('.modal')) return;   /* поверх открытого окна незачем */
+  load(0,1);
+},10000);
 </script>
