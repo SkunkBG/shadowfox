@@ -1,6 +1,7 @@
 #include "engine.h"
 #include "apply.h"
 #include "log.h"
+#include "status.h"
 #include "nodelist.h"
 #include "xraycfg.h"
 #include "util.h"
@@ -237,6 +238,9 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
 {
     if (!e || !cfg) return -1;
 
+    e->started_at = time(NULL);
+    e->cfg        = cfg;
+
     if (!ips_find_bin(e->ips.bin, sizeof(e->ips.bin))) {
         if (err) str_copy(err, err_size, "не найден ipset");
         return -1;
@@ -269,6 +273,7 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
                  "подсети из ip.list работают", cap_err);
     }
 
+    status_write(e, cfg);
     return 0;
 }
 
@@ -354,8 +359,13 @@ void engine_tick(engine_t *e, time_t now)
 
     /* Раз в минуту показываем, что видит перехват. Пустой набор сам по
        себе не говорит, молчит ли сеть или сокет ничего не получает. */
-    if (e->capturing && now - e->last_stats >= 60) {
+    if (now - e->last_stats >= 60) {
         e->last_stats = now;
+        status_write(e, e->cfg);
+    }
+
+    if (e->capturing && now - e->last_stats_log >= 60) {
+        e->last_stats_log = now;
         log_info("перехват: пакетов %lu, ответов %lu, адресов %lu; "
                  "мимо: не UDP/53 %lu, не разобрались %lu",
                  e->cap.seen, e->cap.parsed, e->matched,

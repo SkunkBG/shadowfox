@@ -89,6 +89,14 @@ curl -fsSL https://skunkbg.github.io/shadowfox/add-repo.sh -o /tmp/sf.sh && sh /
 shadowfox start | stop | restart | status
 ```
 
+Полная картина одной командой: что прочитано из списков, куда заворачивается
+каждая группа, сколько адресов в наборах, работает ли своё ядро, что видит
+перехват и срабатывают ли правила.
+
+```bash
+shadowfoxd --status
+```
+
 Обновить после новой сборки:
 
 ```bash

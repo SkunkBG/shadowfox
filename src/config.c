@@ -134,7 +134,8 @@ int config_apply_args(config_t *cfg, int argc, char **argv)
         if (!strcmp(argv[i], "--no-fragment") ||
             !strcmp(argv[i], "--fragment") ||
             !strcmp(argv[i], "--dry-run") ||
-            !strcmp(argv[i], "--setup-proxy")) continue;
+            !strcmp(argv[i], "--setup-proxy") ||
+            !strcmp(argv[i], "-s") || !strcmp(argv[i], "--status")) continue;
 
         if (!strncmp(argv[i], "--", 2) && i + 1 < argc &&
             config_set(cfg, argv[i] + 2, argv[i + 1]) == 0) {

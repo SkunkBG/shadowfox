@@ -8,6 +8,7 @@
 #include "xraycfg.h"
 #include "shadowfox.h"
 #include "signals.h"
+#include "status.h"
 #include "util.h"
 
 #include <errno.h>
@@ -34,6 +35,7 @@ static void usage(FILE *out)
         "      --sub ФАЙЛ        то же из файла: подписка base64 или список ссылок\n"
         "      --socks-port N    порт локального SOCKS для --link (по умолчанию 2080)\n"
         "      --listen АДРЕС    адрес входа SOCKS (по умолчанию 127.0.0.1)\n"
+        "  -s, --status          показать состояние демона и выйти\n"
         "      --dry-run         показать план правил и выйти, ничего не меняя\n"
         "      --setup-proxy     напечатать команды для своего прокси в Keenetic\n"
         "      --fragment        включить фрагментацию TLS и шум UDP\n"
@@ -193,6 +195,13 @@ int main(int argc, char **argv)
             fprintf(stderr, "узлов: %d\n", list.count);
             printf("%s\n", out);
             return 0;
+        } else if (!strcmp(argv[i], "-s") || !strcmp(argv[i], "--status")) {
+            config_t st;
+            config_defaults(&st);
+            str_copy(st.conf_file, sizeof(st.conf_file), conf_path);
+            config_load_file(&st, st.conf_file);
+            config_apply_args(&st, argc, argv);
+            return status_print(&st);
         } else if (!strcmp(argv[i], "--setup-proxy")) {
             config_t sp;
             config_defaults(&sp);

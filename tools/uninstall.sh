@@ -21,7 +21,7 @@ rm -f  /opt/etc/init.d/S99shadowfox
 rm -f  /opt/etc/ndm/netfilter.d/015-shadowfox.sh
 rm -f  /opt/etc/ndm/ifstatechanged.d/015-shadowfox.sh
 rm -f  /opt/var/log/shadowfoxd.log
-rm -f  /opt/var/run/shadowfoxd.pid
+rm -f  /opt/var/run/shadowfoxd.pid /opt/var/run/shadowfoxd.status
 
 # Фид отключаем последним: пока он подключён, opkg может снова
 # подтянуть пакет при следующем upgrade.
@@ -30,7 +30,8 @@ rm -f /opt/etc/opkg/shadowfox.conf
 echo ""
 echo "готово. Проверка, что ничего не осталось:"
 left=$(ls -d /opt/etc/shadowfox /opt/bin/shadowfox* /opt/etc/init.d/S99shadowfox \
-              /opt/etc/ndm/*/015-shadowfox.sh /opt/etc/opkg/shadowfox.conf 2>/dev/null)
+              /opt/etc/ndm/*/015-shadowfox.sh /opt/etc/opkg/shadowfox.conf \
+              /opt/var/run/shadowfoxd.status 2>/dev/null)
 if [ -n "$left" ]; then
     echo "$left"
 else

@@ -2,6 +2,6 @@
 # Вызывается до удаления файлов пакета.
 
 /opt/etc/init.d/S99shadowfox stop >/dev/null 2>&1 || true
-rm -f /opt/bin/shadowfox 2>/dev/null || true
+rm -f /opt/bin/shadowfox /opt/var/run/shadowfoxd.status 2>/dev/null || true
 
 exit 0

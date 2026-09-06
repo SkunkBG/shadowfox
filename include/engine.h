@@ -13,7 +13,7 @@
 
 /* Связывает всё вместе: списки, наборы, правила, перехват. */
 
-typedef struct {
+typedef struct engine {
     wl_t   wl;
     ips_t  ips;
     rt_t   rt;
@@ -24,8 +24,11 @@ typedef struct {
 
     int    rules_applied;
     int    capturing;
+    time_t started_at;
     time_t last_flush;
     time_t last_stats;
+    time_t last_stats_log;
+    const config_t *cfg;   /* для выкладывания состояния */
     time_t restore_due;   /* когда применить накопленный запрос */
 
     unsigned long matched;   /* адресов, попавших под правила */
