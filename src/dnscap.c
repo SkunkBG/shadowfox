@@ -23,6 +23,11 @@ static unsigned rd16(const unsigned char *p)
 
 int dcap_extract(const unsigned char *pkt, size_t len, dns_reply_t *out)
 {
+    return dcap_extract_why(pkt, len, out) == 0 ? 0 : -1;
+}
+
+int dcap_extract_why(const unsigned char *pkt, size_t len, dns_reply_t *out)
+{
     if (!pkt || !out || len < 20) return -1;
 
     unsigned version = pkt[0] >> 4;
@@ -65,7 +70,7 @@ int dcap_extract(const unsigned char *pkt, size_t len, dns_reply_t *out)
     }
     if (!avail) return -1;
 
-    return dns_parse_reply(pkt + payload, avail, out);
+    return dns_parse_reply(pkt + payload, avail, out) == 0 ? 0 : -2;
 }
 
 #ifdef __linux__
@@ -203,8 +208,19 @@ int dcap_poll(dcap_t *c, void (*cb)(const dns_reply_t *, void *), void *ctx)
         c->seen++;
 
         dns_reply_t reply;
-        if (dcap_extract(c->buf, (size_t)n, &reply) != 0) {
+        int         why = dcap_extract_why(c->buf, (size_t)n, &reply);
+
+        if (why != 0) {
             c->ignored++;
+            if (why == -1) c->drop_notip++;
+            else           c->drop_notreply++;
+
+            /* Первые байты показывают версию IP и протокол — по ним
+               сразу видно, тот ли слой отдаёт сокет. */
+            log_debug("пакет мимо (%s), %zd байт, начало %02x %02x %02x %02x",
+                      why == -1 ? "не UDP/53" : "не разобрался",
+                      n, c->buf[0], c->buf[1],
+                      n > 2 ? c->buf[2] : 0, n > 3 ? c->buf[3] : 0);
             continue;
         }
 

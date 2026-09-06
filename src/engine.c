@@ -255,8 +255,10 @@ void engine_tick(engine_t *e, time_t now)
        себе не говорит, молчит ли сеть или сокет ничего не получает. */
     if (e->capturing && now - e->last_stats >= 60) {
         e->last_stats = now;
-        log_info("перехват: пакетов %lu, ответов %lu, мимо %lu, адресов %lu",
-                 e->cap.seen, e->cap.parsed, e->cap.ignored, e->matched);
+        log_info("перехват: пакетов %lu, ответов %lu, адресов %lu; "
+                 "мимо: не UDP/53 %lu, не разобрались %lu",
+                 e->cap.seen, e->cap.parsed, e->matched,
+                 e->cap.drop_notip, e->cap.drop_notreply);
     }
 
     if (e->ips.queued && now - e->last_flush >= ENGINE_FLUSH_SECONDS) {

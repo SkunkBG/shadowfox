@@ -21,7 +21,13 @@ typedef struct {
     int           filtered;        /* фильтр ядра принят */
     unsigned long seen;            /* пакетов прочитано */
     unsigned long parsed;          /* ответов разобрано */
-    unsigned long ignored;         /* не DNS-ответы */
+    unsigned long ignored;         /* всего отброшено */
+
+    /* Раздельные причины отказа. Общий счётчик «мимо» сваливает в кучу
+       не тот протокол, не ответ и ответ без адресов — а лечатся они
+       по-разному. */
+    unsigned long drop_notip;      /* не IPv4/IPv6, не UDP, не порт 53 */
+    unsigned long drop_notreply;   /* не ответ, ошибка либо без адресов */
     unsigned char buf[DCAP_BUF_BYTES];
 } dcap_t;
 
@@ -39,6 +45,11 @@ void dcap_close(dcap_t *c);
    Вынесено отдельно от сокета намеренно: разбор проверяется тестами на
    любой машине, а сокет живёт только на Linux. */
 int  dcap_extract(const unsigned char *pkt, size_t len, dns_reply_t *out);
+
+/* То же, но с указанием, на чём именно отказано: 0 — успех,
+   -1 — не похоже на UDP-ответ с порта 53, -2 — DNS-сообщение
+   не разобралось или в нём нет адресов. */
+int  dcap_extract_why(const unsigned char *pkt, size_t len, dns_reply_t *out);
 
 /* Читает готовые пакеты и вызывает cb на каждый разобранный ответ.
    Возвращает число разобранных ответов. */
