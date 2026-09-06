@@ -1,0 +1,100 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Юнит-тесты
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make check
+
+  build:
+    name: Сборка под Keenetic
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      # Тулчейны весят ~500 МБ и качаются с musl.cc, который бывает
+      # недоступен, поэтому кешируем их между прогонами.
+      - name: Кеш тулчейнов
+        id: tc-cache
+        uses: actions/cache@v4
+        with:
+          path: /opt/toolchains
+          key: musl-toolchains-v1
+
+      - name: Скачать тулчейны
+        if: steps.tc-cache.outputs.cache-hit != 'true'
+        run: sudo -E sh tools/fetch-toolchains.sh /opt/toolchains
+
+      - name: Добавить в PATH
+        run: |
+          for tc in aarch64-linux-musl-cross mipsel-linux-muslsf-cross mips-linux-muslsf-cross; do
+            echo "/opt/toolchains/$tc/bin" >> "$GITHUB_PATH"
+          done
+
+      - name: Собрать бинарники
+        run: make all
+
+      - name: Проверить, что бинарники под нужные архитектуры
+        run: |
+          set -e
+          file build/shadowfoxd-aarch64 | grep -q 'ARM aarch64'
+          file build/shadowfoxd-mipsel  | grep -qi 'MIPS'
+          file build/shadowfoxd-mips    | grep -qi 'MIPS'
+          # Статическая линковка обязательна: на роутере нет ни musl,
+          # ни гарантии совместимости с системным libc.
+          for b in build/shadowfoxd-*; do
+            file "$b" | grep -q 'statically linked' || {
+              echo "$b слинкован динамически"; exit 1; }
+          done
+
+      # Ревизия равна номеру прогона: без этого каждая пересборка даёт
+      # ту же версию 0.1.0-1, opkg считает её уже установленной и
+      # `opkg upgrade` молча ничего не делает.
+      - name: Собрать пакеты и фид
+        run: make feed REVISION=${{ github.run_number }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipk
+          path: build/ipk/*.ipk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feed
+          path: build/feed
+
+  publish:
+    name: Публикация фида
+    runs-on: ubuntu-latest
+    needs: build
+    # Публикуем и с main, а не только с тегов: файлы заливаются через
+    # веб-интерфейс GitHub, теги при этом не создаются, а фид нужен сразу.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: feed
+          path: feed
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: feed
+      - id: deploy
+        uses: actions/deploy-pages@v4

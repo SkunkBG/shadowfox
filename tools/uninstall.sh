@@ -2,7 +2,7 @@
 # Полностью убирает Shadow Fox с роутера, вместе с настройками,
 # журналом и подключённым фидом.
 #
-#   curl -Ls https://skunkbg.github.io/shadowfox/uninstall.sh | sh
+#   curl -fsSL https://skunkbg.github.io/shadowfox/uninstall.sh | sh
 #
 # `opkg remove` сам по себе оставляет за собой изменённые файлы настроек
 # (они объявлены как conffiles), журнал и запись о репозитории. Для

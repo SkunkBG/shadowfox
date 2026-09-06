@@ -1,0 +1,53 @@
+name: xray
+
+# Ядро Xray собирается отдельно от демона: это чужой апстрим с закреплённой
+# версией, сборка тяжёлая, и на каждый push она не нужна.
+on:
+  workflow_dispatch:
+    inputs:
+      xray_version:
+        description: Тег Xray-core
+        default: v26.2.6
+  push:
+    tags: ['v*']
+  schedule:
+    # Раз в неделю: обрезка правит структуру infra/conf апстрима, и если
+    # она сломается при обновлении Xray, узнать об этом лучше заранее,
+    # а не в тот момент, когда сборка внезапно понадобится.
+    - cron: '0 6 * * 1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Собрать все варианты и сравнить размеры
+        run: sh xray/build.sh --version "${{ github.event.inputs.xray_version || 'v26.2.6' }}"
+
+      # Размеров недостаточно: можно потерять загрузчик конфига и не заметить
+      # этого — бинарник станет меньше и молча перестанет читать файл.
+      - name: Проверить, что сборки принимают эталонный конфиг
+        run: |
+          for v in full lean lean-plus; do
+            sh xray/check.sh "$v"
+          done
+
+      # Сквозная проверка: конфиги нашего генератора скармливаются
+      # настоящему Xray. Держим её здесь, а не в основном workflow,
+      # потому что только тут есть собранное ядро.
+      - name: Собрать демона и прогнать через него конфиги
+        env:
+          SF_REQUIRE_XRAY: "1"
+        run: |
+          make native
+          sh tools/check-configs.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xray-binaries
+          path: build/xray/out/*

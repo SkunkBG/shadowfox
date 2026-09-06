@@ -61,7 +61,7 @@ make xray-ipk VARIANT=minimal  # упаковать в .ipk
 Подключить фид и поставить пакет:
 
 ```bash
-curl -Ls https://skunkbg.github.io/shadowfox/add-repo.sh | sh
+curl -fsSL https://skunkbg.github.io/shadowfox/add-repo.sh | sh
 opkg update && opkg install shadowfox
 ```
 
@@ -84,7 +84,7 @@ opkg update && opkg upgrade shadowfox
 Удалить полностью — вместе с настройками, журналом и подключённым фидом:
 
 ```bash
-curl -Ls https://skunkbg.github.io/shadowfox/uninstall.sh | sh
+curl -fsSL https://skunkbg.github.io/shadowfox/uninstall.sh | sh
 ```
 
 Одного `opkg remove shadowfox` для установки начисто мало: файлы настроек
