@@ -61,9 +61,13 @@ make xray-ipk VARIANT=minimal  # упаковать в .ipk
 Подключить фид и поставить пакет:
 
 ```bash
-curl -fsSL https://skunkbg.github.io/shadowfox/add-repo.sh | sh
-opkg update && opkg install shadowfox
+curl -fsSL https://skunkbg.github.io/shadowfox/add-repo.sh -o /tmp/sf.sh && sh /tmp/sf.sh && opkg update && opkg install shadowfox
 ```
+
+Скрипт скачивается в файл, а не подаётся в `sh` через конвейер, намеренно:
+у конвейера код возврата берётся от последней команды, а `sh` с пустым
+вводом завершается успешно. Из-за этого `curl … | sh && opkg install`
+продолжает работу даже когда скачать ничего не удалось.
 
 Управление — через симлинк `shadowfox`, созданный при установке:
 
@@ -84,7 +88,7 @@ opkg update && opkg upgrade shadowfox
 Удалить полностью — вместе с настройками, журналом и подключённым фидом:
 
 ```bash
-curl -fsSL https://skunkbg.github.io/shadowfox/uninstall.sh | sh
+curl -fsSL https://skunkbg.github.io/shadowfox/uninstall.sh -o /tmp/sfrm.sh && sh /tmp/sfrm.sh
 ```
 
 Одного `opkg remove shadowfox` для установки начисто мало: файлы настроек
