@@ -104,25 +104,46 @@ static long status_num(const char *path, const char *key)
     return atol(v);
 }
 
-/* Сколько записей в наборе. -1, если набора нет. */
+/* Сколько записей в наборе.
+   Возвращает число, либо IPSET_NO_SET если набора нет,
+   либо IPSET_UNKNOWN если сосчитать не удалось.
+
+   Различать это важно: раньше обе неудачи показывались как «набора
+   нет», и отсутствие сведений выдавалось за отрицательный ответ. */
+#define IPSET_NO_SET   (-1)
+#define IPSET_UNKNOWN  (-2)
+
 static long ipset_count(const char *bin, const char *set)
 {
-    char  name[WL_SETNAME_MAX];
-    char  flag[] = "-t";
-    char  list[] = "list";
-    char  binbuf[128];
+    char name[WL_SETNAME_MAX];
+    char binbuf[128];
+    char list[] = "list";
 
     str_copy(binbuf, sizeof(binbuf), bin);
     str_copy(name, sizeof(name), set);
 
-    char *argv[] = { binbuf, list, flag, name, NULL };
-    char  out[2048];
+    /* Полный список, а не краткий: в старых версиях ipset краткий режим
+       не печатает число записей вовсе — проверено на роутере. */
+    char *argv[] = { binbuf, list, name, NULL };
 
-    if (proc_run(argv, out, sizeof(out), 5) != 0) return -1;
+    static char out[128 * 1024];
+    if (proc_run(argv, out, sizeof(out), 5) != 0) {
+        /* Набора нет — ipset так и говорит. Всё прочее это наша беда. */
+        return strstr(out, "does not exist") ? IPSET_NO_SET : IPSET_UNKNOWN;
+    }
 
-    const char *p = strstr(out, "Number of entries:");
-    if (!p) return -1;
-    return atol(p + 18);
+    /* Если новая версия сама посчитала — берём её число. */
+    const char *n = strstr(out, "Number of entries:");
+    if (n) return atol(n + 18);
+
+    const char *m = strstr(out, "Members:");
+    if (!m) return IPSET_UNKNOWN;
+
+    long count = 0;
+    for (const char *p = strchr(m, '\n'); p; p = strchr(p + 1, '\n'))
+        if (p[1] && p[1] != '\n') count++;
+
+    return count;
 }
 
 static void print_rule_counters(const rt_t *rt)
@@ -215,13 +236,31 @@ int status_print(const config_t *cfg)
         if (have_ipset) {
             long c4 = ipset_count(ipbin, g->ipset4);
             long c6 = ipset_count(ipbin, g->ipset6);
-            printf("        наборы: %s %s, %s %s\n",
-                   g->ipset4, c4 >= 0 ? "" : "нет",
-                   g->ipset6, c6 >= 0 ? "" : "нет");
-            if (c4 >= 0) printf("        адресов: v4 %ld, v6 %ld\n", c4, c6 >= 0 ? c6 : 0);
+
+            if (c4 == IPSET_NO_SET && c6 == IPSET_NO_SET) {
+                printf("        наборы ещё не созданы\n");
+            } else if (c4 == IPSET_UNKNOWN || c6 == IPSET_UNKNOWN) {
+                printf("        наборы есть, число записей не прочитать\n");
+            } else {
+                printf("        адресов: v4 %ld, v6 %ld\n",
+                       c4 >= 0 ? c4 : 0, c6 >= 0 ? c6 : 0);
+            }
         }
     }
     printf("\n");
+
+    if (status_num(spath, "started") < 0) {
+        /* Файл пишется демоном при запуске и раз в минуту. Если его нет,
+           демон, скорее всего, ещё не закончил старт. Сообщать в этом
+           случае «перехват выключен» значит выдавать незнание за факт. */
+        printf("  сведения от демона пока недоступны — он только что\n");
+        printf("  запустился. Повтори через несколько секунд.\n\n");
+
+        rt_t rt0;
+        rt_init(&rt0);
+        if (rt_find_bins(&rt0)) print_rule_counters(&rt0);
+        return 0;
+    }
 
     long xpid = status_num(spath, "xray_pid");
     if (xpid > 0) {
