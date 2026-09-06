@@ -10,6 +10,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 int ndm_header(const char *response, const char *name, char *out, unsigned out_size)
@@ -112,9 +113,17 @@ ndm_result_t ndm_check_password(const char *host, int port,
 {
     if (!host || !login || !password) return NDM_UNAVAILABLE;
 
-    char req[512];
-    snprintf(req, sizeof(req),
-             "GET /auth HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", host);
+    /* С запасом: сюда складываются логин, ответ на запрос и кука
+       сессии. Обрезанный запрос роутер отверг бы, а понять почему было
+       бы неоткуда. */
+    char req[1024];
+    int  n = snprintf(req, sizeof(req),
+                      "GET /auth HTTP/1.1\r\nHost: %s\r\n"
+                      "Connection: close\r\n\r\n", host);
+    if (n < 0 || (size_t)n >= sizeof(req)) {
+        if (err) str_copy(err, err_size, "слишком длинный адрес роутера");
+        return NDM_UNAVAILABLE;
+    }
 
     static char resp[8192];
     int code = exchange(host, port, req, resp, sizeof(resp));
@@ -151,13 +160,17 @@ ndm_result_t ndm_check_password(const char *host, int port,
     char *semi = strchr(cookie, ';');
     if (semi) *semi = '\0';
 
-    snprintf(req, sizeof(req),
-             "POST /auth HTTP/1.1\r\nHost: %s\r\n"
-             "X-NDM-Login: %s\r\nX-NDM-Password: %s\r\n"
-             "%s%s%s"
-             "Content-Length: 0\r\nConnection: close\r\n\r\n",
-             host, login, answer,
-             cookie[0] ? "Cookie: " : "", cookie, cookie[0] ? "\r\n" : "");
+    n = snprintf(req, sizeof(req),
+                 "POST /auth HTTP/1.1\r\nHost: %s\r\n"
+                 "X-NDM-Login: %s\r\nX-NDM-Password: %s\r\n"
+                 "%s%s%s"
+                 "Content-Length: 0\r\nConnection: close\r\n\r\n",
+                 host, login, answer,
+                 cookie[0] ? "Cookie: " : "", cookie, cookie[0] ? "\r\n" : "");
+    if (n < 0 || (size_t)n >= sizeof(req)) {
+        if (err) str_copy(err, err_size, "слишком длинный логин");
+        return NDM_UNAVAILABLE;
+    }
 
     code = exchange(host, port, req, resp, sizeof(resp));
 
