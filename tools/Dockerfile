@@ -13,7 +13,7 @@ RUN apt-get update \
 COPY tools/fetch-toolchains.sh /usr/local/bin/fetch-toolchains.sh
 RUN /usr/local/bin/fetch-toolchains.sh /opt/toolchains
 
-ENV PATH="/opt/toolchains/aarch64-linux-musl-cross/bin:/opt/toolchains/mipsel-linux-muslsf-cross/bin:/opt/toolchains/mips-linux-muslsf-cross/bin:${PATH}"
+ENV PATH="/opt/toolchains/aarch64-unknown-linux-musl/bin:/opt/toolchains/mipsel-unknown-linux-muslsf/bin:/opt/toolchains/mips-unknown-linux-muslsf/bin:${PATH}"
 
 WORKDIR /w
 CMD ["make", "all"]

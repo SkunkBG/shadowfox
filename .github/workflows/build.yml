@@ -22,14 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Тулчейны весят ~500 МБ и качаются с musl.cc, который бывает
-      # недоступен, поэтому кешируем их между прогонами.
       - name: Кеш тулчейнов
         id: tc-cache
         uses: actions/cache@v4
         with:
           path: /opt/toolchains
-          key: musl-toolchains-v1
+          key: musl-cross-20260823-v2
 
       - name: Скачать тулчейны
         if: steps.tc-cache.outputs.cache-hit != 'true'
@@ -37,7 +35,7 @@ jobs:
 
       - name: Добавить в PATH
         run: |
-          for tc in aarch64-linux-musl-cross mipsel-linux-muslsf-cross mips-linux-muslsf-cross; do
+          for tc in aarch64-unknown-linux-musl mipsel-unknown-linux-muslsf mips-unknown-linux-muslsf; do
             echo "/opt/toolchains/$tc/bin" >> "$GITHUB_PATH"
           done
 

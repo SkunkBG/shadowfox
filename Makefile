@@ -5,9 +5,15 @@ REVISION = 1
 
 # Кросс-компиляторы musl. На macOS их нет — собирай через `make docker-all`
 # или в CI. Локально доступна только цель `native` для юнит-тестов.
-CC_AARCH64 = aarch64-linux-musl-gcc
-CC_MIPSEL  = mipsel-linux-muslsf-gcc
-CC_MIPS    = mips-linux-muslsf-gcc
+#
+# Имена берём первое доступное из списка: у сборок cross-tools/musl-cross
+# префикс с "unknown", у старых с musl.cc — без него. Так работает и то,
+# что уже стоит на машине, и то, что ставит fetch-toolchains.sh.
+pick_cc = $(firstword $(foreach c,$(1),$(if $(shell command -v $(c) 2>/dev/null),$(c))) $(firstword $(1)))
+
+CC_AARCH64 = $(call pick_cc,aarch64-unknown-linux-musl-gcc aarch64-linux-musl-gcc)
+CC_MIPSEL  = $(call pick_cc,mipsel-unknown-linux-muslsf-gcc mipsel-linux-muslsf-gcc)
+CC_MIPS    = $(call pick_cc,mips-unknown-linux-muslsf-gcc mips-linux-muslsf-gcc)
 CC_NATIVE  = cc
 
 COMMON_CFLAGS = -Os -Wall -Wextra -Wno-unused-parameter \
