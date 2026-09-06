@@ -152,6 +152,21 @@ static int add_domain(wl_t *w, int group, const char *raw)
     return 0;
 }
 
+/* Похоже ли на адрес, а не на имя. Домен не содержит ':' и не бывает
+   целиком из цифр и точек, так что спутать нельзя. Нужно, чтобы адрес,
+   вписанный в общий список группы, попал в подсети: иначе он молча
+   ложился доменом с таким именем и не совпадал ни с чем. */
+static int looks_like_ip(const char *s)
+{
+    if (strchr(s, ':')) return 1;
+    if (*s < '0' || *s > '9') return 0;
+
+    for (const char *p = s; *p; p++)
+        if ((*p < '0' || *p > '9') && *p != '.' && *p != '/') return 0;
+
+    return 1;
+}
+
 static int add_cidr(wl_t *w, int group, const char *raw)
 {
     if (w->cidr_count >= WL_CIDRS_MAX) return -1;
@@ -226,7 +241,8 @@ static int load(wl_t *w, const char *path, int cidrs)
            куда заворачивать трафик. */
         if (group < 0) { w->skipped++; continue; }
 
-        int rc = cidrs ? add_cidr(w, group, s) : add_domain(w, group, s);
+        int rc = (cidrs || looks_like_ip(s)) ? add_cidr(w, group, s)
+                                            : add_domain(w, group, s);
         if (rc != 0) w->skipped++;
     }
 

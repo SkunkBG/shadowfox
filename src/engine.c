@@ -365,6 +365,12 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
 
     int have = load_lists(e, cfg);
 
+    /* Правила уже сняты, так что сейчас — единственный момент, когда
+       наборы исчезнувших групп можно удалить: пока на них ссылаются
+       правила, ядро их не отдаёт. */
+    int gone = ips_destroy_orphans(&e->ips, &e->wl);
+    if (gone) log_info("убрано наборов от прежних групп: %d", gone);
+
     /* Перехват пересчитываем всегда: именно здесь появляются домены,
        добавленные через страницу. */
     sync_capture(e, cfg);
@@ -423,9 +429,9 @@ void engine_tick(engine_t *e, time_t now)
     if (e->capturing && now - e->last_stats_log >= 60) {
         e->last_stats_log = now;
         log_info("перехват: пакетов %lu, ответов %lu, адресов %lu; "
-                 "мимо: не UDP/53 %lu, не разобрались %lu",
+                 "мимо: не наш трафик %lu, без адресов %lu, битых %lu",
                  e->cap.seen, e->cap.parsed, e->matched,
-                 e->cap.drop_notip, e->cap.drop_notreply);
+                 e->cap.drop_notip, e->cap.drop_empty, e->cap.drop_bad);
     }
 
     if (e->ips.queued && now - e->last_flush >= ENGINE_FLUSH_SECONDS) {

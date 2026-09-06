@@ -94,16 +94,19 @@ int dns_parse_reply(const unsigned char *buf, size_t len, dns_reply_t *out)
 
     unsigned flags = rd16(buf + 2);
 
-    /* Нас интересуют только ответы без ошибки. Запросы и отказы
-       адресов не несут. */
-    if (!(flags & 0x8000)) return -1;          /* QR: это запрос */
-    if ((flags & 0x000F) != 0) return -1;      /* RCODE не NOERROR */
+    /* Нас интересуют только ответы без ошибки. Запросы и отказы адресов
+       не несут — но это не поломка, а обычная жизнь: на каждое имя
+       браузер спрашивает и AAAA, и очень часто получает пустой ответ.
+       Такие случаи отдаём как -2, чтобы счётчики не выдавали их за сбой
+       разбора: на этом легко построить ложный диагноз. */
+    if (!(flags & 0x8000)) return -2;          /* QR: это запрос */
+    if ((flags & 0x000F) != 0) return -2;      /* RCODE не NOERROR */
 
     unsigned qdcount = rd16(buf + 4);
     unsigned ancount = rd16(buf + 6);
 
-    if (qdcount != 1) return -1;               /* иных не бывает на практике */
-    if (ancount == 0) return -1;
+    if (qdcount != 1) return -2;               /* иных не бывает на практике */
+    if (ancount == 0) return -2;
 
     size_t off = DNS_HEADER_LEN;
 
@@ -147,5 +150,5 @@ int dns_parse_reply(const unsigned char *buf, size_t len, dns_reply_t *out)
         off += rdlen;
     }
 
-    return out->answer_count ? 0 : -1;
+    return out->answer_count ? 0 : -2;   /* ответ был, адресов в нём нет */
 }

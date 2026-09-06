@@ -27,7 +27,8 @@ typedef struct {
        не тот протокол, не ответ и ответ без адресов — а лечатся они
        по-разному. */
     unsigned long drop_notip;      /* не IPv4/IPv6, не UDP, не порт 53 */
-    unsigned long drop_notreply;   /* не ответ, ошибка либо без адресов */
+    unsigned long drop_empty;      /* настоящий ответ, но адресов в нём нет */
+    unsigned long drop_bad;        /* пакет испорчен — вот это уже сбой */
     unsigned char buf[DCAP_BUF_BYTES];
 } dcap_t;
 

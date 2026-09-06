@@ -70,7 +70,8 @@ int dcap_extract_why(const unsigned char *pkt, size_t len, dns_reply_t *out)
     }
     if (!avail) return -1;
 
-    return dns_parse_reply(pkt + payload, avail, out) == 0 ? 0 : -2;
+    int rc = dns_parse_reply(pkt + payload, avail, out);
+    return rc == 0 ? 0 : (rc == -2 ? -2 : -3);
 }
 
 #ifdef __linux__
@@ -212,13 +213,15 @@ int dcap_poll(dcap_t *c, void (*cb)(const dns_reply_t *, void *), void *ctx)
 
         if (why != 0) {
             c->ignored++;
-            if (why == -1) c->drop_notip++;
-            else           c->drop_notreply++;
+            if (why == -1)      c->drop_notip++;
+            else if (why == -2) c->drop_empty++;
+            else                c->drop_bad++;
 
             /* Первые байты показывают версию IP и протокол — по ним
                сразу видно, тот ли слой отдаёт сокет. */
             log_debug("пакет мимо (%s), %zd байт, начало %02x %02x %02x %02x",
-                      why == -1 ? "не UDP/53" : "не разобрался",
+                      why == -1 ? "не UDP/53"
+                                : (why == -2 ? "без адресов" : "битый"),
                       n, c->buf[0], c->buf[1],
                       n > 2 ? c->buf[2] : 0, n > 3 ? c->buf[3] : 0);
             continue;

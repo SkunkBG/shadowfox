@@ -106,6 +106,53 @@ void ips_destroy(ips_t *s, const wl_t *w)
     }
 }
 
+/* Наборы групп, которых больше нет. Группу переименовали или удалили —
+   её наборы оставались висеть в ядре: занимали память и путали
+   диагностику, потому что «ipset list» показывал давно неживое.
+   Вызывать можно только когда правила уже сняты: набор, на который
+   ссылается правило, ядро удалить не даст. */
+int ips_destroy_orphans(ips_t *s, const wl_t *w)
+{
+    if (!s || !w || !s->bin[0]) return 0;
+
+    char bin[IPS_BIN_MAX];
+    char arg1[] = "list";
+    char arg2[] = "-n";
+    str_copy(bin, sizeof(bin), s->bin);
+
+    char *argv[] = { bin, arg1, arg2, NULL };
+    static char out[16 * 1024];
+
+    if (proc_run(argv, out, sizeof(out), s->timeout) != 0) return 0;
+
+    int killed = 0;
+
+    for (char *line = strtok(out, "\n"); line; line = strtok(NULL, "\n")) {
+        char *name = str_trim(line);
+
+        if (strncmp(name, "sf4_", 4) != 0 && strncmp(name, "sf6_", 4) != 0)
+            continue;
+
+        int ours = 0;
+        for (int i = 0; i < w->group_count && !ours; i++)
+            ours = !strcmp(name, w->groups[i].ipset4) ||
+                   !strcmp(name, w->groups[i].ipset6);
+        if (ours) continue;
+
+        char nbin[IPS_BIN_MAX];
+        char cmd[] = "destroy";
+        char nm[WL_SETNAME_MAX];
+        str_copy(nbin, sizeof(nbin), s->bin);
+        if (str_copy(nm, sizeof(nm), name) != 0) continue;
+
+        char *dargv[] = { nbin, cmd, nm, NULL };
+        char  derr[256];
+        if (proc_run(dargv, derr, sizeof(derr), s->timeout) == 0) killed++;
+    }
+
+    return killed;
+}
+
 void ips_queue_add(ips_t *s, const wl_t *w, int group, int family,
                    const char *text)
 {

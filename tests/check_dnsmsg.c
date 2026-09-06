@@ -206,18 +206,18 @@ static void test_rejects_non_answers(void)
     /* Запрос, а не ответ. */
     header(&p, 0x0100, 1, 0);
     question(&p, "example.com", 1);
-    CHECK(dns_parse_reply(p.b, p.n, &r) == -1, "запрос отброшен");
+    CHECK(dns_parse_reply(p.b, p.n, &r) == -2, "запрос: ответа нет, но пакет цел");
 
     /* Ответ с ошибкой: адресов в нём нет. */
     header(&p, 0x8183, 1, 1);
     question(&p, "example.com", 1);
     answer_a(&p, "example.com", "192.0.2.1");
-    CHECK(dns_parse_reply(p.b, p.n, &r) == -1, "NXDOMAIN отброшен");
+    CHECK(dns_parse_reply(p.b, p.n, &r) == -2, "NXDOMAIN: пакет цел, адресов нет");
 
     /* Ответ без записей. */
     header(&p, 0x8180, 1, 0);
     question(&p, "example.com", 1);
-    CHECK(dns_parse_reply(p.b, p.n, &r) == -1, "пустой ответ отброшен");
+    CHECK(dns_parse_reply(p.b, p.n, &r) == -2, "пустой ответ: пакет цел");
 
     /* Только CNAME, без адресов — заворачивать нечего. */
     header(&p, 0x8180, 1, 1);
@@ -227,7 +227,16 @@ static void test_rejects_non_answers(void)
     pkt_t t; t.n = 0; put_name(&t, "b.example.com");
     put16(&p, (unsigned)t.n);
     memcpy(p.b + p.n, t.b, t.n); p.n += t.n;
-    CHECK(dns_parse_reply(p.b, p.n, &r) == -1, "ответ без адресов отброшен");
+    CHECK(dns_parse_reply(p.b, p.n, &r) == -2, "только CNAME: пакет цел");
+
+    /* А вот это уже поломка, и путать её с пустотой нельзя: на счётчике
+       «битых» строится вывод о том, что перехват смотрит не на тот слой. */
+    header(&p, 0x8180, 1, 1);
+    question(&p, "example.com", 1);
+    p.n -= 3;
+    CHECK(dns_parse_reply(p.b, p.n, &r) == -1, "обрезанный пакет — битый");
+
+    CHECK(dns_parse_reply(p.b, 4, &r) == -1, "огрызок — битый");
 }
 
 static void test_survives_garbage(void)

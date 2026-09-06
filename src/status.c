@@ -55,7 +55,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "parsed=%lu\n"
         "matched=%lu\n"
         "drop_notip=%lu\n"
-        "drop_notreply=%lu\n"
+        "drop_empty=%lu\n"
+        "drop_bad=%lu\n"
         "flushes=%lu\n"
         "restores=%lu\n"
         "rules=%d\n"
@@ -65,7 +66,7 @@ void status_write(const struct engine *ce, const config_t *cfg)
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
-        e->cap.drop_notip, e->cap.drop_notreply,
+        e->cap.drop_notip, e->cap.drop_empty, e->cap.drop_bad,
         e->flushes, e->restores, e->rules_applied,
         (long)e->xray.pid, e->xray.restarts, cfg->socks_port);
 
@@ -281,10 +282,14 @@ int status_print(const config_t *cfg)
         printf("              пакетов %ld, ответов %ld, адресов %ld\n",
                status_num(spath, "seen"), status_num(spath, "parsed"),
                status_num(spath, "matched"));
+        /* «Без адресов» — не сбой: на каждое имя браузер спрашивает и
+           AAAA, и часто получает пустой ответ. Сбой — только «битых». */
         long a = status_num(spath, "drop_notip");
-        long b = status_num(spath, "drop_notreply");
-        if (a > 0 || b > 0)
-            printf("              мимо: не UDP/53 %ld, не разобрались %ld\n", a, b);
+        long b = status_num(spath, "drop_empty");
+        long c = status_num(spath, "drop_bad");
+        if (a > 0 || b > 0 || c > 0)
+            printf("              мимо: не наш трафик %ld, без адресов %ld, "
+                   "битых %ld\n", a, b, c);
     } else {
         printf("  перехват:   выключен\n");
     }

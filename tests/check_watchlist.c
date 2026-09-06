@@ -229,6 +229,48 @@ static void test_cidrs(void)
     CHECK(wl_match_ip(&w, 6, a) == -1, "адрес v4 не ищется среди v6");
 }
 
+/* Адрес, вписанный в общий список группы, обязан стать подсетью, а не
+   «доменом» с таким именем: последнее не совпадает ни с чем и молчит. */
+static void test_ip_in_domain_list(void)
+{
+    wl_t w;
+    load_domains(&w,
+        "[Стриминг]\n"
+        "interface = ShadowFox\n"
+        "netflix.com\n"
+        "104.244.42.0/24\n"
+        "8.8.8.8\n"
+        "2001:db8::/32\n");
+
+    CHECK(w.domain_count == 1, "доменов ровно один: %d", w.domain_count);
+    CHECK(w.cidr_count == 3, "адресов три: %d", w.cidr_count);
+    CHECK(w.skipped == 0, "ничего не отброшено: %d", w.skipped);
+
+    unsigned char v4[4] = { 104, 244, 42, 7 };
+    CHECK(wl_match_ip(&w, 4, v4) == 0, "адрес из подсети совпал");
+
+    unsigned char dns[4] = { 8, 8, 8, 8 };
+    CHECK(wl_match_ip(&w, 4, dns) == 0, "одиночный адрес совпал");
+
+    CHECK(match(&w, "netflix.com") == 0, "домен рядом не пострадал");
+    CHECK(match(&w, "104.244.42.0/24") < 0, "адрес не стал доменом");
+}
+
+/* Имя с цифрами в начале — всё ещё домен, а не адрес. */
+static void test_numeric_domain_stays_domain(void)
+{
+    wl_t w;
+    load_domains(&w,
+        "[Разное]\n"
+        "interface = ShadowFox\n"
+        "1337x.to\n"
+        "2ip.ru\n");
+
+    CHECK(w.domain_count == 2, "оба остались доменами: %d", w.domain_count);
+    CHECK(w.cidr_count == 0, "подсетей нет: %d", w.cidr_count);
+    CHECK(match(&w, "1337x.to") == 0, "домен с цифр совпадает");
+}
+
 static void test_longest_prefix_wins(void)
 {
     write_file("ip2.list",
@@ -278,6 +320,8 @@ int main(void)
     test_longest_match_wins();
     test_bad_lines_are_skipped();
     test_cidrs();
+    test_ip_in_domain_list();
+    test_numeric_domain_stays_domain();
     test_longest_prefix_wins();
     test_missing_file();
 

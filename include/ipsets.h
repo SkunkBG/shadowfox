@@ -43,6 +43,10 @@ void ips_queue_create(ips_t *s, const wl_t *w, int timeout);
    Вызывать можно только когда на наборы не ссылаются правила. */
 void ips_destroy(ips_t *s, const wl_t *w);
 
+/* Удаляет наши наборы, которым больше не соответствует ни одна группа.
+   Возвращает, сколько удалено. Только при снятых правилах. */
+int  ips_destroy_orphans(ips_t *s, const wl_t *w);
+
 /* Ставит в очередь добавление адреса в набор группы.
    family — 4 или 6, text — адрес в обычной записи. */
 void ips_queue_add(ips_t *s, const wl_t *w, int group, int family,

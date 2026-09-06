@@ -167,7 +167,8 @@ function viewRules(){
     return `<h2>Правила маршрутизации</h2>
       <div class="card"><h3>Правил пока нет</h3>
       <p>Правило — это цель, куда заворачивается трафик: политика Keenetic
-      либо сетевой интерфейс. Внутри правила — группы доменов.</p>
+      либо сетевой интерфейс. Внутри правила — группы: в каждой домены и
+      адреса, по одному в строке.</p>
       <button class="b" id="newrule">Создать правило</button></div>`;
 
   return `<h2>Правила маршрутизации</h2>`
@@ -182,7 +183,9 @@ function viewRules(){
               <input value="${esc(g.name)}" data-name>
               <button class="icon" data-del title="Удалить группу">✕</button>
             </div>
-            <textarea spellcheck="false" data-lines>${esc(g.lines.join('\n'))}</textarea>
+            <textarea spellcheck="false" data-lines
+              placeholder="домены и адреса, по одному в строке"
+              >${esc(g.lines.join('\n'))}</textarea>
           </div>`).join('')}
         <div class="add" data-addgrp="${i}">+</div>
       </div>
@@ -250,12 +253,10 @@ function viewConn(){
 
   <div class="card">
     <h3>Подсети</h3>
-    <p>Для сервисов с зашитыми адресами, которые не спрашивают DNS: там
-    перехват ответов бессилен.</p>
-    <textarea class="wide" id="cidrs" spellcheck="false"
-      style="min-height:100px">${esc(D.cidrs)}</textarea>
-    <div class="bar"><button class="b" data-save="cidrs">Сохранить</button>
-      <span class="msg" id="m-cidrs"></span></div>
+    <p>Отдельного списка больше нет: адреса и подсети пишутся в те же
+    группы, что и домены — <code>104.244.42.0/24</code> или
+    <code>8.8.8.8</code> отдельной строкой. Это нужно сервисам с
+    зашитыми адресами, которые DNS не спрашивают: там ловить нечего.</p>
   </div>`;
 }
 
