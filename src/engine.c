@@ -11,6 +11,8 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
 
 /* Как часто отдавать накопленные адреса в ipset. Раз в секунду: адреса
    должны попадать в наборы быстро, иначе первое соединение к домену
@@ -214,8 +216,26 @@ static int apply_all(engine_t *e, char *err, unsigned err_size, int recreate)
    Отсутствие файла со ссылками — не ошибка: тогда своего ядра просто
    нет, а маршрутизация продолжает работать через то подключение,
    которое настроено вручную. */
+/* Отметка «ядро выключено вручную». Файлом, а не полем в памяти:
+   перезапуск демона иначе молча поднял бы то, что выключили. */
+static void core_flag_path(const config_t *cfg, char *dst, size_t size)
+{
+    snprintf(dst, size, "%s/core.off", cfg->conf_dir);
+}
+
+int engine_core_off(const config_t *cfg)
+{
+    char path[CFG_PATH_MAX + 32];
+    core_flag_path(cfg, path, sizeof(path));
+    return access(path, F_OK) == 0;
+}
+
 static void start_own_xray(engine_t *e, const config_t *cfg)
 {
+    if (engine_core_off(cfg)) {
+        log_info("своё ядро выключено из интерфейса, не запускаю");
+        return;
+    }
     FILE *f = fopen(cfg->nodes_file, "r");
     if (!f) {
         log_info("файла %s нет, свой Xray не запускается", cfg->nodes_file);
@@ -339,6 +359,39 @@ void engine_stop(engine_t *e)
 
         e->rules_applied = 0;
     }
+}
+
+int engine_core_set(engine_t *e, const config_t *cfg, int on,
+                    char *err, unsigned err_size)
+{
+    if (!e || !cfg) return -1;
+
+    char path[CFG_PATH_MAX + 32];
+    core_flag_path(cfg, path, sizeof(path));
+
+    if (on) {
+        if (unlink(path) != 0 && errno != ENOENT) {
+            if (err) snprintf(err, err_size, "не убрать %s: %s", path, strerror(errno));
+            return -1;
+        }
+        if (e->xray_managed) return 0;      /* уже работает */
+        start_own_xray(e, cfg);
+        return 0;
+    }
+
+    FILE *f = fopen(path, "w");
+    if (!f) {
+        if (err) snprintf(err, err_size, "не создать %s: %s", path, strerror(errno));
+        return -1;
+    }
+    fclose(f);
+
+    if (e->xray_managed) {
+        sv_stop(&e->xray);
+        e->xray_managed = 0;
+        log_info("своё ядро остановлено из интерфейса");
+    }
+    return 0;
 }
 
 int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size)

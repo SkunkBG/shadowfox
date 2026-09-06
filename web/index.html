@@ -5,210 +5,298 @@
 <style>
 @font-face{font-family:Cinzel;font-style:normal;font-weight:600;font-display:swap;src:url(data:font/woff2;base64,d09GMgABAAAAAAX4AA8AAAAACjQAAAWhAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhYbIBwqBmA/U1RBVBwAbBEICopgiRIBNgIkAygLFgAEIAWDKAcgG0sIII7SHDKQqWQzTv4XbdbrnsH+DCQOceoq4mRFHQgR92XPYV0kcuIaePjn3t2/Kwt9Tcvq+KKlcYGGEmAnoE35+//vVb0/YywbUzQU8Yi8kXWzx/Gfj+32DdYK9QSoa2k3liYu0SFWIK7KdMy8aBB/90ZgABkAABzDqTAMQAIRDNaaON0MNREAVwAAQKRwRIJDptOts2rLYQAK2EtMp3IbFMDPUgcwbRq2QF8WC0pm2E8e74qrMKIxe9q7ELg7rBbmYX9+sQljoK2MWgK8AZrNjwWFtYwrJwCBcVmAWUW2GE+4Q/CTjJhoniy5ClVojABtaPgN8XRdiCOxPbbGplgTSzHUZ5gDh7gBGAIECUyz2R3gI4wGkUg4hcYuEk5JBSKBWqOkfN83Rkeizl8EsUy01NtdJFGj04kLXfbOEEmRB0oKICdJUr/9MrFEy54rLKc1sV7unClc362TOa8EZND6y2R3MCalSesuSXanBFo5b9065WMmezc5OgPXXoqynOsK7OwkR/f96PU7dgRIW7u6Jt3pYfbjQ63nu0O29PRYDMRKiijZtnafJDn/thcCSiyplLJmw5Yt+iTISZa07pxkdzLIieQ8UOLs6sL8zk6iYKfTyZw9zN5NdoeDmCSSIs2ZWUcCUmj9+SBig1FRjuRQTsyQ2ZLzAJOk+Q6TlygR2OWOs6CGfT85rBWLTmAQYFi3T7kU9sJ67jwNEF94PAlZmL1nkObsCRdLhl4n5iNOy5CSzBkWm33tRgNZM3zUmuQcy8aNfvNSEjbsJwrB2FBuDvWhWtB5b0YRFaetPfTmk+GSCwGJI2zWHMu6e5IEOaLFdMt7H/Szrr9PxMpsfRMTF+muwbzhsFu3/OPCxeaLqbPCvwj3nhXhE/F5jZWkkHUhfG6DdR7/SP6INLgni7ShD8OElAFBTeSrWNMxf8psgpb/eA2PEjTj/aFFs5rqTSMnt4d08+o3cXWNqp36TR42dOj4YWTQnbi62BE2PYSntJeUSb+M/M9L8wzvrdT0jZo7Oz7z2dQx/YN/8jr5xvvh5jiTaaY17luNWOiD8VtjofP606XLD1zyUNMtgprP+Q9YNM9/T5z4zV/Cg9+va4o2hwqhQc43PjjvDTWqkdrjEhrnRasmzX41PV0gw9MUves1NT0OebuFLS01C/Nhyp4ZOtdWb2O+YyYTtAw/KVg3V2kNkFEP8xNtdbZoyEP2BoSOCC38b9REgpToe31rBF+dHhLq+Gl76LV6n/5/PWttMSwXGH5QVAuKXj1k1AWry3AE7FN+b8CueDl3ekdM2py+1ZMnC0RKlDhdS5kqpO42bcaYnHGDW82WwS1SHDPGDGqxmAe1/ncQN2fBkmWR9+9VaW1njuLIEZVGn/8Wzb+2L+z2i4crluz8DUuXKDW+qWtdMQuLPdR0nqDif8mRjflYvykAaoRq7utx07rQ4nBYcgzXlnlCQg+Sg97/5crfobd1E1nNUAd/rg2SKZgg86xaHkuQeNqPvclfyIFaGsdemJ7u6X2DkTZQ7pzMt2d5QUYAoOMEBuDw28GGwxluw39XC8JXAPAgfbMBAN4d1Fd0fdG7UDFOeApAiQMABk1vXWwCwLgNGPqrKPkNffkYJHAj+nOH6zv+EyL594gS1IgUKl0/vsD1k38AMAAp545KWqeuJuAAtXwClmsAbAaUYSYYm8OczsWwoD/urxdhYQV/9IaUgpnhgYxDTgZinAqVmlQrUqBQLSP6IkHoG2HWFPJwHKBfrlmJpVv8bNUqFBdzrEhj1KntGmZWq2FEpFNkw0qN5UNhggkFikAUKmaLR8723WVMmGm8KeYZZxarCeYyebZZlNc4T4plmjh2Irc119yLCtQplaVaX8QjgROHYaZZ29YJhjmSOA6sPNg7FalQzvisxCok5pKsKaBUrqu+AA==) format('woff2')}
 :root{
-  --bg:#f2f4f7;--panel:#fff;--card:#fff;--line:#e2e6ec;--soft:#f7f9fb;
-  --fg:#1a1f27;--dim:#6b7686;--acc:#0fb0cd;--ok:#12b76a;--bad:#e5484d;--warn:#f59f0b;
+  --bg:#0b0f14;--side:#0d1218;--panel:#131a22;--card:#161e27;--line:#222c38;
+  --soft:#0f151c;--fg:#e9eef5;--dim:#8b95a5;--acc:#22c8e6;--acc-soft:#22c8e61f;
+  --ok:#3ddc84;--bad:#ff5f5f;--warn:#f5b23d;
 }
-:root[data-theme=dark]{
-  --bg:#0d1014;--panel:#151a21;--card:#1b212a;--line:#28303b;--soft:#12171d;
-  --fg:#e8ecf2;--dim:#8b95a5;--acc:#22b8d6;
+:root[data-theme=light]{
+  --bg:#f4f6f9;--side:#fff;--panel:#fff;--card:#fff;--line:#e3e8ee;
+  --soft:#f7f9fb;--fg:#161c24;--dim:#66707e;--acc:#0d9fbc;--acc-soft:#0d9fbc17;
+  --ok:#0f9d58;--bad:#d93a3a;--warn:#c98118;
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme=light]){
-    --bg:#0d1014;--panel:#151a21;--card:#1b212a;--line:#28303b;--soft:#12171d;
-    --fg:#e8ecf2;--dim:#8b95a5;--acc:#22b8d6;
+@media (prefers-color-scheme:light){
+  :root:not([data-theme=dark]){
+    --bg:#f4f6f9;--side:#fff;--panel:#fff;--card:#fff;--line:#e3e8ee;
+    --soft:#f7f9fb;--fg:#161c24;--dim:#66707e;--acc:#0d9fbc;--acc-soft:#0d9fbc17;
+    --ok:#0f9d58;--bad:#d93a3a;--warn:#c98118;
   }
 }
 *{box-sizing:border-box}
-/* Свой display в классе перебивает атрибут hidden, и скрытое остаётся
-   видимым: полоса сохранения висела на пустом месте. */
 [hidden]{display:none!important}
-body{margin:0;min-height:100vh;display:flex;flex-direction:column;
-  background:var(--bg);color:var(--fg);
+.sp{flex:1}   /* распорка: объявлена один раз для всех */
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--fg);
   font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--acc)}
+svg{display:block}
 
-/* ---- шапка ---- */
-header{display:flex;align-items:center;gap:18px;padding:10px 20px;
-  background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
-.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
-.brand svg,.brand .mark{width:44px;height:44px;flex:0 0 auto;display:block}
-.brand b{font:600 25px/1 Cinzel,"Times New Roman",Georgia,serif;
-  color:var(--acc);letter-spacing:.04em}
-.brand span{color:var(--dim);font-size:13px;margin-left:2px}
-.tabs{display:flex;gap:4px;margin-left:18px}
-.tabs button{background:none;border:0;border-bottom:2px solid transparent;
-  color:var(--dim);font:inherit;font-size:14.5px;padding:9px 14px;cursor:pointer}
-.tabs button:hover{color:var(--fg)}
-.tabs button.on{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
-.sp{flex:1}
-.pill{display:inline-flex;align-items:center;gap:8px;color:var(--dim);font-size:13.5px}
+.app{display:flex;min-height:100vh}
+
+/* ---- боковая панель ---- */
+aside{width:270px;flex:0 0 auto;background:var(--side);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;
+  padding:20px 16px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:12px;margin:0 6px 26px;
+  text-decoration:none;color:inherit}
+.brand svg,.brand .mark{width:46px;height:46px;flex:0 0 auto}
+.brand b{display:block;font:600 21px/1.1 Cinzel,"Times New Roman",Georgia,serif;
+  color:var(--acc);letter-spacing:.03em}
+.brand i{font-style:normal;color:var(--dim);font-size:12.5px}
+aside nav{display:flex;flex-direction:column;gap:4px}
+aside nav button{display:flex;align-items:center;gap:13px;width:100%;
+  background:none;border:0;border-radius:12px;padding:12px 14px;cursor:pointer;
+  color:var(--dim);font:inherit;font-size:15px;text-align:left}
+aside nav button svg{width:21px;height:21px;flex:0 0 auto}
+aside nav button:hover{color:var(--fg);background:var(--panel)}
+aside nav button.on{background:var(--acc-soft);color:var(--acc);font-weight:600}
+.grow{flex:1}
+.srow{display:flex;align-items:center;gap:12px;width:100%;background:none;
+  border:0;padding:11px 14px;border-radius:12px;cursor:pointer;color:var(--dim);
+  font:inherit;font-size:14px;text-decoration:none}
+.srow svg{width:19px;height:19px;flex:0 0 auto}
+.srow:hover{color:var(--fg);background:var(--panel)}
+.srow .sp{flex:1}
+.sep{height:1px;background:var(--line);margin:14px 8px}
+.core{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+  border:1px solid var(--bad);color:var(--bad);background:none;border-radius:12px;
+  padding:13px;cursor:pointer;font:inherit;font-size:14.5px;font-weight:600}
+.core:hover{background:#ff5f5f14}
+.core.on{border-color:var(--ok);color:var(--ok)}
+.core.on:hover{background:#3ddc8414}
+.core svg{width:19px;height:19px}
+
+/* ---- правая часть ---- */
+.side2{flex:1;min-width:0;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:flex-end;gap:12px;
+  padding:18px 30px 0}
+.pill{display:inline-flex;align-items:center;gap:9px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:10px 16px;
+  font-size:14px;color:var(--fg)}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:0 0 auto}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
-.tbtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:9px;
-  width:38px;height:38px;cursor:pointer;font-size:16px;display:grid;place-items:center;
-  text-decoration:none}
-.tbtn:hover{color:var(--fg);border-color:var(--acc)}
-a.tbtn:hover{color:var(--bad);border-color:var(--bad)}
+.tbtn{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+  border-radius:12px;width:44px;height:44px;cursor:pointer;
+  display:grid;place-items:center}
+.tbtn svg{width:20px;height:20px}
+.tbtn:hover{color:var(--acc);border-color:var(--acc)}
+main{padding:22px 30px 40px;flex:1}
 
-main{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:26px 22px 40px}
-.htop{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-h2{margin:0;font-size:22px;font-weight:650}
+h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
+.sub{margin:5px 0 0;color:var(--dim);font-size:14.5px}
+.htop{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
+.htop .sp{flex:1}
 
 /* ---- кнопки ---- */
-.b{background:var(--acc);color:#04222a;border:0;border-radius:9px;
-  padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}
+.b{background:var(--acc);color:#04222a;border:0;border-radius:11px;
+  padding:12px 20px;font:inherit;font-weight:600;font-size:14.5px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:9px}
 .b.ghost{background:none;color:var(--fg);border:1px solid var(--line)}
 .b.ghost:hover{border-color:var(--acc)}
-.b.sm{padding:7px 13px;font-size:13.5px}
-.b:disabled{opacity:.45;cursor:default}
+.b.out{background:none;color:var(--acc);border:1px solid var(--acc)}
+.b.sm{padding:9px 15px;font-size:13.5px;border-radius:10px}
+.b:disabled{opacity:.5;cursor:default}
+.b svg{width:17px;height:17px}
 
-/* ---- правило ---- */
-.rule{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:16px;margin-bottom:16px}
-.rule>.top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.rule>.top b{font-size:16px}
-.badge{background:var(--soft);border:1px solid var(--line);border-radius:20px;
-  padding:3px 11px;color:var(--dim);font-size:12.5px}
+/* ---- поиск ---- */
+.search{display:flex;align-items:center;gap:10px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:11px 15px;
+  margin-bottom:20px;max-width:520px}
+.search svg{width:18px;height:18px;color:var(--dim)}
+.search input{flex:1;background:none;border:0;outline:0;color:var(--fg);
+  font:inherit;font-size:14.5px}
 
-/* ---- группа ---- */
-.grp{border:1px solid var(--line);border-radius:11px;margin-bottom:10px;
-  background:var(--card);overflow:hidden}
-.grp.off .gh .nm{color:var(--dim)}
-.gh{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
-.gh .ico{width:26px;height:26px;flex:0 0 auto;border-radius:6px;
-  display:grid;place-items:center}
-.gh .ico svg{width:22px;height:22px;display:block}
-.nm{font-size:15px;font-weight:600;background:none;border:0;color:inherit;
-  font-family:inherit;padding:2px 0;min-width:60px;flex:0 1 auto}
-.nm:focus{outline:0;border-bottom:1px solid var(--acc)}
-.chev{color:var(--dim);transition:transform .15s;flex:0 0 auto}
-.grp.open .chev{transform:rotate(180deg)}
-.gbody{display:none;padding:0 14px 14px;gap:14px}
-.grp.open .gbody{display:grid;grid-template-columns:1fr 300px}
-@media(max-width:820px){.grp.open .gbody{grid-template-columns:1fr}}
-
-.ed{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;
-  background:var(--soft)}
-.ed .gut{padding:9px 8px 9px 12px;color:var(--dim);text-align:right;
-  font:12.5px/1.6 ui-monospace,Menlo,monospace;user-select:none;overflow:hidden;
-  border-right:1px solid var(--line);min-width:38px;
-  white-space:pre}   /* иначе номера строк выстраиваются в строку */
-.ed textarea{flex:1;min-height:150px;border:0;outline:0;resize:vertical;
-  background:none;color:var(--fg);padding:9px 12px;
-  font:12.5px/1.6 ui-monospace,Menlo,monospace}
-.hint{background:var(--soft);border:1px solid var(--line);border-radius:9px;
-  padding:14px;color:var(--dim);font-size:13px;height:fit-content}
-.hint b{display:flex;align-items:center;gap:8px;color:var(--fg);
-  font-size:13.5px;margin-bottom:7px}
-.hint b svg{width:18px;height:18px;flex:0 0 auto}
-.hint code{background:var(--card)}
-.icon{background:none;border:0;color:var(--dim);cursor:pointer;font-size:15px;
-  padding:3px 6px;border-radius:6px}
-.icon:hover{color:var(--bad);background:var(--soft)}
-
-/* ---- переключатель ---- */
-.sw{flex:0 0 auto;width:40px;height:22px;border-radius:11px;border:0;padding:0;
-  background:var(--line);cursor:pointer;position:relative;transition:background .15s}
-.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;
-  border-radius:50%;background:#fff;transition:transform .15s;
-  box-shadow:0 1px 2px rgba(0,0,0,.25)}
-.sw.on{background:var(--acc)}
-.sw.on::after{transform:translateX(18px)}
-
-/* ---- карточки прочих разделов ---- */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:17px 19px;margin-bottom:16px}
-.card h3{margin:0 0 6px;font-size:16px}
+/* ---- карточки ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:20px 22px;margin-bottom:16px}
+.card h3{margin:0 0 8px;font-size:18px}
 .card p{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.7}
-label{display:block;color:var(--dim);font-size:12.5px;margin:12px 0 6px}
-textarea.wide{width:100%;min-height:130px;background:var(--soft);color:var(--fg);
-  border:1px solid var(--line);border-radius:9px;padding:10px;
-  font:12.5px/1.6 ui-monospace,Menlo,monospace;resize:vertical}
-pre{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:12px;
-  overflow-x:auto;font:12px/1.6 ui-monospace,Menlo,monospace;margin:0;color:var(--dim)}
-code{background:var(--soft);padding:1px 6px;border-radius:5px;font-size:12.5px}
-.bar{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
-.msg{font-size:13px;color:var(--dim)}.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
-.rows{display:grid;grid-template-columns:repeat(3,1fr);gap:0 26px}
-@media(max-width:820px){.rows{grid-template-columns:1fr}main{padding:18px 14px 40px}
-  .tabs{margin-left:0}header{flex-wrap:wrap;gap:10px}}
-.kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;
-  border-bottom:1px solid var(--line);font-size:14px}
+.rule{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+  padding:20px 22px;margin-bottom:18px}
+.rule>.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.rule>.top b{font-size:19px}
+.badge{background:var(--soft);border:1px solid var(--line);border-radius:20px;
+  padding:4px 12px;color:var(--dim);font-size:12.5px;white-space:nowrap}
+.badge.ok{color:var(--ok);border-color:#3ddc8455}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.g{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:16px;display:flex;flex-direction:column}
+.g.off{opacity:.55}
+.g .gh{display:flex;align-items:flex-start;gap:12px;margin-bottom:13px}
+.g .ico{width:38px;height:38px;flex:0 0 auto;border-radius:11px;background:var(--soft);
+  display:grid;place-items:center}
+.g .ico svg{width:23px;height:23px}
+.g .nm{font-size:17px;font-weight:650;background:none;border:0;color:inherit;
+  font-family:inherit;padding:0;width:100%}
+.g .nm:focus{outline:0;border-bottom:1px solid var(--acc)}
+.g .cnt{color:var(--dim);font-size:13px;margin-top:2px}
+.g .list{background:var(--soft);border:1px solid var(--line);border-radius:10px;
+  padding:11px 13px;font:13px/1.85 ui-monospace,Menlo,monospace;color:var(--fg);
+  height:150px;overflow:auto;white-space:pre;flex:1}
+.g textarea{background:var(--soft);border:1px solid var(--acc);border-radius:10px;
+  padding:11px 13px;font:13px/1.85 ui-monospace,Menlo,monospace;color:var(--fg);
+  height:150px;resize:vertical;outline:0;flex:1;width:100%}
+.g .gf{display:flex;align-items:center;gap:10px;margin-top:13px;
+  border-top:1px solid var(--line);padding-top:12px}
+.lnk{display:inline-flex;align-items:center;gap:8px;background:none;border:0;
+  color:var(--acc);font:inherit;font-size:14px;cursor:pointer;padding:0}
+.lnk svg{width:16px;height:16px}
+.lnk.d{color:var(--bad)}
+.sw{flex:0 0 auto;width:44px;height:24px;border-radius:12px;border:0;padding:0;
+  background:var(--line);cursor:pointer;position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
+  border-radius:50%;background:#fff;transition:transform .15s;
+  box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw.on{background:var(--acc)}
+.sw.on::after{transform:translateX(20px)}
+.note{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:13.5px;
+  margin-top:16px}
+.note svg{width:17px;height:17px;flex:0 0 auto}
+
+/* ---- плитки состояния ---- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:16px;margin-bottom:18px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:18px;display:flex;align-items:flex-start;gap:14px}
+.tile .ic{width:42px;height:42px;flex:0 0 auto;border-radius:12px;background:var(--soft);
+  display:grid;place-items:center;color:var(--acc)}
+.tile .ic svg{width:22px;height:22px}
+.tile .t{color:var(--dim);font-size:13.5px}
+.tile .v{font-size:24px;font-weight:650;margin-top:2px}
+.tile .v.sm{font-size:16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media(max-width:1040px){.two{grid-template-columns:1fr}}
+
+.kv{display:flex;justify-content:space-between;gap:14px;padding:10px 0;
+  border-bottom:1px solid var(--line);font-size:14.5px}
+.kv:last-child{border-bottom:0}
 .kv span:first-child{color:var(--dim)}
 
-/* ---- полоса сохранения ---- */
-.save{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;gap:14px;
-  background:var(--panel);border-top:1px solid var(--line);padding:14px 22px;
-  box-shadow:0 -6px 24px rgba(0,0,0,.10)}
-.save .t{font-weight:600}
-.save .s{color:var(--dim);font-size:13px}
+/* ---- сворачиваемые ---- */
+.fold{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  margin-bottom:14px;overflow:hidden}
+.fold>button{display:flex;align-items:center;width:100%;background:none;border:0;
+  padding:17px 20px;cursor:pointer;color:var(--fg);font:inherit;font-size:16px;
+  font-weight:600;text-align:left}
+.fold>button .sp{flex:1}
+.fold .chev{color:var(--dim);transition:transform .15s}
+.fold.open .chev{transform:rotate(180deg)}
+.fold .body{display:none;padding:0 20px 20px}
+.fold.open .body{display:block}
 
-/* ---- подвал ---- */
-footer{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:10px 26px;
-  padding:14px 22px;border-top:1px solid var(--line);background:var(--panel);
-  color:var(--dim);font-size:12.5px}
-footer b{color:var(--fg);font-weight:600}
-footer a,footer .ver{display:inline-flex;align-items:center;gap:7px;color:var(--dim);
-  text-decoration:none;border:1px solid var(--line);border-radius:9px;padding:7px 13px}
-footer a:hover{color:var(--fg);border-color:var(--acc)}
-footer .ver{line-height:1.3;text-align:center;display:block}
+/* ---- цепочка «как это работает» ---- */
+.flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.flow span{background:var(--soft);border:1px solid var(--line);border-radius:10px;
+  padding:11px 18px;font-size:14.5px}
+.flow i{color:var(--dim);font-style:normal}
+
+label{display:block;color:var(--dim);font-size:13px;margin:14px 0 7px}
+.field{display:flex;align-items:center;gap:10px;background:var(--soft);
+  border:1px solid var(--line);border-radius:11px;padding:4px 6px 4px 14px}
+.field code{flex:1;font:13.5px/2.4 ui-monospace,Menlo,monospace;color:var(--fg);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;padding:0}
+textarea.wide{width:100%;min-height:130px;background:var(--soft);color:var(--fg);
+  border:1px solid var(--line);border-radius:11px;padding:12px;
+  font:13px/1.7 ui-monospace,Menlo,monospace;resize:vertical;outline:0}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:14px;
+  overflow-x:auto;font:12.5px/1.7 ui-monospace,Menlo,monospace;margin:0;color:var(--dim)}
+code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
+.bar{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.msg{font-size:13.5px;color:var(--dim)}.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
+
+/* ---- строка состояния справа ---- */
+.stat{display:flex;align-items:center;gap:14px;background:var(--panel);
+  border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:14px;
+  width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.stat:hover{border-color:var(--acc)}
+.stat .ic{width:46px;height:46px;flex:0 0 auto;border-radius:13px;background:var(--soft);
+  display:grid;place-items:center;color:var(--fg)}
+.stat .ic svg{width:23px;height:23px}
+.stat .t{font-size:16.5px;font-weight:600}
+.stat .s{display:flex;align-items:center;gap:8px;color:var(--dim);
+  font-size:14px;margin-top:4px}
+.stat .s svg{width:16px;height:16px}
+.stat .chev{color:var(--dim)}
+
+/* ---- полоса сохранения ---- */
+.save{position:sticky;bottom:18px;z-index:30;display:flex;align-items:center;gap:16px;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:16px 20px;margin:0 30px 18px;box-shadow:0 10px 34px rgba(0,0,0,.28)}
+@media(max-width:880px){.save{margin:0 14px 14px}}
+.save .t{display:flex;align-items:center;gap:10px;font-weight:600}
 
 /* ---- окна ---- */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;
   display:grid;place-items:center;padding:22px}
-.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;
-  width:min(720px,100%);max-height:86vh;overflow:auto;padding:24px 28px 22px;
-  box-shadow:0 18px 60px rgba(0,0,0,.35)}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+  width:min(740px,100%);max-height:86vh;overflow:auto;padding:26px 28px 22px;
+  box-shadow:0 20px 70px rgba(0,0,0,.5)}
 .modal .box.warn{border-top:4px solid var(--warn)}
-.modal h3{margin:0 0 4px;text-align:center;font-size:19px}
-.modal .sub{text-align:center;color:var(--dim);font-size:13px;margin:0 0 18px}
-.fine{max-width:none}
+.modal h3{margin:0 0 6px;text-align:center;font-size:20px}
+.modal .ctr{text-align:center;color:var(--dim);font-size:13.5px;margin:0 0 20px}
 .fine p,.fine ul{color:var(--fg);font-size:14.5px;line-height:1.8;margin:0 0 14px}
 .fine ul{padding-left:22px}.fine li{margin-bottom:8px}
-.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.pick{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px}
+.pick{display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
   font:inherit;color:inherit;text-align:left}
 .pick:hover{border-color:var(--acc)}
-.pick svg{width:22px;height:22px;flex:0 0 auto}
+.pick svg{width:23px;height:23px;flex:0 0 auto}
 .pick i{font-style:normal;color:var(--dim);font-size:12px;display:block}
+
+@media(max-width:880px){
+  .app{flex-direction:column}
+  aside{width:auto;height:auto;position:static;flex-direction:row;flex-wrap:wrap;
+    align-items:center;gap:10px;padding:14px}
+  .brand{margin:0 12px 0 0}
+  aside nav{flex-direction:row;flex-wrap:wrap}
+  .grow,.sep{display:none}
+  .core{width:auto;padding:11px 16px}
+  main{padding:18px 14px 34px}
+  header{padding:14px 14px 0}
+}
 </style>
 
-<header>
-  <a class="brand" href="/">
-    <!--ЛОГОТИП-->
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path fill="var(--acc)" d="M10 6l9 10h26l9-10 3 18c0 6-3 11-8 15l-9 7-8 8-8-8-9-7c-5-4-8-9-8-15z"/>
-      <path fill="var(--bg)" d="M22 27c0-3 3-5 7-5h6v4h-8v3h6c3 0 5 2 5 5s-2 5-5 5h-8v-4h8v-3h-5c-4 0-6-2-6-5zm18-5h11v4h-7v3h6v4h-6v7h-4z"/>
-    </svg>
-    <!--/ЛОГОТИП-->
-    <b>Shadow&nbsp;Fox</b><span id="ver"></span>
-  </a>
+<div class="app">
+  <aside>
+    <a class="brand" href="/">
+      <!--ЛОГОТИП-->
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path fill="var(--acc)" d="M10 6l9 10h26l9-10 3 18c0 6-3 11-8 15l-9 7-8 8-8-8-9-7c-5-4-8-9-8-15z"/>
+        <path fill="var(--bg)" d="M22 27c0-3 3-5 7-5h6v4h-8v3h6c3 0 5 2 5 5s-2 5-5 5h-8v-4h8v-3h-5c-4 0-6-2-6-5zm18-5h11v4h-7v3h6v4h-6v7h-4z"/>
+      </svg>
+      <!--/ЛОГОТИП-->
+      <span><b>Shadow&nbsp;Fox</b><i id="ver"></i></span>
+    </a>
 
-  <nav class="tabs">
-    <button data-tab="rules" class="on">Правила</button>
-    <button data-tab="conn">Подключения</button>
-    <button data-tab="info">Информация</button>
-  </nav>
+    <nav>
+      <button data-tab="rules" class="on"></button>
+      <button data-tab="conn"></button>
+      <button data-tab="info"></button>
+    </nav>
 
-  <div class="sp"></div>
-  <span class="pill" id="core"></span>
-  <button class="tbtn" id="theme" title="Тема">◐</button>
-  <a class="tbtn" href="/logout" title="Выйти">⏻</a>
-</header>
+    <div class="grow"></div>
+    <div class="sep"></div>
+    <button class="srow" id="theme"></button>
+    <a class="srow" href="https://github.com/SkunkBG/shadowfox"
+       target="_blank" rel="noopener" id="gh"></a>
+    <div class="sep"></div>
+    <button class="core" id="core"></button>
+  </aside>
 
-<main id="view">загружаю…</main>
-
-<div class="save" id="save" hidden>
-  <span style="color:var(--warn);font-size:18px">⚠</span>
-  <div><div class="t">Есть несохранённые изменения</div>
-       <div class="s" id="save-note">Не забывай сохранять.</div></div>
-  <div class="sp"></div>
-  <button class="b ghost" id="undo">Отменить</button>
-  <button class="b" id="apply">Сохранить и применить</button>
+  <div class="side2">
+    <header>
+      <span class="pill" id="corestate"></span>
+      <button class="tbtn" id="theme2" title="Тема"></button>
+    </header>
+    <main id="view">загружаю…</main>
+    <div class="save" id="save" hidden>
+      <span class="t"><i class="dot warn"></i>Есть изменения</span>
+      <div class="sp"></div>
+      <span class="msg" id="m-rules"></span>
+      <button class="b ghost" id="undo">Отменить</button>
+      <button class="b" id="apply">Сохранить и применить</button>
+    </div>
+  </div>
 </div>
-
-<footer id="foot"></footer>
 
 <div id="gate" hidden></div>
 <div id="dns" hidden></div>
@@ -220,11 +308,44 @@ const $=s=>document.querySelector(s);
 const tok=new URLSearchParams(location.search).get('token');
 const api=p=>tok?p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(tok):p;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const plural=(n,a,b,c)=>{const m=n%100,k=n%10;
+  return n+' '+(m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c);};
 
-let D=null, tab='rules', open={}, dirty=false, dnsShown=0, nodesMode='masked';
+let D=null, tab='rules', edit={}, dirty=false, dnsShown=0,
+    nodesMode='masked', query='', folds={};
 
-/* Значки нарисованы упрощённо: они опознают сервис в списке, а не
-   воспроизводят фирменный знак. */
+/* Значки интерфейса. Обводкой, чтобы одинаково читались в обеих темах. */
+const UI={
+ rules:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h7M15 17h5"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="13" cy="17" r="2"/></svg>',
+ conn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v5M12 16v5M4.6 7.3l4.3 2.5M15.1 14.2l4.3 2.5M19.4 7.3l-4.3 2.5M8.9 14.2l-4.3 2.5"/><circle cx="12" cy="12" r="2.4"/></svg>',
+ info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></svg>',
+ sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+ moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"/></svg>',
+ gh:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.7 1a9.4 9.4 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.3.2 2.3.1 2.6.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7 1 .7 2v2.9c0 .3.2.6.7.5A10 10 0 0012 2z"/></svg>',
+ out:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>',
+ power:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.5 6.8a8 8 0 1011 0"/></svg>',
+ chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>',
+ right:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+ find:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+ plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+ pen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17z"/></svg>',
+ trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
+ done:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+ ok:'<svg viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.6 2.6L16 9.6" stroke-linecap="round"/></svg>',
+ no:'<svg viewBox="0 0 24 24" fill="none" stroke="var(--bad)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6" stroke-linecap="round"/></svg>',
+ box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2.8l8 4.2v10L12 21.2 4 17V7z"/><path d="M4 7l8 4.2L20 7M12 11.2V21"/></svg>',
+ router:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 16.5h.01M10 16.5h.01M13 16.5h.01M17 16.5h2"/><path d="M8 9a5.7 5.7 0 018 0M5.5 6a9.2 9.2 0 0113 0"/></svg>',
+ shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2.8l7.5 3v6.4c0 4.3-3 7.8-7.5 9-4.5-1.2-7.5-4.7-7.5-9V5.8z"/><path d="M9 12.3l2.2 2.2L15.5 10" stroke-linecap="round"/></svg>',
+ gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1v.3a2 2 0 11-4 0v-.2a1.6 1.6 0 00-2.8-1.1l-.1.1A2 2 0 114.5 16l.1-.1a1.6 1.6 0 00-1.1-2.7H3.2a2 2 0 110-4h.2A1.6 1.6 0 004.5 6.5l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 0010 2.6a2 2 0 114 0v.2a1.6 1.6 0 002.7 1.1l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 001.1 2.7h.2a2 2 0 110 4h-.2a1.6 1.6 0 00-1.2 1z"/></svg>',
+ globe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg>',
+ pkt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2.8l8 4.2v10L12 21.2 4 17V7z"/></svg>',
+ back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.7L3 8"/><path d="M3 3v5h5"/></svg>',
+ eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.7"/></svg>',
+ i:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8v.1"/></svg>'
+};
+
+/* Значки сервисов нарисованы упрощённо: они опознают сервис в списке,
+   а не воспроизводят фирменный знак. */
 const ICONS={
  yt:'<svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="5" fill="#ff0033"/><path d="M10 8.5l6 3.5-6 3.5z" fill="#fff"/></svg>',
  dc:'<svg viewBox="0 0 24 24"><path d="M4 18c-2-4-2-8 0-12 2-1 4-1.6 6-1.7l.6 1.3h2.8l.6-1.3c2 .1 4 .7 6 1.7 2 4 2 8 0 12-2 1.2-4 1.8-6 2l-.8-1.6c-1.2.3-2.4.3-3.6 0L8.4 20c-2-.2-3.4-.8-4.4-2z" fill="#5865f2"/><circle cx="9" cy="12" r="1.6" fill="#fff"/><circle cx="15" cy="12" r="1.6" fill="#fff"/></svg>',
@@ -239,7 +360,7 @@ const ICONS={
  fg:'<svg viewBox="0 0 24 24"><path d="M9 2h3v5H9a2.5 2.5 0 010-5z" fill="#f24e1e"/><path d="M12 2h3a2.5 2.5 0 010 5h-3z" fill="#ff7262"/><path d="M12 7h3a2.5 2.5 0 010 5h-3z" fill="#a259ff"/><path d="M9 7h3v5H9a2.5 2.5 0 010-5z" fill="#1abcfe"/><path d="M9 12h3v2.5A2.5 2.5 0 119 12z" fill="#0acf83"/></svg>',
  rb:'<svg viewBox="0 0 24 24"><path d="M5.4 2.6l16 4.3-4.3 16-16-4.3z" fill="#e2231a"/><path d="M10.2 9.4l4.4 1.2-1.2 4.4-4.4-1.2z" fill="#fff"/></svg>',
  st:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1b2838"/><circle cx="15" cy="9" r="3.2" fill="none" stroke="#66c0f4" stroke-width="1.6"/><circle cx="9" cy="15" r="2.6" fill="#66c0f4"/><path d="M2 13l5 2" stroke="#66c0f4" stroke-width="1.4" fill="none"/></svg>',
- www:'<svg viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg>'
+ www:UI.globe
 };
 
 const KEYS=[['yt',['youtube','ютуб','ютьюб']],['dc',['discord','дискорд']],
@@ -251,11 +372,11 @@ const KEYS=[['yt',['youtube','ютуб','ютьюб']],['dc',['discord','дис�
 
 function iconFor(name){
   const n=String(name||'').toLowerCase();
-  for(const [k,words] of KEYS) if(words.some(w=>n.includes(w))) return ICONS[k];
+  for(const [k,w] of KEYS) if(w.some(x=>n.includes(x))) return ICONS[k];
   return ICONS.www;
 }
 
-/* ---- разбор и сборка списка ---- */
+/* ---- разбор и сборка ---- */
 function parseDomains(text){
   const groups=[]; let g=null;
   for(const raw of String(text).split('\n')){
@@ -290,79 +411,98 @@ function buildDomains(rules){
 
 function collect(drop){
   const rules=parseDomains(D.domains);
-  document.querySelectorAll('.grp').forEach(el=>{
+  document.querySelectorAll('.g').forEach(el=>{
     const r=+el.dataset.r, g=+el.dataset.g;
     if(!rules[r]||!rules[r].groups[g]) return;
     const t=rules[r].groups[g];
-    t.name=el.querySelector('[data-name]').value.trim()||'без имени';
+    const nm=el.querySelector('[data-name]'), ta=el.querySelector('[data-lines]');
+    if(nm) t.name=nm.value.trim()||'без имени';
+    if(ta) t.lines=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
     t.on=el.querySelector('[data-toggle]').classList.contains('on');
-    t.lines=el.querySelector('[data-lines]').value.split('\n')
-      .map(s=>s.trim()).filter(Boolean);
   });
   if(drop) for(const r of rules) r.groups=r.groups.filter(g=>g.lines.length);
   return rules.filter(r=>r.groups.length);
 }
 
-function sync(){ D.domains=buildDomains(collect()); }
-function touch(){ dirty=true; $('#save').hidden=false; }
+/* Полоса сохранения живёт вне перерисовываемой части: иначе при наборе
+   текста её просто нет — вид не перерисовывается, чтобы не терять
+   курсор, — и сохранить набранное было нечем. */
+function touch(){ dirty=true; showBar(); }
+function showBar(){ const b=$('#save'); if(b) b.hidden=!(dirty && tab==='rules'); }
 
-/* ---- отрисовка ---- */
-const plural=(n,a,b,c)=>{const m=n%100,k=n%10;
-  return n+' '+(m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c);};
-
-function gutter(text){
-  const n=Math.max(1,String(text).split('\n').length);
-  let s=''; for(let i=1;i<=n;i++) s+=i+'\n';
-  return s;
+/* ---- раздел «Правила» ---- */
+function matches(g){
+  if(!query) return true;
+  const q=query.toLowerCase();
+  return g.name.toLowerCase().includes(q) ||
+         g.lines.some(l=>l.toLowerCase().includes(q));
 }
 
 function viewRules(){
   const rules=parseDomains(D.domains);
 
-  const head=`<div class="htop"><h2>Правила маршрутизации</h2><div class="sp"></div>
-    <button class="b" id="newrule">+ Правило</button></div>`;
+  const head=`<div class="htop">
+    <div><h2>Правила маршрутизации</h2>
+      <p class="sub">Управляйте группами доменов и IP-адресов</p></div>
+    <div class="sp"></div>
+    <button class="b out" id="newrule">${UI.plus}Правило</button></div>
+    <div class="search">${UI.find}
+      <input id="q" placeholder="Найти группу или домен" value="${esc(query)}"></div>`;
 
   if(!rules.length)
     return head+`<div class="card"><h3>Правил пока нет</h3>
-      <p>Правило — это цель, куда заворачивается трафик: политика Keenetic
-      либо сетевой интерфейс. Внутри правила — группы: в каждой домены и
-      адреса, по одной записи в строке.</p></div>`;
+      <p>Правило — это цель, куда заворачивается трафик: политика Keenetic либо
+      сетевой интерфейс. Внутри правила — группы: в каждой домены и адреса,
+      по одной записи в строке.</p></div>`;
 
-  return head + rules.map((r,i)=>`
-    <div class="rule">
+  const body = rules.map((r,i)=>{
+    const shown=r.groups.map((g,k)=>({g,k})).filter(x=>matches(x.g));
+    if(query && !shown.length) return '';
+    return `<div class="rule">
       <div class="top"><b>${esc(r.target||'без цели')}</b>
         <span class="badge">${plural(r.groups.length,'группа','группы','групп')}</span>
         <div class="sp"></div>
-        <button class="b ghost sm" data-addgrp="${i}">+ Группа</button></div>
-      ${r.groups.map((g,k)=>{
-        const id=i+'.'+k, isOpen=!!open[id];
-        return `<div class="grp ${isOpen?'open':''} ${g.on===false?'off':''}"
-                     data-r="${i}" data-g="${k}" data-id="${id}">
+        <button class="b sm" data-addgrp="${i}">${UI.plus}Группа</button></div>
+      <div class="grid">${shown.map(({g,k})=>{
+        const id=i+'.'+k, ed=!!edit[id];
+        return `<div class="g ${g.on===false?'off':''}" data-r="${i}" data-g="${k}" data-id="${id}">
           <div class="gh">
+            <span class="ico">${iconFor(g.name)}</span>
+            <div style="flex:1;min-width:0">
+              ${ed?`<input class="nm" value="${esc(g.name)}" data-name>`
+                  :`<div class="nm">${esc(g.name)}</div>`}
+              <div class="cnt">${plural(g.lines.length,'запись','записи','записей')}</div>
+            </div>
             <button class="sw ${g.on===false?'':'on'}" data-toggle
               title="${g.on===false?'Включить':'Выключить'}"></button>
-            <span class="ico">${iconFor(g.name)}</span>
-            <input class="nm" value="${esc(g.name)}" data-name>
-            <span class="badge">${plural(g.lines.length,'запись','записи','записей')}</span>
-            <div class="sp"></div>
-            <button class="icon" data-del title="Удалить группу">✕</button>
-            <span class="chev">⌄</span>
           </div>
-          <div class="gbody">
-            <div class="ed">
-              <div class="gut">${esc(gutter(g.lines.join('\n')))}</div>
-              <textarea spellcheck="false" data-lines
-                placeholder="example.com&#10;104.244.42.0/24">${esc(g.lines.join('\n'))}</textarea>
-            </div>
-            <div class="hint"><b>${ICONS.www} Домены и IP</b>
-              Одна запись в строке. Поддомены попадают сами:
-              <code>googlevideo.com</code> ловит и
-              <code>rr1.googlevideo.com</code>.<br><br>
-              Адрес или подсеть пишутся так же — они нужны сервисам,
-              которые DNS не спрашивают.</div>
+          ${ed?`<textarea data-lines spellcheck="false"
+                  placeholder="example.com&#10;104.244.42.0/24">${esc(g.lines.join('\n'))}</textarea>`
+              :`<div class="list">${esc(g.lines.join('\n'))||'<span style="color:var(--dim)">пусто</span>'}</div>`}
+          <div class="gf">
+            <button class="lnk" data-edit>${ed?UI.done+'Готово':UI.pen+'Редактировать'}</button>
+            <div class="sp" style="flex:1"></div>
+            <button class="lnk d" data-del title="Удалить группу">${UI.trash}</button>
           </div>
-        </div>`;}).join('')}
-    </div>`).join('');
+        </div>`;}).join('')}</div>
+      <div class="note">${UI.i}Можно добавлять домены, IP и подсети</div>
+    </div>`;}).join('');
+
+  return head + (body || `<div class="card"><p>Ничего не найдено.</p></div>`);
+}
+
+/* ---- раздел «Подключения» ---- */
+function stat(icon,title,ok,text){
+  return `<div class="stat"><span class="ic">${icon}</span>
+    <div style="flex:1"><div class="t">${title}</div>
+      <div class="s">${ok?UI.ok:UI.no}${esc(text)}</div></div>
+    <span class="chev">${UI.right}</span></div>`;
+}
+
+function fold(id,title,inner){
+  return `<div class="fold ${folds[id]?'open':''}" data-fold="${id}">
+    <button>${title}<span class="sp"></span><span class="chev">${UI.chev}</span></button>
+    <div class="body">${inner}</div></div>`;
 }
 
 function viewConn(){
@@ -372,130 +512,172 @@ function viewConn(){
     `interface ${P} proxy protocol socks5`,
     `interface ${P} proxy upstream ${host} ${D.socks_port}`,
     `interface ${P} proxy socks5-udp`,`interface ${P} up`,
-    `system configuration save`]
-    .map(c=>`ndmc -c "${c}"`).join('\n');
-  const dot=(v,t)=>`<span class="pill"><i class="dot ${v?'ok':'bad'}"></i>${t}</span>`;
+    `system configuration save`].map(c=>`ndmc -c "${c}"`).join('\n');
 
-  return `<div class="htop"><h2>Подключения</h2></div>
+  /* Показываем первую ссылку, а не первую строку: строкой может
+     оказаться заголовок или настройка. */
+  const first=(D.nodes||'').split('\n').map(s=>s.trim())
+    .find(s=>s.includes('://'))||'';
 
-  <div class="card"><h3>Ядро Xray</h3>
-    ${D.xray_bin
-      ? `<p>${dot(1,'установлено')} &nbsp; <code>${esc(D.xray_bin)}</code></p>
-         <p>Shadow Fox поднимает свой процесс на порту ${D.socks_port} и чужой
-         не трогает.</p>`
-      : `<p>${dot(0,'не установлено')}</p><p>Выполни в консоли роутера:</p>
-         <pre>opkg install xray</pre>`}</div>
+  const server=`<div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+      <h3 style="margin:0">Сервер</h3>
+      ${D.have_link?'<span class="badge ok">Настроен</span>'
+                   :'<span class="badge">Не настроен</span>'}</div>
+    <p style="margin:0 0 4px">Ссылка VLESS или подписка</p>
+    <label>Ссылки подключения</label>
+    ${nodesMode==='masked'
+      ? `<div class="field"><code>${esc(first)||'пусто'}</code>
+           <button class="b ghost sm" id="nodes-show">${UI.eye}Показать</button></div>
+         <p style="margin:8px 0 0;font-size:13px">Ключ скрыт</p>
+         <div class="bar"><button class="b" id="nodes-new"
+           style="width:100%;justify-content:center">Заменить подключение</button></div>`
+      : `<textarea class="wide" id="nodes" spellcheck="false" placeholder="vless://..."
+           >${esc(nodesMode==='new'?'':D.nodes)}</textarea>
+         <div class="bar">
+           <button class="b" data-save="nodes">Сохранить и запустить</button>
+           <button class="b ghost" id="nodes-hide">Скрыть</button>
+           <span class="msg" id="m-nodes"></span></div>`}
+  </div>
 
-  <div class="card"><h3>Сервер</h3>
-    <p>Ссылки <code>vless://</code> по одной в строке либо подписка целиком.
-    При нескольких выбирается самый быстрый. Конфиг проверяется ядром до
-    применения: негодный не заменит рабочий.</p>
-    <label>Ссылки</label>
-    <textarea class="wide" id="nodes" spellcheck="false" placeholder="vless://..."
-      ${nodesMode==='masked'?'readonly':''}>${esc(nodesMode==='new'?'':D.nodes)}</textarea>
-    <div class="bar">
-      ${nodesMode==='masked'
-        ? `<button class="b ghost" id="nodes-show">Показать</button>
-           <button class="b" id="nodes-new">Заменить</button>`
-        : `<button class="b" data-save="nodes">Сохранить и запустить</button>
-           <button class="b ghost" id="nodes-hide">Скрыть</button>`}
-      <span class="msg" id="m-nodes"></span></div>
-    ${nodesMode==='masked'?`<p style="margin:12px 0 0;font-size:13px">Ключ скрыт:
-      он не передаётся странице, пока не нажать «Показать».</p>`:''}</div>
+  ${fold('pol','Как настроить политику доступа',
+    `<p>В панели роутера: <b>Приоритеты подключений → Политики доступа</b>.
+     Политика <code>${esc(POL)}</code> должна содержать <b>только</b> подключение
+     Shadow-Fox. Без этого шага метка будет, а заворачивать трафик станет
+     некуда — и молча себя это не проявит.</p>
+     <p>Если подключение ещё не создано, выполни в консоли роутера по одной
+     команде — <code>ndmc</code> несколько сразу не принимает:</p>
+     <pre>${esc(cmds)}</pre>`)}
 
-  <div class="card"><h3>Подключение в роутере</h3>
-    <p>${dot(D.proxy_ready, D.proxy_ready?`${esc(P)} создано`:`${esc(P)} не создано`)}</p>
-    ${D.proxy_ready?'':`<p>Выполни в консоли роутера по одной команде —
-      <code>ndmc</code> несколько сразу не принимает:</p><pre>${esc(cmds)}</pre>`}</div>
+  ${fold('dom','Домены, IP и подсети',
+    `<p>В группах правил пишется по одной записи в строке. Поддомены попадают
+     сами: <code>googlevideo.com</code> ловит и <code>rr1.googlevideo.com</code>.</p>
+     <p>Адрес или подсеть пишутся так же — они нужны сервисам, которые DNS не
+     спрашивают, и там перехват ответов бессилен.</p>`)}
 
-  <div class="card"><h3>Политика доступа</h3>
-    <p>${dot(D.policy_ready, D.policy_ready?`${esc(POL)} готова`:`${esc(POL)} не настроена`)}</p>
-    <p>В панели роутера: <b>Приоритеты подключений → Политики доступа</b>.
-    Политика <code>${esc(POL)}</code> должна содержать <b>только</b> подключение
-    Shadow-Fox. Без этого шага метка будет, а заворачивать трафик станет
-    некуда — и молча себя это не проявит.</p></div>`;
+  <div class="note">${UI.i}Конфигурация проверяется ядром перед применением:
+    негодная не заменит рабочую</div>`;
+
+  const right=`
+    ${stat(UI.box,'Ядро Xray',!!D.xray_bin,D.xray_bin?'Установлено':'Не установлено')}
+    ${stat(UI.router,'Подключение роутера',D.proxy_ready,
+           D.proxy_ready?P+' создано':P+' не создано')}
+    ${stat(UI.shield,'Политика доступа',D.policy_ready,
+           D.policy_ready?POL+' готова':POL+' не настроена')}`;
+
+  return `<div class="htop"><div><h2>Подключения</h2>
+      <p class="sub">Настройка сервера и проверка готовности</p></div></div>
+    <div class="two"><div>${server}</div><div>${right}</div></div>`;
 }
 
+/* ---- раздел «Информация» ---- */
+const tile=(ic,t,v,sm)=>`<div class="tile"><span class="ic">${ic}</span>
+  <div><div class="t">${t}</div><div class="v ${sm?'sm':''}">${v}</div></div></div>`;
 const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
 
 function viewInfo(){
-  return `<div class="htop"><h2>Информация</h2></div>
-  <div class="card"><h3>Состояние</h3><div class="rows">
+  const core=D.xray_pid>0;
+  return `<div class="htop"><div><h2>Информация</h2>
+      <p class="sub">Состояние Shadow Fox и параметры работы</p></div></div>
+
+  <div class="tiles">
+    ${tile(UI.gear,'Демон',
+      `<span style="color:var(--ok)">Работает</span>
+       <div style="font-size:13.5px;color:var(--dim);font-weight:400">${esc(D.uptime)}</div>`,1)}
+    ${tile(UI.globe,'Адресов',D.matched)}
+    ${tile(UI.pkt,'Пакетов',D.seen)}
+    ${tile(UI.back,'Ответов',D.parsed)}
+  </div>
+
+  <div class="two">
+    <div class="card"><h3>Параметры системы</h3>
       ${kv('Версия',esc(D.version))}
-      ${kv('Демон','работает, '+esc(D.uptime))}
-      ${kv('Своё ядро',D.xray_pid>0?'работает':'не запущено')}
-      ${kv('Перехват',D.capture?'на '+esc(D.iface):'выключен')}
-      ${kv('Пакетов',D.seen)}
-      ${kv('Ответов',D.parsed)}
-      ${kv('Адресов',D.matched)}
-      ${kv('Правила',D.rules?'установлены':'нет')}
+      ${kv('Перехват',D.capture?esc(D.iface):'выключен')}
+      ${kv('DNS устройства', D.dns==='ok'?'Через роутер'
+           :D.dns==='bypass'?'Мимо роутера':'Пока не видно')}
+      ${kv('Правила',D.rules?'Установлены':'Нет')}
       ${kv('Помечено',D.marked+' соединений')}
-      ${kv('DNS устройства', D.dns==='ok'?'через роутер'
-           :D.dns==='bypass'?'мимо роутера':'пока не видно')}
-  </div></div>
+      ${D.model?kv('Модель',esc(D.model)):''}
+      ${D.osver?kv('Прошивка',esc(D.osver)):''}
+    </div>
+    <div class="card"><h3>Ядро Xray</h3>
+      <p style="display:flex;align-items:center;gap:9px;margin:0 0 8px">
+        <i class="dot ${core?'ok':'bad'}"></i>
+        <b style="color:var(--${core?'ok':'bad'})">${core?'Работает':'Не запущено'}</b></p>
+      <p style="margin:0">${D.core_on?'Отдельный процесс Shadow Fox на порту '+D.socks_port
+                                     :'Выключено из интерфейса'}</p>
+    </div>
+  </div>
 
   <div class="card"><h3>Как это работает</h3>
-    <p>Домен из правила → перехват DNS-ответа → адрес в ipset → метка на
-    соединении → политика Keenetic → подключение → свой Xray → сервер.</p>
-    <p>Перехват пассивный: если демон упадёт, DNS у сети продолжит работать.
-    Адреса в наборах стареют, чтобы не копить давно переехавшие.</p></div>
+    <div class="flow"><span>Домен</span><i>→</i><span>DNS</span><i>→</i>
+      <span>Правило</span><i>→</i><span>Xray</span><i>→</i><span>Сервер</span></div>
+    <p style="margin:14px 0 0">Перехват DNS-ответов пассивный: если демон упадёт,
+      DNS у сети продолжит работать. Адреса в наборах стареют, чтобы не копить
+      давно переехавшие.</p></div>
 
-  <div class="card fine"><h3>Отказ от ответственности</h3>${disclaimer()}
-    <p style="margin-top:14px"><a href="#" id="reshow">Показать при следующем
-    входе</a></p></div>`;
+  ${fold('law','Условия использования и отказ от ответственности',
+    `<div class="fine">${disclaimer()}
+     <p><a href="#" id="reshow">Показать при следующем входе</a></p></div>`)}`;
 }
 
-/* ---- отказ от ответственности: один текст на плашку и на карточку ---- */
 function disclaimer(){ return `
     <p>Shadow Fox распространяется «как есть», без каких-либо гарантий,
     обязательств или заверений, явных либо подразумеваемых. Использование
     осуществляется пользователем на собственный риск.</p>
-    <p>Автор не несёт ответственности за любые последствия использования
-    или невозможности использования программного продукта, включая, но не
+    <p>Автор не несёт ответственности за любые последствия использования или
+    невозможности использования программного продукта, включая, но не
     ограничиваясь:</p>
     <ul>
       <li>сбоями, неисправностями, ошибками или иными нарушениями работы
       оборудования, программного обеспечения или сетевых сервисов;</li>
       <li>утратой, повреждением, искажением или несанкционированным
       раскрытием данных;</li>
-      <li>нарушениями требований законодательства и иных
-      нормативно-правовых актов государства, на территории которого
-      находится пользователь;</li>
-      <li>любым прямым, косвенным, случайным, непредвиденным,
-      репутационным или иным ущербом, включая упущенную выгоду, вызванным
-      использованием или невозможностью использования продукта.</li>
+      <li>нарушениями требований законодательства и иных нормативно-правовых
+      актов государства, на территории которого находится пользователь;</li>
+      <li>любым прямым, косвенным, случайным, непредвиденным, репутационным
+      или иным ущербом, включая упущенную выгоду, вызванным использованием
+      или невозможностью использования продукта.</li>
     </ul>
-    <p>Автор не несёт ответственности перед пользователем или третьими
-    лицами за любой ущерб, возникший вследствие действий, бездействия,
-    ошибок или иных обстоятельств, связанных с использованием продукта,
-    даже если Автор был уведомлён о возможности таких последствий.
-    Настоящее ограничение ответственности применяется в максимально
-    допустимой законом степени.</p>
+    <p>Автор не несёт ответственности перед пользователем или третьими лицами
+    за любой ущерб, возникший вследствие действий, бездействия, ошибок или
+    иных обстоятельств, связанных с использованием продукта, даже если Автор
+    был уведомлён о возможности таких последствий. Настоящее ограничение
+    ответственности применяется в максимально допустимой законом степени.</p>
     <p>Используя проект, пользователь подтверждает, что выполняет действия
     сознательно и добровольно, принимая все риски и возможные последствия.
     Пользователь несёт полную ответственность за результаты своей
-    конфигурации, соблюдение требований законодательства, политик
-    провайдера и правил сети.</p>`; }
+    конфигурации, соблюдение требований законодательства, политик провайдера
+    и правил сети.</p>`; }
 
-function head(){
+/* ---- обвязка ---- */
+function chrome(){
   $('#ver').textContent=D.version;
-  const on=D.xray_pid>0;
-  $('#core').innerHTML=`<i class="dot ${on?'ok':'bad'}"></i>${on?'Ядро работает':'Ядро не запущено'}`;
-}
 
-function foot(){
-  $('#foot').innerHTML=`
-    ${D.osver?`<span>Версия ОС <b>${esc(D.osver)}</b></span>`:''}
-    ${D.model?`<span>Модель <b>${esc(D.model)}</b></span>`:''}
-    <span class="sp"></span>
-    <span class="ver">Shadow&nbsp;Fox<br><b>${esc(D.version)}</b></span>
-    <a href="https://github.com/SkunkBG/shadowfox" target="_blank" rel="noopener">GitHub</a>`;
+  const nav={rules:['Правила',UI.rules],conn:['Подключения',UI.conn],
+             info:['Информация',UI.info]};
+  document.querySelectorAll('aside nav button').forEach(b=>{
+    const [t,ic]=nav[b.dataset.tab];
+    b.innerHTML=ic+t;
+    b.classList.toggle('on',b.dataset.tab===tab);
+  });
+
+  const dark=theme()==='dark';
+  $('#theme').innerHTML=(dark?UI.moon:UI.sun)+'Тема<span class="sp"></span>'+UI.right;
+  $('#theme2').innerHTML=dark?UI.moon:UI.sun;
+  $('#gh').innerHTML=UI.gh+'GitHub<span class="sp"></span>'+UI.out;
+
+  const core=D.xray_pid>0;
+  $('#corestate').innerHTML=`<i class="dot ${core?'ok':'bad'}"></i>${
+    core?'Ядро работает':D.core_on?'Ядро не запущено':'Ядро выключено'}`;
+  $('#core').className='core'+(D.core_on?'':' on');
+  $('#core').innerHTML=UI.power+(D.core_on?'Выключить ядро':'Включить ядро');
 }
 
 function draw(){
-  head(); foot();
+  chrome();
   $('#view').innerHTML = tab==='rules'?viewRules() : tab==='conn'?viewConn() : viewInfo();
-  $('#save').hidden = !(dirty && tab==='rules');
+  showBar();
 }
 
 async function load(probed){
@@ -503,18 +685,17 @@ async function load(probed){
     const r=await fetch(api('/data'+(probed?'?probed=1':'')));
     if(!r.ok) throw new Error('код '+r.status);
     D=await r.json();
-    dirty=false;
+    dirty=false; edit={};
     draw();
+    const msg=$('#m-rules'); if(msg) msg.textContent='';
     if(D.dns==='bypass' && !dnsShown && $('#gate').hidden){ dnsShown=1; dnsWarn(); }
   }catch(e){
-    $('#view').innerHTML='<p style="color:var(--bad)">Нет связи с демоном: '+esc(e.message)+'</p>';
+    $('#view').innerHTML='<div class="card"><p style="color:var(--bad)">'+
+      'Нет связи с демоном: '+esc(e.message)+'</p></div>';
   }
 }
 
 async function save(what,text,msgId){
-  /* Пустое имя раньше давало querySelector('#') — исключение до
-     отправки. Кнопка «Сохранить» тогда не делала ничего, а страница
-     выглядела так, будто сохранила. */
   const m=msgId?$('#'+msgId):null;
   if(m){ m.className='msg'; m.textContent='сохраняю…'; }
   try{
@@ -531,39 +712,34 @@ function picker(ruleIdx){
   const el=$('#pick');
   el.className='modal'; el.hidden=false;
   el.innerHTML=`<div class="box"><h3>Новая группа</h3>
-    <p class="sub">Готовый набор доменов или пустая группа</p>
+    <p class="ctr">Готовый набор доменов или пустая группа</p>
     <div class="picks">
       ${PRESETS.map((p,i)=>`<button class="pick" data-preset="${i}">
-         ${ICONS[p.icon]||ICONS.www}<span>${esc(p.name)}
-         <i>${plural(p.lines.length,'запись','записи','записей')}</i></span></button>`).join('')}
+        ${ICONS[p.icon]||ICONS.www}<span>${esc(p.name)}
+        <i>${plural(p.lines.length,'запись','записи','записей')}</i></span></button>`).join('')}
       <button class="pick" data-preset="-1">${ICONS.www}<span>Пустая<i>своя</i></span></button>
     </div>
-    <div class="bar" style="margin-top:18px">
-      <button class="b ghost" id="pick-close">Отмена</button></div></div>`;
+    <div class="bar"><button class="b ghost" id="pick-close">Отмена</button></div></div>`;
 
   const close=()=>{ el.hidden=true; el.className=''; el.innerHTML=''; };
   $('#pick-close').onclick=close;
 
   el.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
-    const n=+b.dataset.preset;
-    const rules=collect();
+    const n=+b.dataset.preset, rules=collect();
     const used=new Set();
     for(const r of rules) for(const g of r.groups) used.add(g.name.toLowerCase());
 
-    let name, lines;
+    let name,lines;
     if(n<0){ let i=1; while(used.has(('группа '+i).toLowerCase())) i++;
              name='группа '+i; lines=[]; }
-    else   { const p=PRESETS[n];
-             name=p.name; lines=p.lines.slice();
-             if(used.has(name.toLowerCase())){
-               let i=2; while(used.has((name+' '+i).toLowerCase())) i++;
-               name=name+' '+i;
-             } }
+    else{ const p=PRESETS[n]; name=p.name; lines=p.lines.slice();
+          if(used.has(name.toLowerCase())){
+            let i=2; while(used.has((name+' '+i).toLowerCase())) i++; name=name+' '+i; } }
 
     rules[ruleIdx].groups.push({name,on:true,lines});
-    open[ruleIdx+'.'+(rules[ruleIdx].groups.length-1)]=1;
+    edit[ruleIdx+'.'+(rules[ruleIdx].groups.length-1)]=1;
     D.domains=buildDomains(rules);
-    close(); touch(); draw();
+    close(); touch(); query=''; draw();
   });
 }
 
@@ -574,10 +750,10 @@ function gate(){
   const el=$('#gate');
   el.className='modal'; el.hidden=false;
   el.innerHTML=`<div class="box warn"><h3>Отказ от ответственности</h3>
-    <p class="sub">Прочти перед тем, как настраивать маршрутизацию</p>
+    <p class="ctr">Прочти перед тем, как настраивать маршрутизацию</p>
     <div class="fine">${disclaimer()}</div>
-    <div class="bar" style="margin-top:18px">
-      <button class="b" id="accept" style="flex:1">Принимаю</button></div></div>`;
+    <div class="bar"><button class="b" id="accept"
+      style="flex:1;justify-content:center">Принимаю</button></div></div>`;
   $('#accept').onclick=()=>{
     try{ localStorage.setItem('sf-disclaimer','1'); }catch(e){}
     el.hidden=true; el.className=''; el.innerHTML='';
@@ -585,7 +761,7 @@ function gate(){
 }
 
 /* Заставляем устройство разрешить случайное имя под доменом из своих же
-   списков: без этого «Проверить снова» перечитывала бы прежний ответ. */
+   списков: иначе «Проверить снова» перечитывала бы прежний ответ. */
 async function probe(){
   const host=(D.domains||'').split('\n').map(s=>s.trim())
     .find(s=>s && !/^[[#;]/.test(s) && !/=/.test(s) && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s));
@@ -601,7 +777,7 @@ function dnsWarn(){
   const el=$('#dns');
   el.className='modal'; el.hidden=false;
   el.innerHTML=`<div class="box warn"><h3>Устройство не спрашивает роутер</h3>
-    <p class="sub">Адрес устройства: ${esc(D.peer||'неизвестен')}</p>
+    <p class="ctr">Адрес устройства: ${esc(D.peer||'неизвестен')}</p>
     <div class="fine">
       <p>Демон видит DNS-ответы другим устройствам сети, но этому — ни одного.
       Значит имена оно разрешает мимо роутера, и <b>маршрутизация по доменам
@@ -615,10 +791,9 @@ function dnsWarn(){
         <li>на самом устройстве работает VPN или прокси.</li>
       </ul>
       <p>Выключи то, что найдёшь, и нажми «Проверить снова»: страница сама
-      заставит устройство разрешить случайное имя и посмотрит, прошёл ли
-      запрос через роутер. Никуда он не ведёт — такого имени не существует.</p>
-    </div>
-    <div class="bar" style="margin-top:18px">
+      заставит устройство разрешить случайное имя и посмотрит, прошёл ли запрос
+      через роутер. Никуда он не ведёт — такого имени не существует.</p></div>
+    <div class="bar">
       <button class="b" id="dns-recheck">Проверить снова</button>
       <button class="b ghost" id="dns-close">Закрыть</button></div></div>`;
 
@@ -631,82 +806,93 @@ function dnsWarn(){
 }
 
 /* ---- тема ---- */
-try{ document.documentElement.dataset.theme=localStorage.getItem('sf-theme')||''; }catch(e){}
-$('#theme').onclick=()=>{
-  const cur=document.documentElement.dataset.theme
-    || (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
-  const t=cur==='light'?'dark':'light';
+function theme(){
+  const set=document.documentElement.dataset.theme;
+  if(set) return set;
+  return matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';
+}
+try{ const t=localStorage.getItem('sf-theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+function flipTheme(){
+  const t=theme()==='light'?'dark':'light';
   document.documentElement.dataset.theme=t;
   try{ localStorage.setItem('sf-theme',t); }catch(e){}
-};
+  if(D) chrome();
+}
 
 /* ---- события ---- */
 document.addEventListener('input',ev=>{
-  const ta=ev.target.closest('[data-lines]');
-  if(ta){ const g=ta.parentElement.querySelector('.gut');
-          if(g) g.textContent=gutter(ta.value); }
-  if(ev.target.closest('.grp')) touch();
+  if(ev.target.id==='q'){ query=ev.target.value;
+    const el=$('#view'); const pos=ev.target.selectionStart;
+    draw(); const q=$('#q'); if(q){ q.focus(); q.setSelectionRange(pos,pos); }
+    return; }
+  if(ev.target.closest('.g')) touch();
 });
 
-document.addEventListener('scroll',ev=>{
-  const ta=ev.target.closest && ev.target.closest('[data-lines]');
-  if(ta){ const g=ta.parentElement.querySelector('.gut');
-          if(g) g.scrollTop=ta.scrollTop; }
-},true);
-
 document.addEventListener('click',async ev=>{
-  const nav=ev.target.closest('.tabs button');
-  if(nav){ tab=nav.dataset.tab;
-    document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b===nav));
-    if(nodesMode!=='masked') nodesMode='masked';
-    draw(); return; }
+  const nav=ev.target.closest('aside nav button');
+  if(nav){ tab=nav.dataset.tab; if(nodesMode!=='masked') nodesMode='masked';
+           draw(); return; }
 
-  if(ev.target.closest('.nm')||ev.target.closest('[data-toggle]')===null&&ev.target.closest('.icon')) {}
+  if(ev.target.closest('#theme')||ev.target.closest('#theme2')) return flipTheme();
+
+  const coreBtn=ev.target.closest('#core');
+  if(coreBtn){
+    const on=!D.core_on;
+    if(!on && !confirm('Выключить своё ядро? Трафик правил перестанет ходить через сервер.'))
+      return;
+    coreBtn.disabled=true;
+    const r=await fetch(api('/core?state='+(on?'on':'off')),{method:'POST'});
+    coreBtn.disabled=false;
+    if(!r.ok) alert(await r.text());
+    await load(); return; }
+
+  const f=ev.target.closest('[data-fold]');
+  if(f && ev.target.closest('button') && !ev.target.closest('.body')){
+    folds[f.dataset.fold]=!folds[f.dataset.fold]; f.classList.toggle('open'); return; }
 
   const sw=ev.target.closest('[data-toggle]');
-  if(sw){ const el=sw.closest('.grp'), rules=collect();
+  if(sw){ const el=sw.closest('.g'), rules=collect();
     const g=rules[+el.dataset.r].groups[+el.dataset.g];
     g.on=!g.on; D.domains=buildDomains(rules); touch(); draw(); return; }
 
-  const del=ev.target.closest('[data-del]');
-  if(del){ const el=del.closest('.grp'), rules=collect();
-    rules[+el.dataset.r].groups.splice(+el.dataset.g,1);
-    D.domains=buildDomains(rules); touch(); draw(); return; }
+  const edb=ev.target.closest('[data-edit]');
+  if(edb){ const el=edb.closest('.g'), id=el.dataset.id;
+    if(edit[id]){ D.domains=buildDomains(collect()); delete edit[id]; }
+    else edit[id]=1;
+    draw(); return; }
 
-  const gh=ev.target.closest('.gh');
-  if(gh && !ev.target.closest('.nm')){
-    const el=gh.parentElement, id=el.dataset.id;
-    sync(); open[id]=!open[id]; draw(); return; }
+  const del=ev.target.closest('[data-del]');
+  if(del){ const el=del.closest('.g'), rules=collect();
+    if(!confirm('Удалить группу «'+rules[+el.dataset.r].groups[+el.dataset.g].name+'»?')) return;
+    rules[+el.dataset.r].groups.splice(+el.dataset.g,1);
+    D.domains=buildDomains(rules); edit={}; touch(); draw(); return; }
 
   const addg=ev.target.closest('[data-addgrp]');
-  if(addg){ picker(+addg.dataset.addgrp); return; }
+  if(addg){ D.domains=buildDomains(collect()); picker(+addg.dataset.addgrp); return; }
 
-  if(ev.target.id==='newrule'){
+  if(ev.target.closest('#newrule')){
     const t=prompt('Куда заворачивать? Имя политики Keenetic либо интерфейса:',
                    D.policy_name);
     if(!t) return;
     const rules=collect();
     rules.push({target:t.trim(),groups:[]});
-    D.domains=buildDomains(rules);
-    touch(); draw(); picker(rules.length-1); return; }
+    D.domains=buildDomains(rules); touch(); draw(); picker(rules.length-1); return; }
 
   if(ev.target.id==='apply'){
     const btn=ev.target; btn.disabled=true;
-    const note=$('#save-note'); note.textContent='сохраняю…';
     D.domains=buildDomains(collect(true));
-    const ok=await save('domains',D.domains,null);
+    const ok=await save('domains',D.domains,'m-rules');
     btn.disabled=false;
-    if(ok){ dirty=false; $('#save').hidden=true; note.textContent='Не забывай сохранять.'; }
-    else   { note.textContent='не удалось сохранить'; }
+    if(ok){ dirty=false; edit={}; showBar(); }
     return; }
 
-  if(ev.target.id==='undo'){ dirty=false; $('#save').hidden=true; load(); return; }
+  if(ev.target.id==='undo'){ dirty=false; edit={}; showBar(); load(); return; }
 
-  if(ev.target.id==='nodes-show'){
+  if(ev.target.closest('#nodes-show')){
     const r=await fetch(api('/data?reveal=1'));
     if(r.ok){ D=await r.json(); nodesMode='shown'; draw(); } return; }
-  if(ev.target.id==='nodes-new'){ nodesMode='new'; draw(); $('#nodes')?.focus(); return; }
-  if(ev.target.id==='nodes-hide'){ nodesMode='masked'; load(); return; }
+  if(ev.target.closest('#nodes-new')){ nodesMode='new'; draw(); $('#nodes')?.focus(); return; }
+  if(ev.target.closest('#nodes-hide')){ nodesMode='masked'; load(); return; }
 
   if(ev.target.id==='reshow'){ ev.preventDefault();
     try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
