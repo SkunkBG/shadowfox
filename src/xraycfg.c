@@ -32,14 +32,10 @@ void xraycfg_defaults(xraycfg_opts_t *o)
     o->probe_interval = "5m";
 }
 
-static void build_inbound(json_t *j, const xraycfg_opts_t *o,
-                          int server, int port)
+static void build_inbound(json_t *j, const xraycfg_opts_t *o)
 {
-    char tag[32];
-    snprintf(tag, sizeof(tag), TAG_SOCKS_IN "-%d", server);
-
     json_obj_open(j);
-    json_kv_str(j, "tag", tag);
+    json_kv_str(j, "tag", TAG_SOCKS_IN);
 
     /* Адрес входа задаётся явно. У Xray listen по умолчанию 0.0.0.0, и
        neofit его не задавал — на роутере поднимался открытый SOCKS5 без
@@ -48,7 +44,7 @@ static void build_inbound(json_t *j, const xraycfg_opts_t *o,
        на LAN-адрес роутера, а не на localhost. Тогда сюда подставляется
        этот адрес: он всё равно уже не 0.0.0.0. */
     json_kv_str(j, "listen", o->listen && o->listen[0] ? o->listen : "127.0.0.1");
-    json_kv_int(j, "port", port);
+    json_kv_int(j, "port", o->socks_port);
     json_kv_str(j, "protocol", "socks");
 
     json_key(j, "settings");
@@ -214,10 +210,7 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
 {
     if (!l || !o || !buf || l->count <= 0) return -1;
 
-    /* Серверов может быть несколько: у каждого свой вход SOCKS, свои
-       узлы и свой балансировщик. Процесс при этом один — на роутере
-       память дороже, чем простота второго процесса. */
-    const int servers = l->server_count > 0 ? l->server_count : 1;
+    const int balanced = l->count > 1;
 
     json_t j;
     json_init(&j, buf, size);
@@ -229,11 +222,7 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
     json_kv_str(&j, "loglevel", o->log_level ? o->log_level : "warning");
     json_obj_close(&j);
 
-    int any_balanced = 0;
-    for (int k = 0; k < servers; k++)
-        if (l->servers[k].nodes > 1) any_balanced = 1;
-
-    if (any_balanced) {
+    if (balanced) {
         /* Наблюдатель периодически измеряет узлы, а балансировщик
            выбирает самый быстрый живой. Без него strategy leastPing
            не с чем работать. */
@@ -250,15 +239,14 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
 
     json_key(&j, "inbounds");
     json_arr_open(&j);
-    for (int k = 0; k < servers; k++)
-        build_inbound(&j, o, k, nodelist_port(l, k, o->socks_port));
+    build_inbound(&j, o);
     json_arr_close(&j);
 
     json_key(&j, "outbounds");
     json_arr_open(&j);
     for (int i = 0; i < l->count; i++) {
-        char tag[40];
-        snprintf(tag, sizeof(tag), PROXY_PREFIX "%d-%d", l->owner[i], i);
+        char tag[32];
+        snprintf(tag, sizeof(tag), PROXY_PREFIX "%d", i);
         build_proxy_outbound(&j, &l->items[i], o, tag);
     }
     if (o->fragment) build_fragment_outbound(&j, o);
@@ -278,63 +266,37 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
     json_obj_open(&j);
     json_kv_str(&j, "domainStrategy", "AsIs");
 
-    if (any_balanced) {
+    if (balanced) {
         json_key(&j, "balancers");
         json_arr_open(&j);
-        for (int k = 0; k < servers; k++) {
-            if (l->servers[k].nodes <= 1) continue;
-
-            char btag[32], sel[32];
-            snprintf(btag, sizeof(btag), TAG_BALANCER "-%d", k);
-            snprintf(sel,  sizeof(sel),  PROXY_PREFIX "%d-", k);
-
-            json_obj_open(&j);
-            json_kv_str(&j, "tag", btag);
-            json_key(&j, "selector");
-            json_arr_open(&j);
-            json_str(&j, sel);
-            json_arr_close(&j);
-            json_key(&j, "strategy");
-            json_obj_open(&j);
-            json_kv_str(&j, "type", "leastPing");
-            json_obj_close(&j);
-            json_obj_close(&j);
-        }
+        json_obj_open(&j);
+        json_kv_str(&j, "tag", TAG_BALANCER);
+        json_key(&j, "selector");
+        json_arr_open(&j);
+        json_str(&j, PROXY_PREFIX);
+        json_arr_close(&j);
+        json_key(&j, "strategy");
+        json_obj_open(&j);
+        json_kv_str(&j, "type", "leastPing");
+        json_obj_close(&j);
+        json_obj_close(&j);
         json_arr_close(&j);
     }
 
-    /* Каждый вход ведёт строго к своим узлам: в этом весь смысл
-       нескольких серверов — правило на своей политике попадает туда,
-       куда назначено, а не к самому быстрому вообще. */
     json_key(&j, "rules");
     json_arr_open(&j);
-    for (int k = 0; k < servers; k++) {
-        char itag[32];
-        snprintf(itag, sizeof(itag), TAG_SOCKS_IN "-%d", k);
-
-        json_obj_open(&j);
-        json_kv_str(&j, "type", "field");
-        json_key(&j, "inboundTag");
-        json_arr_open(&j);
-        json_str(&j, itag);
-        json_arr_close(&j);
-
-        if (l->servers[k].nodes > 1) {
-            char btag[32];
-            snprintf(btag, sizeof(btag), TAG_BALANCER "-%d", k);
-            json_kv_str(&j, "balancerTag", btag);
-        } else {
-            /* Единственный узел сервера: ищем его номер в общем списке. */
-            char otag[40] = "";
-            for (int i = 0; i < l->count; i++)
-                if (l->owner[i] == k) {
-                    snprintf(otag, sizeof(otag), PROXY_PREFIX "%d-%d", k, i);
-                    break;
-                }
-            json_kv_str(&j, "outboundTag", otag[0] ? otag : TAG_BLOCK);
-        }
-        json_obj_close(&j);
+    json_obj_open(&j);
+    json_kv_str(&j, "type", "field");
+    json_key(&j, "inboundTag");
+    json_arr_open(&j);
+    json_str(&j, TAG_SOCKS_IN);
+    json_arr_close(&j);
+    if (balanced) {
+        json_kv_str(&j, "balancerTag", TAG_BALANCER);
+    } else {
+        json_kv_str(&j, "outboundTag", PROXY_PREFIX "0");
     }
+    json_obj_close(&j);
     json_arr_close(&j);
     json_obj_close(&j);
 

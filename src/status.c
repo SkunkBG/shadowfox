@@ -70,14 +70,6 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->flushes, e->restores, e->rules_applied,
         (long)e->xray.pid, e->xray.restarts, cfg->socks_port);
 
-    /* Раскладка серверов: без неё на роутере не понять, какой вход
-       какому серверу принадлежит, а именно это и надо при настройке
-       второго подключения. */
-    fprintf(f, "servers=%d\n", e->servers);
-    for (int k = 0; k < e->servers; k++)
-        fprintf(f, "server%d=%s|%d|%d\n", k, e->server_name[k],
-                e->server_port[k], e->server_nodes[k]);
-
     fclose(f);
     rename(tmp, path);
 }
@@ -287,29 +279,12 @@ int status_print(const config_t *cfg)
 
     long xpid = status_num(spath, "xray_pid");
     if (xpid > 0) {
-        printf("  своё ядро:  работает, pid %ld\n", xpid);
+        printf("  своё ядро:  работает, pid %ld, socks порт %ld\n",
+               xpid, status_num(spath, "socks"));
         long r = status_num(spath, "xray_restarts");
         if (r > 0) printf("              перезапусков: %ld\n", r);
     } else {
         printf("  своё ядро:  не запущено (нет %s?)\n", cfg->nodes_file);
-    }
-
-    /* Какой вход какому серверу принадлежит: без этого при настройке
-       второго подключения в роутере остаётся только гадать. */
-    long nsrv = status_num(spath, "servers");
-    for (long k = 0; k < nsrv; k++) {
-        char key[32], val[128] = "";
-        snprintf(key, sizeof(key), "server%ld", k);
-        if (!status_get(spath, key, val, sizeof(val))) continue;
-
-        char *port  = strchr(val, '|');
-        if (!port) continue;
-        *port++ = '\0';
-        char *nodes = strchr(port, '|');
-        if (nodes) *nodes++ = '\0';
-
-        printf("    %s -> socks %s, ссылок %s\n", val, port,
-               nodes ? nodes : "?");
     }
 
     char iface[64] = "";
