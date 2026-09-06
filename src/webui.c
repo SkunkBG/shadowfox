@@ -3,6 +3,7 @@
 #include "digest.h"
 #include "ndmauth.h"
 #include "proc.h"
+#include "dnscfg.h"
 
 #define DNS_LINES_MAX 32
 
@@ -379,42 +380,6 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     }
 
     http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
-}
-
-/* Вышестоящие серверы DNS из running-config роутера.
-
-   Они записаны внутри секции dns-proxy строками вида
-   «tls upstream 8.8.8.8 sni dns.google» — сами по себе такие строки
-   ничем не выделяются, поэтому идём по секциям: заголовок секции стоит
-   в первой колонке, содержимое с отступом. Строку портит strtok, так
-   что text обязан быть изменяемым.
-
-   Возвращает число найденных строк. */
-int dns_upstreams(char *text, const char **out, int max)
-{
-    int n = 0, inside = 0;
-
-    for (char *line = strtok(text, "\n"); line && n < max;
-         line = strtok(NULL, "\n")) {
-
-        int indented = (line[0] == ' ' || line[0] == '\t');
-        char *t = str_trim(line);
-        if (!*t) continue;
-
-        if (!indented) {
-            inside = !strcmp(t, "dns-proxy");
-            continue;
-        }
-
-        if (inside) {
-            /* Внутри секции интересны только вышестоящие серверы. */
-            if (strstr(t, "upstream")) out[n++] = t;
-        } else if (!strncmp(t, "ip name-server ", 15)) {
-            out[n++] = t;
-        }
-    }
-
-    return n;
 }
 
 /* Серверы DNS роутера. Берём из его же running-config через ndmc:

@@ -13,11 +13,6 @@ struct engine;
 
 /* Поднимает сервер. Адрес берётся из настроек, а если он пуст — с
    интерфейса локальной сети. Возвращает 0 при успехе. */
-/* Выбирает из running-config роутера строки про вышестоящие серверы
-   DNS. Вынесено ради проверок: строки лежат внутри секции и по виду
-   неотличимы от прочих. text изменяется. */
-int  dns_upstreams(char *text, const char **out, int max);
-
 int  webui_addr(const config_t *cfg, char *out, unsigned size,
                 char *err, unsigned err_size);
 int  webui_needs_rebind(const http_t *h, const config_t *cfg);

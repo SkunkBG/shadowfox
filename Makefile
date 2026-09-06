@@ -43,7 +43,7 @@ src/webpage.c: web/index.html tools/embed.sh tools/build-page.sh $(wildcard web/
 	sh tools/build-page.sh web/index.html web/logo.png > $(BUILD)/page.html
 	sh tools/embed.sh $(BUILD)/page.html web_page > $@
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/digest.c src/ndmauth.c src/webpage.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/digest.c src/ndmauth.c src/dnscfg.c src/webpage.c
 
 BUILD = build
 
@@ -140,12 +140,7 @@ check:
 		src/ndmauth.c src/digest.c src/util.c src/log.c -o $(BUILD)/check_ndmauth
 	./$(BUILD)/check_ndmauth
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_dnscfg.c \
-		src/webui.c src/http.c src/util.c src/log.c src/config.c src/jsonw.c \
-		src/engine.c src/watchlist.c src/ipsets.c src/routing.c src/dnscap.c \
-		src/dnsmsg.c src/proc.c src/apply.c src/supervise.c src/rci.c \
-		src/status.c src/nodelist.c src/node.c src/url.c src/base64.c \
-		src/xraycfg.c src/digest.c src/ndmauth.c src/webpage.c \
-		-o $(BUILD)/check_dnscfg
+		src/dnscfg.c src/util.c -o $(BUILD)/check_dnscfg
 	./$(BUILD)/check_dnscfg
 
 ipk-all: all
