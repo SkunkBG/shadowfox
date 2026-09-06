@@ -17,7 +17,7 @@ a{color:var(--acc)}
 
 header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
 .logo{display:flex;align-items:center;gap:13px}
-.logo svg{width:44px;height:44px;flex:0 0 auto}
+.logo svg,.logo .mark{width:44px;height:44px;flex:0 0 auto;display:block}
 .logo b{font:650 22px/1.1 "Avenir Next","Futura","Century Gothic",
         "Segoe UI Semibold",Inter,system-ui,sans-serif;letter-spacing:.03em}
 .logo span{color:var(--dim);font-size:11.5px;display:block;line-height:1;
@@ -88,14 +88,21 @@ button.b:disabled{opacity:.45;cursor:default}
 @media(max-width:820px){.rows{grid-template-columns:1fr}main{padding:16px 14px 60px}.groups{grid-template-columns:1fr}}
 .kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
 .kv span:first-child{color:var(--dim)}
+.fine p{color:var(--dim);font-size:12.5px;line-height:1.75;margin:0 0 10px}
+.fine ul{color:var(--dim);font-size:12.5px;line-height:1.75;
+    margin:0 0 10px;padding-left:20px}
+.fine li{margin-bottom:5px}
+.fine p:last-child{margin-bottom:0}
 </style>
 
 <header>
   <div class="logo">
+    <!--ЛОГОТИП-->
     <svg viewBox="0 0 64 64" aria-hidden="true">
       <path fill="var(--acc)" d="M10 6l9 10h26l9-10 3 18c0 6-3 11-8 15l-9 7-8 8-8-8-9-7c-5-4-8-9-8-15z"/>
       <path fill="var(--bg)" d="M22 27c0-3 3-5 7-5h6v4h-8v3h6c3 0 5 2 5 5s-2 5-5 5h-8v-4h8v-3h-5c-4 0-6-2-6-5zm18-5h11v4h-7v3h6v4h-6v7h-4z"/>
     </svg>
+    <!--/ЛОГОТИП-->
     <div><b>Shadow&nbsp;Fox</b><span id="ver"></span></div>
   </div>
   <div class="spacer"></div>
@@ -315,6 +322,42 @@ function viewInfo(){
     свой Xray &rarr; сервер.<br>
     Перехват пассивный: если демон упадёт, DNS у сети продолжит работать.
     Адреса в наборах стареют, чтобы не копить давно переехавшие.</p>
+  </div>
+
+  <div class="card fine">
+    <h3>Отказ от ответственности</h3>
+    <p>Shadow Fox распространяется «как есть», без каких-либо гарантий,
+    обязательств или заверений, явных либо подразумеваемых. Использование
+    осуществляется пользователем на собственный риск.</p>
+
+    <p>Автор не несёт ответственности за любые последствия использования
+    или невозможности использования программного продукта, включая, но не
+    ограничиваясь:</p>
+    <ul>
+      <li>сбоями, неисправностями, ошибками или иными нарушениями работы
+      оборудования, программного обеспечения или сетевых сервисов;</li>
+      <li>утратой, повреждением, искажением или несанкционированным
+      раскрытием данных;</li>
+      <li>нарушениями требований законодательства и иных
+      нормативно-правовых актов государства, на территории которого
+      находится пользователь;</li>
+      <li>любым прямым, косвенным, случайным, непредвиденным,
+      репутационным или иным ущербом, включая упущенную выгоду, вызванным
+      использованием или невозможностью использования продукта.</li>
+    </ul>
+
+    <p>Автор не несёт ответственности перед пользователем или третьими
+    лицами за любой ущерб, возникший вследствие действий, бездействия,
+    ошибок или иных обстоятельств, связанных с использованием продукта,
+    даже если Автор был уведомлён о возможности таких последствий.
+    Настоящее ограничение ответственности применяется в максимально
+    допустимой законом степени.</p>
+
+    <p>Используя проект, пользователь подтверждает, что выполняет действия
+    сознательно и добровольно, принимая все риски и возможные последствия.
+    Пользователь несёт полную ответственность за результаты своей
+    конфигурации, соблюдение требований законодательства, политик
+    провайдера и правил сети.</p>
   </div>`;
 }
 const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;

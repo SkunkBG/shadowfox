@@ -38,8 +38,10 @@ LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
 # Страница вшивается в бинарник: пересобираем её, когда меняется исходник.
-src/webpage.c: web/index.html tools/embed.sh
-	sh tools/embed.sh web/index.html web_page > $@
+src/webpage.c: web/index.html tools/embed.sh tools/build-page.sh $(wildcard web/logo.png)
+	@mkdir -p $(BUILD)
+	sh tools/build-page.sh web/index.html web/logo.png > $(BUILD)/page.html
+	sh tools/embed.sh $(BUILD)/page.html web_page > $@
 
 SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/webpage.c
 
