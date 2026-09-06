@@ -470,19 +470,23 @@ static void session_new(char *out, unsigned out_size)
     g_sessions[slot].until = now + SESSION_HOURS * 3600;
 }
 
-static int cookie_value(const char *cookie, const char *name,
+static int cookie_value(const http_req_t *req, const char *name,
                         char *out, unsigned out_size)
 {
-    if (!cookie || !*cookie) return 0;
+    out[0] = '\0';
+    if (!req->cookie || !req->cookie_len) return 0;
 
-    size_t nlen = strlen(name);
-    for (const char *p = cookie; *p; p++) {
-        if (p != cookie && !(p[-1] == ' ' || p[-1] == ';')) continue;
+    const char *c    = req->cookie;
+    const char *end  = c + req->cookie_len;
+    size_t      nlen = strlen(name);
+
+    for (const char *p = c; p + nlen < end; p++) {
+        if (p != c && !(p[-1] == ' ' || p[-1] == ';')) continue;
         if (strncmp(p, name, nlen) != 0 || p[nlen] != '=') continue;
 
         const char *v = p + nlen + 1;
         unsigned    i = 0;
-        while (v[i] && v[i] != ';' && i + 1 < out_size) { out[i] = v[i]; i++; }
+        while (v < end && *v != ';' && i + 1 < out_size) { out[i++] = *v++; }
         out[i] = '\0';
         return i > 0;
     }
@@ -492,7 +496,7 @@ static int cookie_value(const char *cookie, const char *name,
 static int session_valid(const http_req_t *req)
 {
     char tok[64] = "";
-    if (!cookie_value(req->cookie, "sfsession", tok, sizeof(tok))) return 0;
+    if (!cookie_value(req, "sfsession", tok, sizeof(tok))) return 0;
 
     long now = (long)time(NULL);
     for (int i = 0; i < SESSIONS_MAX; i++) {
@@ -505,7 +509,7 @@ static int session_valid(const http_req_t *req)
 static void session_drop(const http_req_t *req)
 {
     char tok[64] = "";
-    if (!cookie_value(req->cookie, "sfsession", tok, sizeof(tok))) return;
+    if (!cookie_value(req, "sfsession", tok, sizeof(tok))) return;
 
     for (int i = 0; i < SESSIONS_MAX; i++)
         if (!strcmp(g_sessions[i].token, tok)) g_sessions[i].until = 0;

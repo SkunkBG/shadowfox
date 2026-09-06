@@ -71,6 +71,41 @@ static void test_body(void)
     CHECK(r.body && strstr(r.body, "тест") != NULL, "содержимое тела");
 }
 
+/* Куки не различают порт: браузер шлёт нам и куки веб-интерфейса
+   роутера с того же адреса. Заголовок от этого длинный, и наша метка
+   сессии оказывается в конце — копия в буфер её обрезала, а вход
+   слетал после захода на страницу роутера. */
+static void test_long_cookie(void)
+{
+    http_req_t r;
+
+    static char req[4096];
+    int n = snprintf(req, sizeof(req),
+                     "GET /data HTTP/1.1\r\nHost: t\r\nCookie: ");
+
+    /* Набиваем чужими куками так, чтобы наша ушла далеко за 256 байт. */
+    for (int i = 0; i < 12; i++)
+        n += snprintf(req + n, sizeof(req) - (size_t)n,
+                      "ndm_session_%02d=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; ", i);
+
+    n += snprintf(req + n, sizeof(req) - (size_t)n,
+                  "sfsession=deadbeef0123456789\r\n\r\n");
+
+    CHECK(parse(req, &r) == 0, "запрос разобран");
+    CHECK(r.cookie != NULL, "заголовок Cookie найден");
+    CHECK(r.cookie_len > 400, "и он длинный: %zu", r.cookie_len);
+
+    /* Ищем нашу метку так же, как это делает обработчик. */
+    char        want[] = "sfsession=";
+    const char *found  = NULL;
+    for (const char *p = r.cookie; p + sizeof(want) - 1 < r.cookie + r.cookie_len; p++)
+        if (!strncmp(p, want, sizeof(want) - 1)) { found = p + sizeof(want) - 1; break; }
+
+    CHECK(found != NULL, "метка сессии видна целиком");
+    CHECK(found && !strncmp(found, "deadbeef0123456789", 18),
+          "и значение не обрезано");
+}
+
 static void test_token(void)
 {
     http_req_t r;
@@ -337,6 +372,7 @@ int main(void)
     test_simple_get();
     test_query();
     test_body();
+    test_long_cookie();
     test_token();
     test_garbage();
     test_refuses_all_interfaces();

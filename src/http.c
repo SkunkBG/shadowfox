@@ -76,9 +76,15 @@ int http_parse_request(const char *buf, size_t len, http_req_t *out)
     for (const char *h = buf; h + 7 < hdr_end; h++) {
         if (h != buf && h[-1] != '\n') continue;
         if (strncasecmp(h, "Cookie:", 7) != 0) continue;
+
         const char *v = h + 7;
         while (v < hdr_end && (*v == ' ' || *v == '\t')) v++;
-        copy_until(v, (size_t)(hdr_end - v), '\r', out->cookie, sizeof(out->cookie));
+
+        const char *e = v;
+        while (e < hdr_end && *e != '\r' && *e != '\n') e++;
+
+        out->cookie     = v;
+        out->cookie_len = (size_t)(e - v);
         break;
     }
     for (const char *h = buf; h + 14 < hdr_end; h++) {
