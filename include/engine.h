@@ -13,7 +13,15 @@
 
 /* Связывает всё вместе: списки, наборы, правила, перехват. */
 
+/* Столько же, сколько понимает список узлов. */
+#define ENGINE_SERVERS_MAX 4
+
 typedef struct engine {
+    int  servers;
+    char server_name[ENGINE_SERVERS_MAX][48];
+    int  server_port[ENGINE_SERVERS_MAX];
+    int  server_nodes[ENGINE_SERVERS_MAX];
+
     wl_t   wl;
     ips_t  ips;
     rt_t   rt;

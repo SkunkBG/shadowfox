@@ -222,6 +222,19 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_str(&j, "proxy_name", cfg->proxy_iface);
     json_kv_int(&j, "socks_port", cfg->socks_port);
 
+    /* Раскладка серверов: страница по ней подсказывает, какой порт
+       указывать при создании подключения в роутере. */
+    json_key(&j, "servers");
+    json_arr_open(&j);
+    for (int k = 0; k < e->servers; k++) {
+        json_obj_open(&j);
+        json_kv_str(&j, "name", e->server_name[k]);
+        json_kv_int(&j, "port", e->server_port[k]);
+        json_kv_int(&j, "nodes", e->server_nodes[k]);
+        json_obj_close(&j);
+    }
+    json_arr_close(&j);
+
     /* Есть ли политика и подключение на роутере. */
     rci_t rci;
     rci_init(&rci);

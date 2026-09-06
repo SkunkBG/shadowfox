@@ -216,6 +216,8 @@ static int apply_all(engine_t *e, char *err, unsigned err_size, int recreate)
    которое настроено вручную. */
 static void start_own_xray(engine_t *e, const config_t *cfg)
 {
+    e->servers = 0;
+
     FILE *f = fopen(cfg->nodes_file, "r");
     if (!f) {
         log_info("файла %s нет, свой Xray не запускается", cfg->nodes_file);
@@ -242,6 +244,18 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     }
     if (list.skipped)
         log_warn("в %s пропущено строк: %d", cfg->nodes_file, list.skipped);
+
+    /* Раскладку запоминаем сразу после разбора, а не после запуска ядра:
+       страница по ней подсказывает порты для подключений в роутере, и эта
+       подсказка нужна как раз тогда, когда ничего ещё не работает. */
+    e->servers = list.server_count < ENGINE_SERVERS_MAX
+               ? list.server_count : ENGINE_SERVERS_MAX;
+    for (int k = 0; k < e->servers; k++) {
+        str_copy(e->server_name[k], sizeof(e->server_name[k]),
+                 list.servers[k].name);
+        e->server_port[k]  = nodelist_port(&list, k, cfg->socks_port);
+        e->server_nodes[k] = list.servers[k].nodes;
+    }
 
     /* Прокси-клиент Keenetic приходит на LAN-адрес роутера, а не на
        петлю, поэтому и слушать надо там. */
@@ -275,8 +289,12 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
         return;
     }
 
-    log_info("конфиг Xray записан: узлов %d, socks %s:%d",
-             list.count, lan, cfg->socks_port);
+    log_info("конфиг Xray записан: серверов %d, узлов %d",
+             list.server_count, list.count);
+    for (int k = 0; k < list.server_count; k++)
+        log_info("  %s: узлов %d, socks %s:%d", list.servers[k].name,
+                 list.servers[k].nodes, lan,
+                 nodelist_port(&list, k, cfg->socks_port));
 
     sv_init(&e->xray, ao.xray_bin, cfg->xray_config);
     if (sv_start(&e->xray) == 0) e->xray_managed = 1;
