@@ -22,11 +22,13 @@ typedef struct {
     int    rules_applied;
     int    capturing;
     time_t last_flush;
+    time_t last_stats;
 
     unsigned long matched;   /* адресов, попавших под правила */
     unsigned long flushes;
     unsigned long restores;
     int           policies_pending;   /* политик без метки */
+    int           may_create_policy;
 } engine_t;
 
 void engine_init(engine_t *e);

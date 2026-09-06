@@ -88,11 +88,19 @@ static void fetch_policy_marks(engine_t *e)
         int      rc   = rci_policy_mark(&e->rci, g->iface, &mark);
 
         if (rc == -2) {
-            /* Политики нет — создаём пустой. Интерфейсы в неё
-               администратор назначает сам через панель роутера. */
-            log_info("политика %s не найдена, создаю", g->iface);
-            if (rci_policy_create(&e->rci, g->iface) == 0)
-                rc = rci_policy_mark(&e->rci, g->iface, &mark);
+            if (!e->may_create_policy) {
+                /* Заводить политику и сохранять конфигурацию роутера —
+                   изменение его настроек. Делать это без разрешения
+                   нельзя: однажды так на роутере завелась лишняя
+                   политика с именем интерфейса. */
+                log_error("политика %s не найдена. Создай её в панели "
+                          "роутера или разреши createPolicy=yes",
+                          g->iface);
+            } else {
+                log_info("политика %s не найдена, создаю", g->iface);
+                if (rci_policy_create(&e->rci, g->iface) == 0)
+                    rc = rci_policy_mark(&e->rci, g->iface, &mark);
+            }
         }
 
         if (rc == 0 && mark) {
@@ -142,7 +150,8 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
         if (err) str_copy(err, err_size, "не найдены iptables или ip");
         return -1;
     }
-    e->rt.ipv6 = cfg->ipv6 && e->rt.ip6tables[0];
+    e->rt.ipv6          = cfg->ipv6 && e->rt.ip6tables[0];
+    e->may_create_policy = cfg->create_policy;
 
     if (!load_lists(e, cfg)) return 0;
 
@@ -219,6 +228,14 @@ void engine_tick(engine_t *e, time_t now)
     if (!e) return;
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
+
+    /* Раз в минуту показываем, что видит перехват. Пустой набор сам по
+       себе не говорит, молчит ли сеть или сокет ничего не получает. */
+    if (e->capturing && now - e->last_stats >= 60) {
+        e->last_stats = now;
+        log_info("перехват: пакетов %lu, ответов %lu, мимо %lu, адресов %lu",
+                 e->cap.seen, e->cap.parsed, e->cap.ignored, e->matched);
+    }
 
     if (e->ips.queued && now - e->last_flush >= ENGINE_FLUSH_SECONDS) {
         char err[256] = "";

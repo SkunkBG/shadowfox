@@ -20,6 +20,10 @@ void config_defaults(config_t *cfg)
     cfg->foreground = 0;
     cfg->auto_start = 1;
     cfg->ipv6       = 1;
+    /* Заводить политики на роутере и сохранять его конфигурацию — это
+       изменение настроек устройства, а не наша внутренняя кухня.
+       Молча так делать нельзя, поэтому по умолчанию выключено. */
+    cfg->create_policy = 0;
 }
 
 int config_set(config_t *cfg, const char *key, const char *value)
@@ -53,6 +57,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "ipv6")) {
         cfg->ipv6 = parse_bool(value, cfg->ipv6);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "createPolicy")) {
+        cfg->create_policy = parse_bool(value, cfg->create_policy);
         return 0;
     }
 
@@ -181,7 +190,12 @@ int config_write_default(const char *path)
         "interface=%s\n"
         "\n"
         "# Обслуживать ли IPv6.\n"
-        "ipv6=yes\n",
+        "ipv6=yes\n"
+        "\n"
+        "# Разрешить демону заводить недостающие политики на роутере и\n"
+        "# сохранять его конфигурацию. Это изменение настроек устройства,\n"
+        "# поэтому по умолчанию выключено: политику создаёт администратор.\n"
+        "createPolicy=no\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface);
 
     fclose(f);
