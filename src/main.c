@@ -29,7 +29,8 @@ static void usage(FILE *out)
         "      --sub ФАЙЛ        то же из файла: подписка base64 или список ссылок\n"
         "      --socks-port N    порт локального SOCKS для --link (по умолчанию 2080)\n"
         "      --listen АДРЕС    адрес входа SOCKS (по умолчанию 127.0.0.1)\n"
-        "      --no-fragment     не включать фрагментацию и шум в --link\n"
+        "      --fragment        включить фрагментацию TLS и шум UDP\n"
+        "      --no-fragment     выключить их явно (и так выключены)\n"
         "      --log УРОВЕНЬ     off | error | warn | info | debug\n"
         "      --КЛЮЧ ЗНАЧЕНИЕ   любой параметр из shadowfox.conf\n"
         "  -v, --version         версия\n"
@@ -97,7 +98,10 @@ int main(int argc, char **argv)
             xraycfg_defaults(&opts);
 
             for (int k = 1; k < argc; k++) {
-                if (!strcmp(argv[k], "--no-fragment")) {
+                if (!strcmp(argv[k], "--fragment")) {
+                    opts.fragment = 1;
+                    opts.noise    = 1;
+                } else if (!strcmp(argv[k], "--no-fragment")) {
                     opts.fragment = 0;
                     opts.noise    = 0;
                 } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
@@ -160,7 +164,10 @@ int main(int argc, char **argv)
             xraycfg_opts_t opts;
             xraycfg_defaults(&opts);
             for (int k = 1; k < argc; k++) {
-                if (!strcmp(argv[k], "--no-fragment")) {
+                if (!strcmp(argv[k], "--fragment")) {
+                    opts.fragment = 1;
+                    opts.noise    = 1;
+                } else if (!strcmp(argv[k], "--no-fragment")) {
                     opts.fragment = 0;
                     opts.noise    = 0;
                 } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {

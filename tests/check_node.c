@@ -76,8 +76,17 @@ static void test_generated_config(void)
     xraycfg_opts_t o;
     xraycfg_defaults(&o);
 
+    /* По умолчанию фрагментации нет: рабочая установка обходится без неё. */
+    CHECK(o.fragment == 0 && o.noise == 0, "по умолчанию выключены");
+
     CHECK(node_from_link(REALITY_LINK, &n, err, sizeof(err)) == 0, "разбор");
-    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг собран");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг без фрагментации");
+    CHECK(strstr(cfg, "dialerProxy") == NULL, "нет ссылки на фрагментацию");
+    CHECK(strstr(cfg, "\"tag\":\"fragment\"") == NULL, "нет лишнего исходящего");
+
+    o.fragment = 1;
+    o.noise    = 1;
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг с фрагментацией");
 
     /* Вход обязан слушать только петлю. У Xray listen по умолчанию
        0.0.0.0, и neofit его не задавал — получался открытый SOCKS5
@@ -96,13 +105,7 @@ static void test_generated_config(void)
     CHECK(strstr(cfg, "\"alpn\"") == NULL,
           "alpn не выдуман там, где его не задавали");
 
-    o.fragment = 0;
-    o.noise    = 0;
-    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг без фрагментации");
-    CHECK(strstr(cfg, "dialerProxy") == NULL,
-          "без фрагментации нет и ссылки на неё");
-    CHECK(strstr(cfg, "\"tag\":\"fragment\"") == NULL,
-          "без фрагментации нет лишнего исходящего");
+
 }
 
 static void test_alpn_from_link(void)

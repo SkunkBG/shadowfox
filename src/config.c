@@ -63,7 +63,8 @@ int config_apply_args(config_t *cfg, int argc, char **argv)
             if (i + 1 < argc) i++;
             continue;
         }
-        if (!strcmp(argv[i], "--no-fragment")) continue;
+        if (!strcmp(argv[i], "--no-fragment") ||
+            !strcmp(argv[i], "--fragment")) continue;
 
         if (!strncmp(argv[i], "--", 2) && i + 1 < argc &&
             config_set(cfg, argv[i] + 2, argv[i + 1]) == 0) {

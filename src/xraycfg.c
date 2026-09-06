@@ -20,8 +20,12 @@ void xraycfg_defaults(xraycfg_opts_t *o)
     memset(o, 0, sizeof(*o));
     o->listen     = "127.0.0.1";
     o->socks_port = 2080;
-    o->fragment   = 1;
-    o->noise      = 1;
+    /* Фрагментация и шум выключены по умолчанию. Рабочая установка на
+       Keenetic обходится без них, а стоят они задержки и процессора.
+       Навязывать то, чего нет в работающей конфигурации, неправильно:
+       включаются флагом --fragment, когда провайдер этого требует. */
+    o->fragment   = 0;
+    o->noise      = 0;
     o->sniffing   = 1;
     o->log_level  = "warning";
     o->probe_url  = "https://www.gstatic.com/generate_204";
