@@ -68,7 +68,7 @@ static void write_escaped(json_t *j, const char *s)
             if (*p < 0x20) {
                 /* Управляющие символы обязаны быть экранированы, иначе
                    получится JSON, который xray отвергнет. */
-                char esc[8];
+                char esc[16];
                 snprintf(esc, sizeof(esc), "\\u%04x", *p);
                 put_s(j, esc);
             } else {

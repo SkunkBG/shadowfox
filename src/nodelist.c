@@ -15,7 +15,9 @@ void nodelist_init(nodelist_t *l)
    маршрутизацию молча. */
 static void make_tag_unique(nodelist_t *l, node_t *n)
 {
-    char base[NODE_TAG_MAX];
+    /* Короче тега на запас под суффикс " #999": иначе добавление номера
+       упирается в границу буфера. */
+    char base[NODE_TAG_MAX - 8];
     str_copy(base, sizeof(base), n->tag);
 
     for (int attempt = 2; attempt < 1000; attempt++) {

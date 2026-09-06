@@ -95,7 +95,12 @@ int node_from_link(const char *link, node_t *n, char *err, unsigned err_size)
     if (u.fragment[0]) {
         str_copy(n->tag, sizeof(n->tag), u.fragment);
     } else {
-        snprintf(n->tag, sizeof(n->tag), "%s:%d", n->address, n->port);
+        /* Адрес длиннее тега, поэтому сначала укорачиваем его сами:
+           так обрезка становится осознанной, а не побочным эффектом
+           snprintf. Запас в 8 байт — под ":" и номер порта. */
+        char addr[NODE_TAG_MAX - 8];
+        str_copy(addr, sizeof(addr), n->address);
+        snprintf(n->tag, sizeof(n->tag), "%s:%d", addr, n->port);
     }
 
     return 0;
