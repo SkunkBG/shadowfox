@@ -23,6 +23,7 @@ typedef struct {
     int    capturing;
     time_t last_flush;
     time_t last_stats;
+    time_t restore_due;   /* когда применить накопленный запрос */
 
     unsigned long matched;   /* адресов, попавших под правила */
     unsigned long flushes;
@@ -47,6 +48,11 @@ int  engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_siz
 /* Восстанавливает правила после того, как роутер переписал netfilter.
    Вызывается по SIGUSR1 из ndm-хуков. */
 int  engine_restore(engine_t *e, char *err, unsigned err_size);
+
+/* Откладывает восстановление на пару секунд. Правка netfilter сама
+   поднимает хуки роутера, и те присылают новый SIGUSR1 — без задержки
+   получилась бы цепная реакция. */
+void engine_request_restore(engine_t *e, time_t now);
 
 /* Один проход главного цикла: забрать пойманное, отдать накопленное. */
 void engine_tick(engine_t *e, time_t now);

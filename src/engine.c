@@ -12,6 +12,12 @@
    ответ. */
 #define ENGINE_FLUSH_SECONDS 1
 
+/* Пауза перед восстановлением правил. Наши собственные правки netfilter
+   поднимают ndm-хуки роутера, а те присылают SIGUSR1 — за одну секунду
+   их приходило пять подряд. Пауза схлопывает всплеск в одно применение
+   и разрывает цепную реакцию. */
+#define ENGINE_RESTORE_DELAY 2
+
 void engine_init(engine_t *e)
 {
     memset(e, 0, sizeof(*e));
@@ -212,6 +218,13 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
     return apply_all(e, err, err_size);
 }
 
+void engine_request_restore(engine_t *e, time_t now)
+{
+    if (!e) return;
+    /* Уже отложено — второй запрос ничего не меняет. */
+    if (!e->restore_due) e->restore_due = now + ENGINE_RESTORE_DELAY;
+}
+
 int engine_restore(engine_t *e, char *err, unsigned err_size)
 {
     if (!e) return -1;
@@ -228,6 +241,15 @@ void engine_tick(engine_t *e, time_t now)
     if (!e) return;
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
+
+    if (e->restore_due && now >= e->restore_due) {
+        e->restore_due = 0;
+        char err[256] = "";
+        if (engine_restore(e, err, sizeof(err)) != 0)
+            log_warn("восстановить правила не удалось: %s", err);
+        else
+            log_info("правила восстановлены");
+    }
 
     /* Раз в минуту показываем, что видит перехват. Пустой набор сам по
        себе не говорит, молчит ли сеть или сокет ничего не получает. */
