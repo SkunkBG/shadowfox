@@ -126,6 +126,7 @@ button.b:disabled{opacity:.45;cursor:default}
 </header>
 
 <div id="gate" hidden></div>
+<div id="dns" hidden></div>
 
 <div class="wrap">
   <nav>
@@ -147,7 +148,7 @@ const $=s=>document.querySelector(s);
 const tok=new URLSearchParams(location.search).get('token');
 const api=p=>tok?p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(tok):p;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let D=null, tab='rules', openRule=0;
+let D=null, tab='rules', openRule=0, dnsShown=0;
 
 /* --- тема --- */
 const theme=localStorage.getItem('sf-theme')||'dark';
@@ -325,6 +326,8 @@ function viewInfo(){
       ${kv('Адресов',D.matched)}
       ${kv('Правила',D.rules?'установлены':'нет')}
       ${kv('Помечено',D.marked+' соединений')}
+      ${kv('DNS устройства', D.dns==='ok' ? 'через роутер'
+           : D.dns==='bypass' ? 'мимо роутера' : 'пока не видно')}
     </div>
   </div>
   <div class="card">
@@ -390,6 +393,9 @@ async function load(){
     if(!r.ok) throw new Error('код '+r.status);
     D=await r.json();
     draw();
+
+    /* Не поверх согласия: две плашки разом читать невозможно. */
+    if(D.dns==='bypass' && !dnsShown && $('#gate').hidden){ dnsShown=1; dnsWarn(); }
   }catch(e){
     $('#view').innerHTML='<p style="color:var(--bad)">Нет связи с демоном: '+esc(e.message)+'</p>';
   }
@@ -480,6 +486,48 @@ document.addEventListener('click',async ev=>{
 function seen(){
   try { return localStorage.getItem('sf-disclaimer') === '1'; }
   catch(e){ return false; }
+}
+
+/* Плашка о DNS. Показываем, только когда демон видит DNS-ответы другим
+   устройствам, но не этому: тогда утверждение «ходит мимо роутера»
+   опирается на наблюдение, а не на догадку. */
+function dnsWarn(){
+  const el=$('#dns');
+  el.className='modal';
+  el.hidden=false;
+  el.innerHTML=`<div class="box">
+    <h3>Устройство не спрашивает роутер</h3>
+    <p class="sub">Адрес устройства: ${esc(D.peer||'неизвестен')}</p>
+    <div class="fine" style="max-width:none">
+      <p>Демон видит DNS-ответы другим устройствам сети, но этому — ни
+      одного за последние десять минут. Значит имена оно разрешает мимо
+      роутера, и <b>маршрутизация по доменам для него работать не
+      будет</b>: адреса брать неоткуда. Подсети в списках при этом
+      работают — они не зависят от DNS.</p>
+
+      <p>Что обычно включено:</p>
+      <ul>
+        <li>в браузере — «Безопасный DNS», «Защищённый DNS», DNS-over-HTTPS;</li>
+        <li>в Windows или macOS — DNS прописан вручную вместо получения
+        от роутера;</li>
+        <li>в Android или iOS — «Частный DNS», «Персональный DNS»,
+        Private Relay;</li>
+        <li>на самом устройстве работает VPN или прокси.</li>
+      </ul>
+
+      <p>Выключи то, что найдёшь, и нажми «Проверить снова». Проверка
+      пассивная: устройству надо сделать хоть один обычный запрос, чтобы
+      демон его увидел — открой любую страницу и вернись сюда.</p>
+    </div>
+    <div class="bar" style="margin-top:18px">
+      <button class="b" id="dns-recheck">Проверить снова</button>
+      <button class="b ghost" id="dns-close">Закрыть</button>
+    </div>
+  </div>`;
+
+  $('#dns-close').onclick=()=>{ el.hidden=true; el.className=''; el.innerHTML=''; dnsShown=2; };
+  $('#dns-recheck').onclick=async()=>{ el.hidden=true; el.className=''; el.innerHTML='';
+    dnsShown=0; await load(); };
 }
 
 function gate(){

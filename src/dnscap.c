@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define IP_PROTO_UDP 17
@@ -24,6 +25,80 @@ static unsigned rd16(const unsigned char *p)
 int dcap_extract(const unsigned char *pkt, size_t len, dns_reply_t *out)
 {
     return dcap_extract_why(pkt, len, out) == 0 ? 0 : -1;
+}
+
+/* Запоминаем, кому пришёл DNS-ответ. Годится любой разбираемый ответ,
+   включая NXDOMAIN и пустой AAAA: он всё равно доказывает, что
+   устройство спрашивает роутер, а это и есть предмет проверки. */
+static void note_client(dcap_t *c, const unsigned char *pkt, size_t len, long now)
+{
+    unsigned char addr[16];
+    unsigned      family;
+
+    if (len < 20) return;
+
+    if ((pkt[0] >> 4) == 4) {
+        memcpy(addr, pkt + 16, 4);
+        memset(addr + 4, 0, 12);
+        family = 4;
+    } else if ((pkt[0] >> 4) == 6) {
+        if (len < 40) return;
+        memcpy(addr, pkt + 24, 16);
+        family = 6;
+    } else {
+        return;
+    }
+
+    int len_cmp = (family == 4) ? 4 : 16;
+
+    for (int i = 0; i < c->client_count; i++) {
+        if (c->clients[i].family != family) continue;
+        if (memcmp(c->clients[i].addr, addr, (size_t)len_cmp) != 0) continue;
+        c->clients[i].last = now;
+        return;
+    }
+
+    int slot = c->client_count;
+    if (slot >= DCAP_CLIENTS_MAX) {
+        /* Вытесняем самое давнее: список устройств не должен расти
+           бесконечно из-за случайных гостей сети. */
+        slot = 0;
+        for (int i = 1; i < c->client_count; i++)
+            if (c->clients[i].last < c->clients[slot].last) slot = i;
+    } else {
+        c->client_count++;
+    }
+
+    memcpy(c->clients[slot].addr, addr, sizeof(addr));
+    c->clients[slot].family = (unsigned char)family;
+    c->clients[slot].last   = now;
+}
+
+int dcap_seen_client(const dcap_t *c, int family, const unsigned char *addr,
+                     long now, int window)
+{
+    if (!c || !addr || (family != 4 && family != 6)) return 0;
+
+    size_t n = (family == 4) ? 4 : 16;
+
+    for (int i = 0; i < c->client_count; i++) {
+        if (c->clients[i].family != family) continue;
+        if (memcmp(c->clients[i].addr, addr, n) != 0) continue;
+        return (now - c->clients[i].last) <= window;
+    }
+
+    return 0;
+}
+
+int dcap_client_count(const dcap_t *c, long now, int window)
+{
+    if (!c) return 0;
+
+    int n = 0;
+    for (int i = 0; i < c->client_count; i++)
+        if (now - c->clients[i].last <= window) n++;
+
+    return n;
 }
 
 int dcap_extract_why(const unsigned char *pkt, size_t len, dns_reply_t *out)
@@ -210,6 +285,9 @@ int dcap_poll(dcap_t *c, void (*cb)(const dns_reply_t *, void *), void *ctx)
 
         dns_reply_t reply;
         int         why = dcap_extract_why(c->buf, (size_t)n, &reply);
+
+        /* -1 значит «не наш пакет»: там и адресата брать неоткуда. */
+        if (why != -1) note_client(c, c->buf, (size_t)n, (long)time(NULL));
 
         if (why != 0) {
             c->ignored++;

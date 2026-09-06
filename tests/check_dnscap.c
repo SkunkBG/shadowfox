@@ -183,6 +183,62 @@ static void test_open_reports_platform(void)
     CHECK(c.fd == -1, "закрытие безопасно и повторно");
 }
 
+/* Учёт устройств, которым пришёл DNS-ответ. На нём стоит проверка
+   «спрашивает ли устройство роутер», поэтому важнее всего, чтобы
+   «не видели» не превращалось в «видели» и наоборот. */
+static void test_clients(void)
+{
+    dcap_t c;
+    dcap_init(&c);
+
+    unsigned char a[4] = { 192, 168, 1, 50 };
+    unsigned char b[4] = { 192, 168, 1, 51 };
+
+    CHECK(dcap_seen_client(&c, 4, a, 1000, 600) == 0, "пусто — никого не видели");
+    CHECK(dcap_client_count(&c, 1000, 600) == 0, "устройств ноль");
+
+    /* Кладём руками: dcap_poll требует живого сокета. */
+    memcpy(c.clients[0].addr, a, 4);
+    c.clients[0].family = 4;
+    c.clients[0].last   = 1000;
+    c.client_count      = 1;
+
+    CHECK(dcap_seen_client(&c, 4, a, 1000, 600) == 1, "видели это устройство");
+    CHECK(dcap_seen_client(&c, 4, b, 1000, 600) == 0, "соседа не видели");
+    CHECK(dcap_client_count(&c, 1000, 600) == 1, "устройство одно");
+
+    /* Наблюдение стареет: иначе выключенный полчаса назад телефон вечно
+       считался бы исправным. */
+    CHECK(dcap_seen_client(&c, 4, a, 1700, 600) == 0, "через 700 с — уже нет");
+    CHECK(dcap_seen_client(&c, 4, a, 1600, 600) == 1, "ровно на границе — ещё да");
+    CHECK(dcap_client_count(&c, 1700, 600) == 0, "и в счёте его нет");
+
+    /* Семейство адресов путать нельзя. */
+    CHECK(dcap_seen_client(&c, 6, a, 1000, 600) == 0, "v6 не совпадает с v4");
+}
+
+/* Переполнение вытесняет самое давнее наблюдение, а не первое подряд. */
+static void test_clients_overflow(void)
+{
+    dcap_t c;
+    dcap_init(&c);
+
+    for (int i = 0; i < DCAP_CLIENTS_MAX; i++) {
+        c.clients[i].addr[0] = 10;
+        c.clients[i].addr[1] = 0;
+        c.clients[i].addr[2] = (unsigned char)(i / 256);
+        c.clients[i].addr[3] = (unsigned char)(i % 256);
+        c.clients[i].family  = 4;
+        c.clients[i].last    = 2000 + i;   /* нулевой — самый давний */
+    }
+    c.client_count = DCAP_CLIENTS_MAX;
+
+    unsigned char oldest[4] = { 10, 0, 0, 0 };
+    CHECK(dcap_seen_client(&c, 4, oldest, 2000, 600) == 1, "давний пока на месте");
+    CHECK(dcap_client_count(&c, 2100, 600) == DCAP_CLIENTS_MAX,
+          "все посчитаны: %d", dcap_client_count(&c, 2100, 600));
+}
+
 int main(void)
 {
     printf("check_dnscap " VERSION "\n");
@@ -193,6 +249,9 @@ int main(void)
     test_bad_udp_length();
     test_truncation_is_safe();
     test_open_reports_platform();
+
+    test_clients();
+    test_clients_overflow();
 
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);

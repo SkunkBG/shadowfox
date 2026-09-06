@@ -1,4 +1,12 @@
 #include "webui.h"
+
+#include <arpa/inet.h>
+#include <time.h>
+
+/* За сколько секунд считаем наблюдение свежим. Десять минут: реже этого
+   устройство в сети без запросов почти не бывает, а короче — начнутся
+   ложные тревоги у того, кто просто открыл страницу и ничего не делал. */
+#define DNS_CHECK_WINDOW  600
 #include "apply.h"
 #include "engine.h"
 #include "ipsets.h"
@@ -108,7 +116,8 @@ static int file_for(const config_t *cfg, const char *what,
     return 0;
 }
 
-static void send_data(int fd, struct engine *ce, const config_t *cfg)
+static void send_data(const http_req_t *req, int fd, struct engine *ce,
+                      const config_t *cfg)
 {
     engine_t *e = (engine_t *)ce;
 
@@ -165,6 +174,28 @@ static void send_data(int fd, struct engine *ce, const config_t *cfg)
             have_link = strstr(nodes, "://") != NULL;
     }
     json_kv_bool(&j, "have_link", have_link);
+
+    /* Проверка DNS. Отвечаем не «да/нет», а тремя состояниями: сказать
+       «устройство ходит мимо» можно только когда видно, что другие
+       устройства роутер всё-таки спрашивают. Иначе это будет ложная
+       тревога сразу после запуска, когда перехват ещё ничего не набрал. */
+    const char *dns = "unknown";
+    if (e->capturing && req->peer[0] &&
+        strcmp(req->peer, "127.0.0.1") != 0 &&
+        strcmp(req->peer, cfg->web_bind[0] ? cfg->web_bind : "") != 0) {
+
+        unsigned char addr[4];
+        long          now = (long)time(NULL);
+
+        if (inet_pton(AF_INET, req->peer, addr) == 1) {
+            if (dcap_seen_client(&e->cap, 4, addr, now, DNS_CHECK_WINDOW))
+                dns = "ok";
+            else if (dcap_client_count(&e->cap, now, DNS_CHECK_WINDOW) > 0)
+                dns = "bypass";
+        }
+    }
+    json_kv_str(&j, "dns", dns);
+    json_kv_str(&j, "peer", req->peer);
 
     json_key(&j, "groups");
     json_arr_open(&j);
@@ -271,7 +302,7 @@ static void handle(const http_req_t *req, int fd, void *ctx)
     }
 
     if (!strcmp(req->path, "/data")) {
-        send_data(fd, c->engine, c->cfg);
+        send_data(req, fd, c->engine, c->cfg);
         return;
     }
 

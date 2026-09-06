@@ -15,6 +15,10 @@
 #define DCAP_IFACE_MAX 32
 #define DCAP_BUF_BYTES 2048
 
+/* Устройств в домашней сети немного; при переполнении вытесняем самое
+   давнее. Точность тут не нужна — нужен ответ «видели или нет». */
+#define DCAP_CLIENTS_MAX  48
+
 typedef struct {
     int           fd;
     char          iface[DCAP_IFACE_MAX];
@@ -26,6 +30,16 @@ typedef struct {
     /* Раздельные причины отказа. Общий счётчик «мимо» сваливает в кучу
        не тот протокол, не ответ и ответ без адресов — а лечатся они
        по-разному. */
+    /* Кому шли DNS-ответы. Нужно, чтобы отличить устройство, которое
+       спрашивает роутер, от того, что ходит мимо него: у второго
+       маршрутизация по доменам работать не может в принципе. */
+    struct {
+        unsigned char addr[16];
+        unsigned char family;
+        long          last;        /* когда пришёл последний ответ */
+    } clients[DCAP_CLIENTS_MAX];
+    int           client_count;
+
     unsigned long drop_notip;      /* не IPv4/IPv6, не UDP, не порт 53 */
     unsigned long drop_empty;      /* настоящий ответ, но адресов в нём нет */
     unsigned long drop_bad;        /* пакет испорчен — вот это уже сбой */
@@ -45,6 +59,14 @@ void dcap_close(dcap_t *c);
 
    Вынесено отдельно от сокета намеренно: разбор проверяется тестами на
    любой машине, а сокет живёт только на Linux. */
+/* Видели ли DNS-ответ этому устройству за последние window секунд. */
+int  dcap_seen_client(const dcap_t *c, int family, const unsigned char *addr,
+                      long now, int window);
+
+/* Сколько устройств спрашивали роутер за это время. Ноль означает, что
+   судить не о чем: перехват мог только что начаться. */
+int  dcap_client_count(const dcap_t *c, long now, int window);
+
 int  dcap_extract(const unsigned char *pkt, size_t len, dns_reply_t *out);
 
 /* То же, но с указанием, на чём именно отказано: 0 — успех,

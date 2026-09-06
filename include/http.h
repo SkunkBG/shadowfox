@@ -25,6 +25,7 @@ typedef struct {
     const char *body;
     size_t      body_len;
     long        declared_len;             /* Content-Length, -1 если нет */
+    char        peer[64];                 /* адрес, с которого пришли */
     char        token[HTTP_TOKEN_MAX];   /* из заголовка авторизации */
 } http_req_t;
 

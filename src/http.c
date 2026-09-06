@@ -305,7 +305,9 @@ void http_poll(http_t *h,
     /* По одному соединению за проход: демон должен вернуться в главный
        цикл к перехвату и сигналам, а не застревать на веб-интерфейсе. */
     for (int i = 0; i < 8; i++) {
-        int c = accept(h->fd, NULL, NULL);
+        struct sockaddr_in from;
+        socklen_t          fromlen = sizeof(from);
+        int c = accept(h->fd, (struct sockaddr *)&from, &fromlen);
         if (c < 0) break;
 
         /* Снимаем неблокирующий режим явно. В BSD и macOS принятый сокет
@@ -359,7 +361,15 @@ void http_poll(http_t *h,
             buf[got] = '\0';
 
             http_req_t req;
-            if (http_parse_request(buf, got, &req) != 0) {
+            int bad_req = http_parse_request(buf, got, &req);
+
+            /* Адрес запрашивающего нужен проверке DNS: она отвечает на
+               вопрос «спрашивает ли роутер именно это устройство». */
+            if (!bad_req && fromlen >= (socklen_t)sizeof(struct sockaddr_in) &&
+                from.sin_family == AF_INET)
+                inet_ntop(AF_INET, &from.sin_addr, req.peer, sizeof(req.peer));
+
+            if (bad_req) {
                 http_send_text(c, 400, "text/plain; charset=utf-8",
                                "битый запрос\n");
                 h->rejected++;
