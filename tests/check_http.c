@@ -164,6 +164,137 @@ static void *late_client(void *arg)
     return strstr(buf, "200 OK") ? (void *)1 : NULL;
 }
 
+/* Тело отдельным сегментом — так и шлёт браузер. Отвечающий обработчик
+   пишет, сколько тела доехало, чтобы проверка увидела именно это. */
+static char g_body[4096];
+static size_t g_body_len;
+static long   g_declared;
+
+static void body_reply(const http_req_t *r, int fd, void *ctx)
+{
+    (void)ctx;
+    g_body_len = r->body_len;
+    g_declared = r->declared_len;
+    if (r->body && r->body_len < sizeof(g_body))
+        memcpy(g_body, r->body, r->body_len);
+    http_send_text(fd, 200, "text/plain", "ok\n");
+}
+
+static int   g_split_hold;   /* сколько байт тела не досылать */
+static char  g_payload[900];
+
+static void *split_client(void *arg)
+{
+    (void)arg;
+
+    int c = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port   = htons((unsigned short)g_port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    if (connect(c, (struct sockaddr *)&sa, sizeof(sa)) != 0) { close(c); return NULL; }
+
+    size_t len = strlen(g_payload);
+    char   head[256];
+    int    hn = snprintf(head, sizeof(head),
+                         "POST /save?what=domains HTTP/1.1\r\nHost: t\r\n"
+                         "Content-Length: %zu\r\n\r\n", len);
+    if (write(c, head, (size_t)hn) < 0) { close(c); return NULL; }
+
+    /* Пауза между заголовками и телом — суть проверки. */
+    struct timespec ts = { 0, 120 * 1000 * 1000 };
+    nanosleep(&ts, NULL);
+
+    size_t send = len - (size_t)g_split_hold;
+    if (write(c, g_payload, send) < 0) { close(c); return NULL; }
+    shutdown(c, SHUT_WR);
+
+    static char buf[512];
+    ssize_t n = read(c, buf, sizeof(buf) - 1);
+    if (n > 0) buf[n] = '\0'; else buf[0] = '\0';
+    close(c);
+
+    return strstr(buf, "200 OK") ? (void *)1 : (void *)2;
+}
+
+static void *run_split(int hold)
+{
+    g_split_hold = hold;
+    g_body_len   = 0;
+    g_declared   = -1;
+    memset(g_body, 0, sizeof(g_body));
+
+    http_t h;
+    char   err[128];
+    http_init(&h);
+    CHECK(http_open(&h, "127.0.0.1", 0, err, sizeof(err)) == 0, "сервер: %s", err);
+
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    getsockname(http_fd(&h), (struct sockaddr *)&sa, &sl);
+    g_port = ntohs(sa.sin_port);
+
+    pthread_t th;
+    pthread_create(&th, NULL, split_client, NULL);
+
+    void *res = NULL;
+    for (int i = 0; i < 60; i++) {
+        http_poll(&h, body_reply, NULL);
+        struct timespec ts = { 0, 20 * 1000 * 1000 };
+        nanosleep(&ts, NULL);
+    }
+    pthread_join(th, &res);
+    http_close(&h);
+    return res;
+}
+
+/* Тело, приехавшее вторым сегментом, обязано дойти целиком. Раньше
+   читался один read(): заголовки успевали, тело нет, и веб-страница
+   молча перезаписывала список доменов пустотой. */
+static void test_body_second_segment(void)
+{
+    for (size_t i = 0; i + 1 < sizeof(g_payload); i++)
+        g_payload[i] = (char)('a' + (i % 26));
+    g_payload[sizeof(g_payload) - 1] = '\0';
+
+    void *res = run_split(0);
+    CHECK(res == (void *)1, "запрос обслужен");
+    CHECK(g_body_len == strlen(g_payload),
+          "тело целиком: %zu из %zu", g_body_len, strlen(g_payload));
+    CHECK(g_declared == (long)strlen(g_payload),
+          "Content-Length разобран: %ld", g_declared);
+    CHECK(memcmp(g_body, g_payload, g_body_len) == 0, "тело не побилось");
+}
+
+/* Оборванное тело — отказ, а не обрезок: списки перезаписываются целиком. */
+static void test_body_truncated(void)
+{
+    void *res = run_split(300);
+    CHECK(res == (void *)2, "оборванное тело отклонено");
+    CHECK(g_body_len == 0, "обработчик не вызван, тела нет: %zu", g_body_len);
+}
+
+/* Разбор Content-Length отдельно: испорченное значение принимать нельзя. */
+static void test_content_length(void)
+{
+    const char *a = "POST / HTTP/1.1\r\nContent-Length: 42\r\n";
+    CHECK(http_content_length(a, strlen(a)) == 42, "длина 42");
+
+    const char *b = "POST / HTTP/1.1\r\ncontent-length:  7\r\n";
+    CHECK(http_content_length(b, strlen(b)) == 7, "регистр и пробелы");
+
+    const char *c = "POST / HTTP/1.1\r\nHost: x\r\n";
+    CHECK(http_content_length(c, strlen(c)) == -1, "заголовка нет");
+
+    const char *d = "POST / HTTP/1.1\r\nContent-Length: abc\r\n";
+    CHECK(http_content_length(d, strlen(d)) == -2, "мусор отвергнут");
+
+    /* Подделка вида X-Content-Length не должна сойти за настоящий. */
+    const char *e = "POST / HTTP/1.1\r\nX-Content-Length: 9\r\n";
+    CHECK(http_content_length(e, strlen(e)) == -1, "чужой заголовок не считается");
+}
+
 /* Запрос, пришедший позже соединения, обязан быть обслужен.
    В BSD принятый сокет наследует неблокирующий режим от слушающего, и
    без явного снятия сервер закрывал такие соединения, не ответив. */
@@ -210,6 +341,9 @@ int main(void)
     test_garbage();
     test_refuses_all_interfaces();
     test_late_request();
+    test_content_length();
+    test_body_second_segment();
+    test_body_truncated();
 
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);

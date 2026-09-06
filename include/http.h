@@ -24,6 +24,7 @@ typedef struct {
     char        query[HTTP_QUERY_MAX];
     const char *body;
     size_t      body_len;
+    long        declared_len;             /* Content-Length, -1 если нет */
     char        token[HTTP_TOKEN_MAX];   /* из заголовка авторизации */
 } http_req_t;
 
@@ -39,6 +40,10 @@ typedef struct {
 /* Разбирает запрос. Возвращает 0 при успехе.
    Тело не копируется: body указывает внутрь buf. */
 int  http_parse_request(const char *buf, size_t len, http_req_t *out);
+
+/* Нужны и циклу приёма: он обязан понять, доехало ли тело, до разбора. */
+const char *http_headers_end(const char *buf, size_t len, size_t *skip);
+long        http_content_length(const char *buf, size_t hdr_len);
 
 /* Достаёт параметр из строки запроса. Возвращает 1, если нашёлся. */
 int  http_query_get(const http_req_t *r, const char *key,

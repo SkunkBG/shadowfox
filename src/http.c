@@ -66,12 +66,8 @@ int http_parse_request(const char *buf, size_t len, http_req_t *out)
     }
 
     /* Тело идёт после пустой строки. */
-    const char *sep  = NULL;
     size_t      skip = 0;
-    for (size_t i = 0; i + 3 < len; i++) {
-        if (!memcmp(buf + i, "\r\n\r\n", 4)) { sep = buf + i; skip = 4; break; }
-        if (!memcmp(buf + i, "\n\n", 2))     { sep = buf + i; skip = 2; break; }
-    }
+    const char *sep  = http_headers_end(buf, len, &skip);
 
     /* Токен: заголовок Authorization целиком, без разбора схемы —
        сравнивать всё равно с одним заданным значением. */
@@ -88,12 +84,58 @@ int http_parse_request(const char *buf, size_t len, http_req_t *out)
         break;
     }
 
+    out->declared_len = http_content_length(buf, (size_t)(hdr_end - buf));
+
     if (sep) {
         out->body     = sep + skip;
         out->body_len = len - (size_t)(out->body - buf);
     }
 
     return 0;
+}
+
+/* Конец заголовков. Вынесено из разбора: цикл приёма обязан узнать то же
+   самое раньше, чем сможет разобрать запрос целиком. */
+const char *http_headers_end(const char *buf, size_t len, size_t *skip)
+{
+    for (size_t i = 0; i + 1 < len; i++) {
+        if (i + 3 < len && !memcmp(buf + i, "\r\n\r\n", 4)) {
+            if (skip) *skip = 4;
+            return buf + i;
+        }
+        if (!memcmp(buf + i, "\n\n", 2)) {
+            if (skip) *skip = 2;
+            return buf + i;
+        }
+    }
+    return NULL;
+}
+
+/* Content-Length из заголовков. -1 — заголовка нет, -2 — он испорчен.
+   Различать важно: у GET тела и не должно быть, а битую длину принимать
+   нельзя, иначе запись пойдёт обрезанной. */
+long http_content_length(const char *buf, size_t hdr_len)
+{
+    static const char key[] = "Content-Length:";
+    const size_t      klen  = sizeof(key) - 1;
+
+    for (size_t i = 0; i + klen < hdr_len; i++) {
+        if (i && buf[i - 1] != '\n') continue;
+        if (strncasecmp(buf + i, key, klen) != 0) continue;
+
+        const char *v = buf + i + klen;
+        const char *e = buf + hdr_len;
+        while (v < e && (*v == ' ' || *v == '\t')) v++;
+        if (v >= e || *v < '0' || *v > '9') return -2;
+
+        long n = 0;
+        for (; v < e && *v >= '0' && *v <= '9'; v++) {
+            n = n * 10 + (*v - '0');
+            if (n > (long)HTTP_BUF_BYTES) return -2;
+        }
+        return n;
+    }
+    return -1;
 }
 
 int http_query_get(const http_req_t *r, const char *key,
@@ -278,14 +320,46 @@ void http_poll(http_t *h,
         setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
+        /* Читаем, пока не приедет тело целиком. Одного read() мало:
+           браузер шлёт заголовки и тело разными сегментами, и тогда
+           запрос выглядит как пустой. По петле это незаметно, а через
+           роутер сохранялся пустой файл — с ответом «сохранено». */
         static char buf[HTTP_BUF_BYTES];
-        ssize_t     got = read(c, buf, sizeof(buf) - 1);
+        size_t      got  = 0;
+        size_t      head = 0;
+        long        clen = -1;
+        int         full = 0;
+
+        while (got < sizeof(buf) - 1) {
+            ssize_t k = read(c, buf + got, sizeof(buf) - 1 - got);
+            if (k <= 0) break;
+            got += (size_t)k;
+
+            if (!head) {
+                size_t      skip = 0;
+                const char *sep  = http_headers_end(buf, got, &skip);
+                if (!sep) continue;
+                head = (size_t)(sep - buf) + skip;
+                clen = http_content_length(buf, (size_t)(sep - buf));
+            }
+
+            if (clen <= 0 || got - head >= (size_t)clen) { full = 1; break; }
+        }
+
+        if (got > 0 && !full && head && clen > 0) {
+            /* Тело оборвалось. Раньше здесь молча писался обрезок. */
+            http_send_text(c, 400, "text/plain; charset=utf-8",
+                           "запрос пришёл не целиком\n");
+            h->rejected++;
+            close(c);
+            continue;
+        }
 
         if (got > 0) {
             buf[got] = '\0';
 
             http_req_t req;
-            if (http_parse_request(buf, (size_t)got, &req) != 0) {
+            if (http_parse_request(buf, got, &req) != 0) {
                 http_send_text(c, 400, "text/plain; charset=utf-8",
                                "битый запрос\n");
                 h->rejected++;

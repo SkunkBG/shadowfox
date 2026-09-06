@@ -187,6 +187,16 @@ static void save(const http_req_t *req, int fd, const config_t *cfg)
         return;
     }
 
+    /* Списки перезаписываем целиком, поэтому неполное тело обязано быть
+       отказом, а не усечённым файлом: один раз это уже стёрло домены. */
+    if (req->declared_len >= 0 && (size_t)req->declared_len != req->body_len) {
+        log_warn("веб: тело %zu из %ld — %s не трогаю",
+                 req->body_len, req->declared_len, path);
+        http_send_text(fd, 400, "text/plain; charset=utf-8",
+                       "запрос пришёл не целиком, ничего не изменено\n");
+        return;
+    }
+
     /* Пишем во временный файл и переименовываем: демон может читать
        этот же файл в этот самый момент. */
     char tmp[CFG_PATH_MAX + 40];
