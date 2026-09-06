@@ -38,12 +38,18 @@ LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
 # Страница вшивается в бинарник: пересобираем её, когда меняется исходник.
+src/logopng.c: web/logo.png tools/embed.sh
+	sh tools/embed.sh web/logo.png web_logo > $@
+
+src/fontwoff.c: web/cinzel.woff2 tools/embed.sh
+	sh tools/embed.sh web/cinzel.woff2 web_font > $@
+
 src/webpage.c: web/index.html tools/embed.sh tools/build-page.sh $(wildcard web/logo.png)
 	@mkdir -p $(BUILD)
 	sh tools/build-page.sh web/index.html web/logo.png > $(BUILD)/page.html
 	sh tools/embed.sh $(BUILD)/page.html web_page > $@
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/digest.c src/ndmauth.c src/dnscfg.c src/webpage.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/digest.c src/ndmauth.c src/dnscfg.c src/logopng.c src/fontwoff.c src/webpage.c
 
 BUILD = build
 
@@ -72,7 +78,7 @@ native: CFLAGS = $(CFLAGS_NATIVE)
 native: LDFLAGS = $(LDFLAGS_NATIVE)
 native: $(BUILD)/$(PROJECT)
 
-$(BUILD)/$(PROJECT)-%: src/webpage.c $(SRCS) $(wildcard include/*.h) Makefile
+$(BUILD)/$(PROJECT)-%: src/webpage.c src/logopng.c src/fontwoff.c $(SRCS) $(wildcard include/*.h) Makefile
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) $(SRCS) -o $@ $(LDFLAGS)
 	@ls -l $@ | awk '{printf "  %-28s %8.1f КБ\n", "$@", $$5/1024}'

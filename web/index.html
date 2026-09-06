@@ -516,11 +516,11 @@ function viewRules(){
 }
 
 /* ---- раздел «Подключения» ---- */
-function stat(icon,title,ok,text){
+function stat(icon,title,ok,text,action){
   return `<div class="stat"><span class="ic">${icon}</span>
-    <div style="flex:1"><div class="t">${title}</div>
+    <div style="flex:1;min-width:0"><div class="t">${title}</div>
       <div class="s">${ok?UI.ok:UI.no}${esc(text)}</div></div>
-    <span class="chev">${UI.right}</span></div>`;
+    ${action||`<span class="chev">${UI.right}</span>`}</div>`;
 }
 
 function fold(id,title,inner){
@@ -531,16 +531,21 @@ function fold(id,title,inner){
 
 /* Форма команд взята из running-config настоящего роутера, а не
    придумана: серверы там записаны ровно так. */
+/* Тот же список, что в демоне: и DoT, и DoH. Форма команд взята из
+   running-config настоящего роутера. */
 const DNSSETS=[
   {key:'cf',    name:'Cloudflare', cmds:[
     'dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com',
-    'dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com']},
+    'dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com',
+    'dns-proxy https upstream https://cloudflare-dns.com/dns-query dnsm']},
   {key:'google',name:'Google', cmds:[
     'dns-proxy tls upstream 8.8.8.8 sni dns.google',
-    'dns-proxy tls upstream 8.8.4.4 sni dns.google']},
+    'dns-proxy tls upstream 8.8.4.4 sni dns.google',
+    'dns-proxy https upstream https://dns.google/dns-query dnsm']},
   {key:'quad9', name:'Quad9', cmds:[
     'dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net',
-    'dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net']}
+    'dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net',
+    'dns-proxy https upstream https://dns.quad9.net/dns-query dnsm']}
 ];
 let dnsPick={cf:1,google:0,quad9:1}, dnsIsp=1;
 
@@ -605,39 +610,6 @@ function viewConn(){
     идёт по HTTPS, и его не видит никто.</p>
   </div>
 
-  ${fold('dnscmd','Поставить чистые серверы',
-    `<p>Все три по DNS-over-TLS, выбери нужные. Серверы <b>добавляются</b>,
-     существующие не трогаются.</p>
-     <div class="picks" style="margin-bottom:14px">
-       ${DNSSETS.map(x=>`<button class="pick ${dnsPick[x.key]?'sel':''}"
-          data-dnsset="${x.key}"><span class="box">${dnsPick[x.key]?'✓':''}</span>
-          <span>${x.name}<i>${x.cmds.length} сервера</i></span></button>`).join('')}
-     </div>
-     <p>Это меняет настройки роутера, поэтому сначала посмотри, что именно
-     будет выполнено:</p>
-     <pre>${esc(dnsCmds()||'ничего не выбрано')}</pre>
-     <div class="bar"><button class="b" id="dns-apply">Установить</button>
-       <span class="msg" id="m-dns"></span></div>
-     <p style="margin-top:14px">Если провайдерский DNS останется включён,
-     роутер будет спрашивать и его — а он обычно ближе и быстрее наших,
-     значит отвечать будет чаще, и толку от чистых серверов немного.
-     То же самое делается в панели роутера галочками «Игнорировать DNSv4
-     и DNSv6 интернет-провайдера» в настройках соединения.</p>
-     ${dnsIspBox()}
-     <p>Проверить, что получилось:</p>
-     <pre>ndmc -c "show running-config" | grep upstream</pre>
-     <p>Лишний сервер убирается тем же способом со словом <code>no</code>
-     впереди.</p>`)}
-
-  ${fold('pol','Как настроить политику доступа',
-    `<p>В панели роутера: <b>Приоритеты подключений → Политики доступа</b>.
-     Политика <code>${esc(POL)}</code> должна содержать <b>только</b> подключение
-     Shadow-Fox. Без этого шага метка будет, а заворачивать трафик станет
-     некуда — и молча себя это не проявит.</p>
-     <p>Если подключение ещё не создано, выполни в консоли роутера по одной
-     команде — <code>ndmc</code> несколько сразу не принимает:</p>
-     <pre>${esc(cmds)}</pre>`)}
-
   ${fold('dom','Домены, IP и подсети',
     `<p>В группах правил пишется по одной записи в строке. Поддомены попадают
      сами: <code>googlevideo.com</code> ловит и <code>rr1.googlevideo.com</code>.</p>
@@ -652,7 +624,29 @@ function viewConn(){
     ${stat(UI.router,'Подключение роутера',D.proxy_ready,
            D.proxy_ready?P+' создано':P+' не создано')}
     ${stat(UI.shield,'Политика доступа',D.policy_ready,
-           D.policy_ready?POL+' готова':POL+' не настроена')}`;
+           D.policy_ready?POL+' готова':POL+' не настроена',
+           D.policy_ready?'':`<button class="b sm" id="mkpolicy">Создать</button>`)}
+    <div class="msg" id="m-policy" style="margin:-6px 0 14px 60px"></div>
+
+    ${fold('dnscmd','Поставить чистые серверы',
+    `<p>Cloudflare, Google и Quad9 по DNS-over-TLS и DNS-over-HTTPS,
+     выбери нужные. Серверы <b>добавляются</b>, существующие не трогаются.</p>
+     <div class="picks" style="margin-bottom:14px">
+       ${DNSSETS.map(x=>`<button class="pick ${dnsPick[x.key]?'sel':''}"
+          data-dnsset="${x.key}"><span class="box">${dnsPick[x.key]?'✓':''}</span>
+          <span>${x.name}<i>DoT и DoH</i></span></button>`).join('')}
+     </div>
+     <p>Это меняет настройки роутера, поэтому сначала посмотри, что именно
+     будет выполнено:</p>
+     <pre>${esc(dnsCmds()||'ничего не выбрано')}</pre>
+     <div class="bar"><button class="b" id="dns-apply">Установить</button>
+       <span class="msg" id="m-dns"></span></div>
+     <p style="margin-top:14px">Если провайдерский DNS останется включён,
+     роутер будет спрашивать и его — а он обычно ближе и быстрее наших,
+     значит отвечать будет чаще, и толку от чистых серверов немного.</p>
+     ${dnsIspBox()}
+     <p style="margin-top:14px">Проверить, что получилось:</p>
+     <pre>ndmc -c "show running-config" | grep upstream</pre>`)}`;
 
   return `<div class="htop"><div><h2>Подключения</h2>
       <p class="sub">Настройка сервера и проверка готовности</p></div></div>
@@ -1040,6 +1034,18 @@ document.addEventListener('click',async ev=>{
   if(ev.target.id==='reshow'){ ev.preventDefault();
     try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
     gate(); return; }
+
+  if(ev.target.id==='mkpolicy'){
+    const btn=ev.target, m=$('#m-policy');
+    btn.disabled=true; m.className='msg'; m.textContent='создаю…';
+    try{
+      const r=await fetch(api('/policy'),{method:'POST'});
+      const t=(await r.text()).trim();
+      m.className=r.ok?'msg ok':'msg bad';
+      m.textContent=r.ok?'создана — теперь добавь в неё подключение Shadow-Fox':t;
+      if(r.ok) setTimeout(load,1500);
+    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    btn.disabled=false; return; }
 
   const dset=ev.target.closest('[data-dnsset]');
   if(dset){ const k=dset.dataset.dnsset; dnsPick[k]=!dnsPick[k];

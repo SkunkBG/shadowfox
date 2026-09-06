@@ -34,6 +34,10 @@
 
 extern const unsigned char web_page[];
 extern const size_t        web_page_len;
+extern const unsigned char web_logo[];
+extern const size_t        web_logo_len;
+extern const unsigned char web_font[];
+extern const size_t        web_font_len;
 
 static long slurp(const char *path, char *dst, size_t size);
 
@@ -472,19 +476,27 @@ static void send_dns(int fd)
    существующего не трогаем, и провайдерский DNS не отключаем: точной
    формы этой команды я не знаю, а угадывать то, что меняет настройки
    роутера, нельзя. */
+/* Ставим и DoT, и DoH: роутер умеет оба, а форма команд взята из его
+   же running-config. */
 static const struct {
     const char *key;
-    const char *cmds[3];
+    const char *cmds[4];
 } DNS_SETS[] = {
     { "cf", {
         "dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com",
-        "dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com", NULL } },
+        "dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com",
+        "dns-proxy https upstream https://cloudflare-dns.com/dns-query dnsm",
+        NULL } },
     { "google", {
         "dns-proxy tls upstream 8.8.8.8 sni dns.google",
-        "dns-proxy tls upstream 8.8.4.4 sni dns.google", NULL } },
+        "dns-proxy tls upstream 8.8.4.4 sni dns.google",
+        "dns-proxy https upstream https://dns.google/dns-query dnsm",
+        NULL } },
     { "quad9", {
         "dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net",
-        "dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net", NULL } },
+        "dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net",
+        "dns-proxy https upstream https://dns.quad9.net/dns-query dnsm",
+        NULL } },
     { NULL, { NULL } }
 };
 
@@ -521,10 +533,10 @@ static void apply_dns(const http_req_t *req, int fd)
 
     /* Собираем список выбранного, а в конце — включение службы и
        сохранение конфигурации, иначе после перезагрузки всё пропадёт. */
-    const char *plan[32];
+    const char *plan[40];
     int         count = 0;
 
-    for (int i = 0; DNS_SETS[i].key && count < 10; i++) {
+    for (int i = 0; DNS_SETS[i].key && count < 14; i++) {
         if (!chosen(sets, DNS_SETS[i].key)) continue;
         for (int k = 0; DNS_SETS[i].cmds[k]; k++) plan[count++] = DNS_SETS[i].cmds[k];
     }
@@ -556,7 +568,7 @@ static void apply_dns(const http_req_t *req, int fd)
             const char *ifs[DNS_LINES_MAX];
             int n = dns_isp_interfaces(cfgtext, ifs, DNS_LINES_MAX);
 
-            for (int i = 0; i < n && ifn + 2 < DNS_LINES_MAX && count < 14; i++) {
+            for (int i = 0; i < n && ifn + 2 < DNS_LINES_MAX && count < 36; i++) {
                 snprintf(ifcmds[ifn], sizeof(ifcmds[ifn]),
                          "interface %s ip no name-servers", ifs[i]);
                 plan[count++] = ifcmds[ifn++];
@@ -791,14 +803,18 @@ static void send_login(int fd, const char *message)
         "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
         "<title>Shadow Fox</title><style>"
         ":root{color-scheme:dark light}"
+        "@font-face{font-family:Cinzel;font-weight:600;font-display:swap;"
+        "src:url(/cinzel.woff2) format('woff2')}"
         "body{margin:0;min-height:100vh;display:grid;place-items:center;"
         "background:#0d1014;color:#e8ecf2;"
         "font:14px/1.55 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}"
         "form{background:#151a21;border:1px solid #28303b;border-radius:12px;"
         "padding:26px 28px;width:min(340px,92vw)}"
-        "h1{margin:0 0 4px;font:650 21px/1.2 'Avenir Next',Futura,system-ui,sans-serif;"
+        "img{display:block;margin:0 auto 14px}"
+        "h1{margin:0 0 4px;text-align:center;color:#22c8e6;"
+        "font:600 26px/1.1 Cinzel,'Times New Roman',Georgia,serif;"
         "letter-spacing:.03em}"
-        "p{margin:0 0 18px;color:#8b95a5;font-size:13px}"
+        "p{margin:0 0 18px;color:#8b95a5;font-size:13px;text-align:center}"
         "label{display:block;color:#8b95a5;font-size:12.5px;margin:12px 0 5px}"
         "input{width:100%%;box-sizing:border-box;background:#0d1014;color:#e8ecf2;"
         "border:1px solid #28303b;border-radius:7px;padding:10px;font:14px/1.4 inherit}"
@@ -807,6 +823,7 @@ static void send_login(int fd, const char *message)
         ".bad{color:#ff6b6b;font-size:13px;margin-top:14px}"
         "</style>"
         "<form method=post action=/login>"
+        "<img src=/logo.png alt=\"\" width=64 height=64>"
         "<h1>Shadow Fox</h1>"
         "<p>Логин и пароль администратора роутера</p>"
         "<label>Логин</label><input name=login autofocus autocomplete=username>"
@@ -901,6 +918,18 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 {
     webctx_t *c = ctx;
 
+    if (!strcmp(req->path, "/cinzel.woff2")) {
+        http_send_gzip(fd, "font/woff2", web_font, web_font_len);
+        return;
+    }
+
+    if (!strcmp(req->path, "/logo.png")) {
+        /* Без проверки входа: картинка нужна самой форме входа, а тайны
+           в ней нет. */
+        http_send_gzip(fd, "image/png", web_logo, web_logo_len);
+        return;
+    }
+
     if (!strcmp(req->path, "/login") && !strcmp(req->method, "POST")) {
         do_login(req, fd, c->cfg);
         return;
@@ -946,6 +975,22 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/data")) {
         send_data(req, fd, c->engine, c->cfg);
+        return;
+    }
+
+    if (!strcmp(req->path, "/policy") && !strcmp(req->method, "POST")) {
+        rci_t r;
+        rci_init(&r);
+
+        if (rci_policy_create(&r, c->cfg->policy) != 0) {
+            log_warn("веб: не создать политику %s", c->cfg->policy);
+            http_send_text(fd, 500, "text/plain; charset=utf-8",
+                           "роутер не создал политику\n");
+        } else {
+            log_info("веб: политика %s создана, запрос с %s",
+                     c->cfg->policy, req->peer);
+            http_send_text(fd, 200, "text/plain; charset=utf-8", "создана\n");
+        }
         return;
     }
 
