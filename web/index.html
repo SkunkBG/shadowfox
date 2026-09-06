@@ -89,6 +89,15 @@ button.b:disabled{opacity:.45;cursor:default}
 .kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .kv span:first-child{color:var(--dim)}
 .fine{max-width:760px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:50;
+    display:grid;place-items:center;padding:22px}
+.modal .box{background:var(--panel);border:1px solid var(--line);
+    border-top:4px solid var(--warn);border-radius:14px;
+    width:min(720px,100%);max-height:86vh;overflow:auto;padding:24px 28px 22px;
+    box-shadow:0 18px 60px rgba(0,0,0,.45)}
+.modal h3{margin:0 0 4px;text-align:center;color:var(--warn);font-size:19px}
+.modal .sub{text-align:center;color:var(--dim);font-size:13px;margin:0 0 18px}
+.modal .ok{display:block;width:100%;margin-top:20px}
 .fine p{color:var(--fg);font-size:14.5px;line-height:1.8;margin:0 0 14px}
 .fine ul{color:var(--fg);font-size:14.5px;line-height:1.8;
     margin:0 0 14px;padding-left:22px}
@@ -115,6 +124,8 @@ button.b:disabled{opacity:.45;cursor:default}
   </div>
   <button class="tbtn" id="theme" title="Тема">◐</button>
 </header>
+
+<div id="gate" hidden></div>
 
 <div class="wrap">
   <nav>
@@ -327,8 +338,15 @@ function viewInfo(){
   </div>
 
   <div class="card fine">
-    <h3>Отказ от ответственности</h3>
-    <p>Shadow Fox распространяется «как есть», без каких-либо гарантий,
+    <h3>Отказ от ответственности</h3>${disclaimer()}
+    <p style="margin-top:14px"><a href="#" id="reshow">Показать при следующем входе</a></p>
+  </div>`;
+}
+const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+
+/* Один текст на карточку и на плашку: две копии разойдутся при
+   первой же правке, а расхождение в таком тексте — не мелочь. */
+function disclaimer(){ return `<p>Shadow Fox распространяется «как есть», без каких-либо гарантий,
     обязательств или заверений, явных либо подразумеваемых. Использование
     осуществляется пользователем на собственный риск.</p>
 
@@ -359,10 +377,7 @@ function viewInfo(){
     сознательно и добровольно, принимая все риски и возможные последствия.
     Пользователь несёт полную ответственность за результаты своей
     конфигурации, соблюдение требований законодательства, политик
-    провайдера и правил сети.</p>
-  </div>`;
-}
-const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+    провайдера и правил сети.</p>`; }
 
 function draw(){
   head();
@@ -418,6 +433,12 @@ document.addEventListener('click',async ev=>{
   if(top){ const r=top.parentElement;
     openRule=r.classList.contains('open')?-1:+r.dataset.i; draw(); return; }
 
+  if(ev.target.id==='reshow'){
+    ev.preventDefault();
+    try { localStorage.removeItem('sf-disclaimer'); } catch(e){}
+    gate(); return;
+  }
+
   if(ev.target.id==='newrule'){
     const t=prompt('Куда заворачивать? Имя политики Keenetic либо сетевого интерфейса:',D.policy_name);
     if(!t) return;
@@ -452,6 +473,32 @@ document.addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-save]');
   if(b) return save(b.dataset.save,$('#'+b.dataset.save).value,'m-'+b.dataset.save);
 });
+
+/* Плашка при первом входе. Согласие помним в браузере: это отметка
+   «прочитал», а не настройка демона, и на роутере ей делать нечего.
+   Приватное окно или другой браузер покажут её снова — так и надо. */
+function seen(){
+  try { return localStorage.getItem('sf-disclaimer') === '1'; }
+  catch(e){ return false; }
+}
+
+function gate(){
+  const el=$('#gate');
+  el.className='modal';
+  el.hidden=false;
+  el.innerHTML=`<div class="box">
+    <h3>Отказ от ответственности</h3>
+    <p class="sub">Прочти перед тем, как настраивать маршрутизацию</p>
+    <div class="fine" style="max-width:none">${disclaimer()}</div>
+    <button class="b ok" id="accept">Принимаю</button>
+  </div>`;
+  $('#accept').onclick=()=>{
+    try { localStorage.setItem('sf-disclaimer','1'); } catch(e){}
+    el.hidden=true; el.className=''; el.innerHTML='';
+  };
+}
+
+if(!seen()) gate();
 
 load();
 setInterval(()=>{ if(!document.querySelector('textarea:focus,input:focus')) load(); },10000);
