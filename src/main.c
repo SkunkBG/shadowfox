@@ -200,6 +200,7 @@ int main(int argc, char **argv)
             static engine_t preview;
             engine_init(&preview);
             rt_find_bins(&preview.rt);
+            ips_find_bin(preview.ips.bin, sizeof(preview.ips.bin));
             preview.rt.ipv6 = dry.ipv6 && preview.rt.ip6tables[0];
 
             char dpath[CFG_PATH_MAX + 32], ipath[CFG_PATH_MAX + 32];

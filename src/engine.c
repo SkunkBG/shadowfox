@@ -196,6 +196,23 @@ void engine_print_plan(const engine_t *e)
 {
     if (!e) return;
 
+    /* Сначала — чем именно будем работать. Иначе, когда групп нет,
+       из вывода не понять, нашлись ли программы вообще. */
+    printf("# программы\n");
+    printf("iptables:  %s\n",  e->rt.iptables[0]  ? e->rt.iptables  : "НЕ НАЙДЕН");
+    printf("ip6tables: %s\n",  e->rt.ip6tables[0] ? e->rt.ip6tables : "нет, IPv6 выключен");
+    printf("ip:        %s\n",  e->rt.ip[0]        ? e->rt.ip        : "НЕ НАЙДЕН");
+    printf("ipset:     %s\n",  e->ips.bin[0]      ? e->ips.bin      : "НЕ НАЙДЕН");
+    printf("\n");
+
+    /* Без групп демон правил не ставит. Печатать план, который не будет
+       применён, значит вводить в заблуждение. */
+    if (!e->wl.group_count) {
+        printf("# групп нет — правила ставиться не будут\n");
+        printf("# заполни domain.conf или ip.list, затем повтори\n");
+        return;
+    }
+
     rt_plan_t plan;
     rt_plan_apply(&plan, &e->rt, &e->wl);
 

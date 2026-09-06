@@ -22,8 +22,11 @@ ln -sf /opt/etc/init.d/S99shadowfox /opt/bin/shadowfox
 # начнёт править netfilter и управлять xray — тем же, чем владеет он.
 if [ -x /opt/bin/hrneo ] || [ -d /opt/etc/HydraRoute ]; then
     echo "[ИНФО] обнаружен HydraRoute."
-    echo "       Shadow Fox не трогает его файлы, службы и правила."
-    echo "       Пока это только каркас: маршрутизацию ведёт HydraRoute."
+    echo "       Общих файлов у них нет, службы уживаются."
+    echo "       Но маршрутизацию теперь умеют оба. Свои списки Shadow Fox"
+    echo "       берёт из /opt/etc/shadowfox/domain.conf, и пока тот пуст,"
+    echo "       никаких правил не ставится."
+    echo "       Посмотреть, что будет сделано: shadowfoxd --dry-run"
 fi
 
 /opt/etc/init.d/S99shadowfox stop  >/dev/null 2>&1 || true
