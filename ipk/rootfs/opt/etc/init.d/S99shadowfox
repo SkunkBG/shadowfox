@@ -1,0 +1,11 @@
+#!/bin/sh
+
+ENABLED=yes
+PROCS=shadowfoxd
+ARGS=""
+PREARGS=""
+DESC="Shadow Fox daemon"
+PATH=/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PIDFILE=/opt/var/run/shadowfoxd.pid
+
+. /opt/etc/init.d/rc.func

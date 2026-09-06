@@ -1,0 +1,33 @@
+#!/bin/sh
+# Ставится после распаковки файлов пакета.
+
+set -e
+
+chmod 0755 /opt/bin/shadowfoxd            2>/dev/null || true
+chmod 0755 /opt/etc/init.d/S99shadowfox   2>/dev/null || true
+chmod 0755 /opt/etc/ndm/netfilter.d/015-shadowfox.sh      2>/dev/null || true
+chmod 0755 /opt/etc/ndm/ifstatechanged.d/015-shadowfox.sh 2>/dev/null || true
+
+# Короткая команда управления: `shadowfox status`, `shadowfox restart` и т.д.
+ln -sf /opt/etc/init.d/S99shadowfox /opt/bin/shadowfox
+
+# Намеренно НЕ правим /opt/etc/init.d/rc.unslung.
+# neofit и hrneo вставляют туда `sleep 10`, чтобы дождаться сети роутера.
+# Это правка чужого общего файла ради задержки на старте. Вместо этого
+# демон переживает неготовую сеть и поднимает правила по SIGUSR1,
+# который ему шлют ndm-хуки при первом же событии интерфейса.
+
+# Предупреждение о соседстве, а не запрет: по файлам мы с HydraRoute не
+# пересекаемся и спокойно стоим рядом. Конфликт начнётся, когда Shadow Fox
+# начнёт править netfilter и управлять xray — тем же, чем владеет он.
+if [ -x /opt/bin/hrneo ] || [ -d /opt/etc/HydraRoute ]; then
+    echo "[ИНФО] обнаружен HydraRoute."
+    echo "       Shadow Fox не трогает его файлы, службы и правила."
+    echo "       Пока это только каркас: маршрутизацию ведёт HydraRoute."
+fi
+
+/opt/etc/init.d/S99shadowfox stop  >/dev/null 2>&1 || true
+/opt/etc/init.d/S99shadowfox start >/dev/null 2>&1 || \
+    echo "[WARN] не удалось запустить shaper, см. /opt/var/log/shadowfoxd.log"
+
+exit 0

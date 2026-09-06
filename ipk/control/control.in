@@ -1,0 +1,9 @@
+Package: @PKG@
+Version: @VERSION@
+Architecture: @ARCH@
+Depends: libc
+Installed-Size: @INSTALLED_SIZE@
+Maintainer: @MAINTAINER@
+Section: net
+Priority: optional
+Description: Xray manager and domain-based policy routing for Keenetic

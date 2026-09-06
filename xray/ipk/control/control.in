@@ -1,0 +1,9 @@
+Package: shadowfox-xray
+Version: @VERSION@
+Architecture: @ARCH@
+Depends: ca-bundle
+Installed-Size: @INSTALLED_SIZE@
+Maintainer: @MAINTAINER@
+Section: net
+Priority: optional
+Description: Xray core, trimmed build for Shadow Fox (@VARIANT@)

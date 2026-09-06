@@ -1,0 +1,35 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [{
+    "tag": "socks-in",
+    "listen": "127.0.0.1",
+    "port": 2080,
+    "protocol": "socks",
+    "settings": { "auth": "noauth", "udp": true },
+    "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
+  }],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": { "vnext": [{ "address": "example.com", "port": 443,
+        "users": [{ "id": "d342d11e-d424-4583-b36e-524ab1f0afa4",
+                    "encryption": "none", "flow": "xtls-rprx-vision" }] }] },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": { "serverName": "www.google.com",
+          "publicKey": "yZ8kPCPPnGVJTIPMQYWvVIeLTHRGb2pDeSCLZlnzWXA",
+          "shortId": "6ba85179e30d4fc2", "fingerprint": "chrome",
+          "spiderX": "/" },
+        "sockopt": { "dialerProxy": "fragment" }
+      }
+    },
+    { "tag": "fragment", "protocol": "freedom",
+      "settings": { "fragment": { "packets": "tlshello", "length": "100-200", "interval": "10-20" },
+                    "noises": [{ "type": "rand", "packet": "10-20", "delay": "10-16" }] } },
+    { "tag": "direct", "protocol": "freedom" },
+    { "tag": "block", "protocol": "blackhole" }
+  ],
+  "routing": { "rules": [{ "type": "field", "inboundTag": ["socks-in"], "outboundTag": "proxy" }] }
+}
