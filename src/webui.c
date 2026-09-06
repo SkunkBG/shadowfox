@@ -4,6 +4,8 @@
 #include "ndmauth.h"
 #include "proc.h"
 
+#define DNS_LINES_MAX 32
+
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <time.h>
@@ -379,6 +381,42 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
 }
 
+/* Вышестоящие серверы DNS из running-config роутера.
+
+   Они записаны внутри секции dns-proxy строками вида
+   «tls upstream 8.8.8.8 sni dns.google» — сами по себе такие строки
+   ничем не выделяются, поэтому идём по секциям: заголовок секции стоит
+   в первой колонке, содержимое с отступом. Строку портит strtok, так
+   что text обязан быть изменяемым.
+
+   Возвращает число найденных строк. */
+int dns_upstreams(char *text, const char **out, int max)
+{
+    int n = 0, inside = 0;
+
+    for (char *line = strtok(text, "\n"); line && n < max;
+         line = strtok(NULL, "\n")) {
+
+        int indented = (line[0] == ' ' || line[0] == '\t');
+        char *t = str_trim(line);
+        if (!*t) continue;
+
+        if (!indented) {
+            inside = !strcmp(t, "dns-proxy");
+            continue;
+        }
+
+        if (inside) {
+            /* Внутри секции интересны только вышестоящие серверы. */
+            if (strstr(t, "upstream")) out[n++] = t;
+        } else if (!strncmp(t, "ip name-server ", 15)) {
+            out[n++] = t;
+        }
+    }
+
+    return n;
+}
+
 /* Серверы DNS роутера. Берём из его же running-config через ndmc:
    точного пути в RCI я не знаю, а выдумывать нельзя. Из вывода отбираем
    только строки про DNS — там же лежит хеш пароля администратора, и
@@ -409,13 +447,9 @@ static void send_dns(int fd)
     json_arr_open(&j);
 
     if (rc == 0) {
-        for (char *line = strtok(out, "\n"); line; line = strtok(NULL, "\n")) {
-            char *t = str_trim(line);
-            if (strncmp(t, "ip name-server", 14) == 0 ||
-                strncmp(t, "dns-proxy", 9) == 0 ||
-                strncmp(t, "ip dns-proxy", 12) == 0)
-                json_str(&j, t);
-        }
+        const char *found[DNS_LINES_MAX];
+        int n = dns_upstreams(out, found, DNS_LINES_MAX);
+        for (int i = 0; i < n; i++) json_str(&j, found[i]);
     }
 
     json_arr_close(&j);

@@ -524,6 +524,17 @@ function fold(id,title,inner){
     <div class="body">${inner}</div></div>`;
 }
 
+/* Форма команд взята из running-config настоящего роутера, а не
+   придумана: серверы там записаны ровно так. */
+const DNSCMDS=[
+  'dns-proxy tls upstream 1.1.1.1 sni cloudflare-dns.com',
+  'dns-proxy tls upstream 1.0.0.1 sni cloudflare-dns.com',
+  'dns-proxy tls upstream 9.9.9.9 sni dns.quad9.net',
+  'dns-proxy tls upstream 149.112.112.112 sni dns.quad9.net',
+  'service dns-proxy',
+  'system configuration save'
+].map(c=>`ndmc -c "${c}"`).join('\n');
+
 function viewConn(){
   const P=D.proxy_name, POL=D.policy_name, host=location.hostname;
   const cmds=[`interface ${P}`,`interface ${P} description Shadow-Fox`,
@@ -573,6 +584,17 @@ function viewConn(){
     вручную. На DNS-over-HTTPS внутри браузера он не действует — там запрос
     идёт по HTTPS, и его не видит никто.</p>
   </div>
+
+  ${fold('dnscmd','Поставить чистые серверы командами',
+    `<p>Если настраивать через панель неудобно, то же самое делается из
+     консоли роутера. Выполняй по одной — <code>ndmc</code> несколько сразу
+     не принимает:</p>
+     <pre>${esc(DNSCMDS)}</pre>
+     <p>После этого проверь, что получилось:</p>
+     <pre>ndmc -c "show running-config" | grep upstream</pre>
+     <p>Команды меняют настройки роутера, поэтому выполняешь их ты, а не мы.
+     Убрать лишний сервер можно тем же способом со словом <code>no</code>
+     впереди.</p>`)}
 
   ${fold('pol','Как настроить политику доступа',
     `<p>В панели роутера: <b>Приоритеты подключений → Политики доступа</b>.
