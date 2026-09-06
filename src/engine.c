@@ -19,6 +19,7 @@ void engine_init(engine_t *e)
     ips_init(&e->ips, NULL);
     rt_init(&e->rt);
     dcap_init(&e->cap);
+    rci_init(&e->rci);
 }
 
 int engine_fd(const engine_t *e)
@@ -68,7 +69,42 @@ static int load_lists(engine_t *e, const config_t *cfg)
              e->wl.group_count, e->wl.domain_count, e->wl.cidr_count,
              e->wl.skipped);
 
+    wl_classify_targets(&e->wl, NULL);
     return e->wl.group_count;
+}
+
+/* Для целей-политик метку назначает роутер, и спросить её можно только
+   у него. Без метки правило ставить нельзя: пустая увела бы трафик в
+   никуда, поэтому такие группы просто пропускаются до следующей попытки. */
+static void fetch_policy_marks(engine_t *e)
+{
+    e->policies_pending = 0;
+
+    for (int i = 0; i < e->wl.group_count; i++) {
+        wl_group_t *g = &e->wl.groups[i];
+        if (g->target != WL_TARGET_POLICY) continue;
+
+        unsigned mark = 0;
+        int      rc   = rci_policy_mark(&e->rci, g->iface, &mark);
+
+        if (rc == -2) {
+            /* Политики нет — создаём пустой. Интерфейсы в неё
+               администратор назначает сам через панель роутера. */
+            log_info("политика %s не найдена, создаю", g->iface);
+            if (rci_policy_create(&e->rci, g->iface) == 0)
+                rc = rci_policy_mark(&e->rci, g->iface, &mark);
+        }
+
+        if (rc == 0 && mark) {
+            g->policy_mark = mark;
+            log_info("политика %s: метка 0x%x", g->iface, mark);
+        } else {
+            g->policy_mark = 0;
+            e->policies_pending++;
+            log_warn("у политики %s пока нет метки, её трафик не метится",
+                     g->iface);
+        }
+    }
 }
 
 /* Ставит наборы и правила. Наборы обязаны существовать до правил:
@@ -79,6 +115,8 @@ static int apply_all(engine_t *e, char *err, unsigned err_size)
         log_info("групп нет, правила не ставятся");
         return 0;
     }
+
+    fetch_policy_marks(e);
 
     ips_queue_create(&e->ips, &e->wl);
     ips_queue_cidrs(&e->ips, &e->wl);
@@ -215,6 +253,21 @@ void engine_print_plan(const engine_t *e)
 
     rt_plan_t plan;
     rt_plan_apply(&plan, &e->rt, &e->wl);
+
+    printf("# цели\n");
+    for (int i = 0; i < e->wl.group_count; i++) {
+        const wl_group_t *g = &e->wl.groups[i];
+        const char *kind =
+            g->target == WL_TARGET_IFACE  ? "устройство" :
+            g->target == WL_TARGET_POLICY ? "политика Keenetic" : "не задана";
+        printf("%-16s %-18s %s", g->name, g->iface[0] ? g->iface : "-", kind);
+        if (g->target == WL_TARGET_POLICY) {
+            if (g->policy_mark) printf(", метка 0x%x", g->policy_mark);
+            else                printf(", МЕТКА НЕ ПОЛУЧЕНА");
+        }
+        printf("\n");
+    }
+    printf("\n");
 
     printf("# наборы\n");
     ips_t preview;

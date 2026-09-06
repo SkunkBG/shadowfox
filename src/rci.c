@@ -77,26 +77,32 @@ int rci_request(const rci_t *r, const char *method, const char *path,
     int fd = connect_rci(r);
     if (fd < 0) return -1;
 
-    char req[1024];
+    /* Заголовки и тело — одной записью. Раздельная отправка законна, но
+       порождает два пакета на каждый запрос и заставляет принимающую
+       сторону читать дважды. */
+    char req[RCI_BODY_MAX];
     int  n = snprintf(req, sizeof(req),
         "%s %s HTTP/1.0\r\n"
         "Host: %s\r\n"
         "Content-Type: application/json\r\n"
         "%s%s%s"
         "Content-Length: %zu\r\n"
-        "\r\n",
+        "\r\n"
+        "%s",
         method, path, r->host,
         r->token[0] ? "Authorization: Token " : "",
         r->token[0] ? r->token : "",
         r->token[0] ? "\r\n" : "",
-        body ? strlen(body) : (size_t)0);
+        body ? strlen(body) : (size_t)0,
+        body ? body : "");
 
     if (n < 0 || (unsigned)n >= sizeof(req)) { close(fd); return -1; }
 
-    if (write(fd, req, (size_t)n) != n) { close(fd); return -1; }
-    if (body && *body) {
-        size_t len = strlen(body);
-        if (write(fd, body, len) != (ssize_t)len) { close(fd); return -1; }
+    ssize_t sent = 0;
+    while (sent < n) {
+        ssize_t k = write(fd, req + sent, (size_t)(n - sent));
+        if (k <= 0) { close(fd); return -1; }
+        sent += k;
     }
 
     char   resp[RCI_BODY_MAX];

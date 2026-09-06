@@ -36,6 +36,10 @@ static void load_lists(wl_t *w)
 
     wl_init(w);
     wl_load_domains(w, path);
+    /* Без классификации цели считаются неизвестными; в этих тестах
+       проверяется путь через настоящее устройство. */
+    for (int i = 0; i < w->group_count; i++)
+        w->groups[i].target = WL_TARGET_IFACE;
 }
 
 static void setup(rt_t *r, int ipv6)
@@ -100,10 +104,10 @@ static void test_apply_plan(void)
     /* Врезка снимается перед вставкой, иначе повторный запуск наплодит
        дублей в PREROUTING. */
     CHECK(strstr(text, "-D PREROUTING -j SHADOWFOX") != NULL, "снятие врезки");
-    CHECK(strstr(text, "-I PREROUTING 1 -j SHADOWFOX") != NULL, "врезка");
+    CHECK(strstr(text, "-A PREROUTING -j SHADOWFOX") != NULL, "врезка");
 
     const char *del = strstr(text, "-D PREROUTING -j SHADOWFOX");
-    const char *ins = strstr(text, "-I PREROUTING 1 -j SHADOWFOX");
+    const char *ins = strstr(text, "-A PREROUTING -j SHADOWFOX");
     CHECK(del && ins && del < ins, "снятие идёт раньше вставки");
 }
 
@@ -151,7 +155,8 @@ static void test_remove_plan(void)
     CHECK(strstr(text, "route flush table 5346") != NULL, "таблица очищена");
 
     /* Снятие не должно ничего добавлять. */
-    CHECK(strstr(text, "-I PREROUTING") == NULL, "врезка не ставится");
+    CHECK(strstr(text, "-A PREROUTING -j SHADOWFOX") == NULL,
+          "врезка не ставится");
     CHECK(strstr(text, "rule add") == NULL, "правила не добавляются");
     CHECK(strstr(text, "route replace") == NULL, "маршруты не добавляются");
 }
@@ -169,6 +174,8 @@ static void test_group_without_interface_skipped(void)
     wl_t w;
     wl_init(&w);
     wl_load_domains(&w, path);
+    for (int i = 0; i < w.group_count; i++)
+        w.groups[i].target = WL_TARGET_IFACE;
 
     rt_t r; setup(&r, 0);
     rt_plan_t p;
@@ -210,6 +217,66 @@ static void test_idempotent_shape(void)
     }
 }
 
+/* Цель-политика заворачивается совсем иначе: метку назначает роутер,
+   ставится она на соединение, и только на новое. */
+static void test_policy_target(void)
+{
+    wl_t w;  load_lists(&w);
+    rt_t r;  setup(&r, 0);
+
+    w.groups[0].target      = WL_TARGET_POLICY;
+    w.groups[0].policy_mark = 0xffffaaa;
+    w.groups[1].target      = WL_TARGET_IFACE;
+
+    rt_plan_t p;
+    rt_plan_apply(&p, &r, &w);
+
+    char text[8192];
+    plan_text(&p, text, sizeof(text));
+
+    /* Переполнение плана выглядит как отсутствие правил, поэтому
+       проверяем его отдельно, а не гадаем по пустому выводу. */
+    CHECK(p.overflow == 0, "план поместился, переполнений %d", p.overflow);
+
+    CHECK(strstr(text, "-j CONNMARK --set-xmark 0xffffaaa/0xffffffff") != NULL,
+          "метка политики ставится на соединение:\n%s", text);
+    /* Только новые соединения: дальше работает восстановление метки. */
+    CHECK(strstr(text, "-m connmark --mark 0x0") != NULL,
+          "метится только соединение без метки");
+    /* И только те пакеты, что ещё не отданы другой политике. */
+    CHECK(strstr(text, "-m mark ! --mark 0xffffaa0/0xfffffff0") != NULL,
+          "чужие политики не перехватываются");
+    CHECK(strstr(text, "--restore-mark") != NULL, "метка переносится на пакет");
+
+    /* Для политики своей таблицы не нужно — маршрутизирует роутер. */
+    CHECK(strstr(text, "table 5346") == NULL,
+          "политике не создаётся своя таблица");
+    /* А для группы-устройства всё по-прежнему. */
+    CHECK(strstr(text, "dev Proxy1 table 5347") != NULL,
+          "устройство маршрутизируется по-старому");
+}
+
+/* Пока метка политики не получена, правил быть не должно: пустая метка
+   в CONNMARK увела бы трафик в никуда. */
+static void test_policy_without_mark(void)
+{
+    wl_t w;  load_lists(&w);
+    rt_t r;  setup(&r, 0);
+
+    w.groups[0].target      = WL_TARGET_POLICY;
+    w.groups[0].policy_mark = 0;
+    w.groups[1].target      = WL_TARGET_POLICY;
+    w.groups[1].policy_mark = 0;
+
+    rt_plan_t p;
+    rt_plan_apply(&p, &r, &w);
+
+    char text[8192];
+    plan_text(&p, text, sizeof(text));
+    CHECK(strstr(text, "CONNMARK") == NULL,
+          "без метки правил нет:\n%s", text);
+}
+
 int main(void)
 {
     printf("check_routing " VERSION "\n");
@@ -223,6 +290,8 @@ int main(void)
     test_remove_plan();
     test_group_without_interface_skipped();
     test_idempotent_shape();
+    test_policy_target();
+    test_policy_without_mark();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 void wl_init(wl_t *w)
 {
@@ -235,6 +236,34 @@ static int load(wl_t *w, const char *path, int cidrs)
 
 int wl_load_domains(wl_t *w, const char *path) { return load(w, path, 0); }
 int wl_load_cidrs(wl_t *w, const char *path)   { return load(w, path, 1); }
+
+int wl_classify_targets(wl_t *w, const char *sysnet_dir)
+{
+    if (!w) return 0;
+
+    const char *base = sysnet_dir ? sysnet_dir : "/sys/class/net";
+    int policies = 0;
+
+    for (int i = 0; i < w->group_count; i++) {
+        wl_group_t *g = &w->groups[i];
+        if (!g->iface[0]) { g->target = WL_TARGET_UNKNOWN; continue; }
+
+        char path[512];
+        snprintf(path, sizeof(path), "%s/%s", base, g->iface);
+
+        /* Настоящее устройство есть в /sys/class/net. Штатный прокси
+           Keenetic туда не попадает — он живёт внутри прошивки, и
+           завернуть в него трафик через ip route нельзя. */
+        if (access(path, F_OK) == 0) {
+            g->target = WL_TARGET_IFACE;
+        } else {
+            g->target = WL_TARGET_POLICY;
+            policies++;
+        }
+    }
+
+    return policies;
+}
 
 const char *inet_ntop_prefix(const wl_cidr_t *c, char *dst, unsigned size)
 {

@@ -114,6 +114,43 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
 
         const char *set = v6 ? g->ipset6 : g->ipset4;
 
+        if (g->target == WL_TARGET_POLICY) {
+            if (remove) continue;        /* всё уносится вместе с цепочкой */
+            if (!g->policy_mark) continue;   /* метку ещё не узнали */
+
+            /* Политика Keenetic маршрутизирует по своей метке, и ставить
+               её надо ровно как ждёт роутер: на соединение, а не на
+               пакет, и только на новое.
+
+               Первое правило: пакет ещё не отдан никакой политике
+               (младший полубайт метки — номер политики, старшая часть
+               общая), у соединения метки нет, назначение в нашем наборе.
+               Второе: перенести метку соединения на пакет. */
+            char pmark[32], guard[40];
+            snprintf(pmark, sizeof(pmark), "0x%x/0xffffffff", g->policy_mark);
+            snprintf(guard, sizeof(guard), "0x%x/0xfffffff0",
+                     g->policy_mark & 0xFFFFFFF0u);
+
+            const char *set_rule[] = {
+                tables, "-t", table_arg, "-A", RT_CHAIN,
+                "-m", "mark", "!", "--mark", guard,
+                "-m", "connmark", "--mark", "0x0",
+                "-m", "set", "--match-set", set, "dst",
+                "-j", "CONNMARK", "--set-xmark", pmark, NULL
+            };
+            add(p, 0, set_rule);
+
+            const char *restore[] = {
+                tables, "-t", table_arg, "-A", RT_CHAIN,
+                "-m", "set", "--match-set", set, "dst",
+                "-j", "CONNMARK", "--restore-mark",
+                "--nfmask", "0xffffffff", "--ctmask", "0xffffffff", NULL
+            };
+            add(p, 0, restore);
+            continue;
+        }
+
+        /* Настоящее устройство: своя метка и своя таблица. */
         char mark[32];
         mark_text(mark, sizeof(mark), g->mark);
 
@@ -163,8 +200,12 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
     add(p, 1, unhook);
 
     if (!remove) {
+        /* Врезаемся в конец, а не в начало. Правила HydraRoute стоят в
+           том же PREROUTING и метят только соединения без метки; встань
+           мы первыми, перехватывали бы соединения раньше него при
+           пересечении списков. Новичку так делать неправильно. */
         const char *hook[] = {
-            tables, "-t", table_arg, "-I", "PREROUTING", "1", "-j", RT_CHAIN, NULL
+            tables, "-t", table_arg, "-A", "PREROUTING", "-j", RT_CHAIN, NULL
         };
         add(p, 0, hook);
     } else {

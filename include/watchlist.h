@@ -46,9 +46,19 @@ typedef struct {
     unsigned char group;
 } wl_cidr_t;
 
+/* Цель группы бывает двух видов, и заворачивается трафик в них
+   по-разному. Различаем по наличию /sys/class/net/<имя>. */
+typedef enum {
+    WL_TARGET_UNKNOWN = 0,
+    WL_TARGET_IFACE,     /* настоящее устройство: своя метка и таблица */
+    WL_TARGET_POLICY     /* политика Keenetic: её метка, маршрутизирует роутер */
+} wl_target_t;
+
 typedef struct {
     char     name[WL_NAME_MAX];
     char     iface[WL_IFACE_MAX];
+    unsigned char target;        /* wl_target_t */
+    unsigned policy_mark;        /* метка политики, полученная из RCI */
     char     ipset4[WL_SETNAME_MAX];
     char     ipset6[WL_SETNAME_MAX];
     unsigned mark;
@@ -90,6 +100,11 @@ int wl_load_cidrs(wl_t *w, const char *path);
    правило всегда перекрывает общее. */
 int wl_match_domain(const wl_t *w, const char *host);
 int wl_match_ip(const wl_t *w, int family, const unsigned char *addr);
+
+/* Определяет вид цели каждой группы: смотрит, есть ли такое устройство
+   в /sys/class/net. sysnet_dir нужен тестам, обычно NULL.
+   Возвращает число групп, оказавшихся политиками Keenetic. */
+int wl_classify_targets(wl_t *w, const char *sysnet_dir);
 
 const char *wl_domain_text(const wl_t *w, int index);
 

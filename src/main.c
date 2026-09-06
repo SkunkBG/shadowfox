@@ -1,5 +1,7 @@
 #include "config.h"
 #include "engine.h"
+#include "rci.h"
+#include "watchlist.h"
 #include "log.h"
 #include "node.h"
 #include "nodelist.h"
@@ -208,6 +210,17 @@ int main(int argc, char **argv)
             snprintf(ipath, sizeof(ipath), "%s/ip.list", dry.conf_dir);
             wl_load_domains(&preview.wl, dpath);
             wl_load_cidrs(&preview.wl, ipath);
+            wl_classify_targets(&preview.wl, NULL);
+
+            /* Метки спрашиваем и здесь: без них план для целей-политик
+               выглядел бы пустым, и было бы непонятно почему. */
+            for (int k = 0; k < preview.wl.group_count; k++) {
+                wl_group_t *g = &preview.wl.groups[k];
+                if (g->target != WL_TARGET_POLICY) continue;
+                unsigned mk = 0;
+                if (rci_policy_mark(&preview.rci, g->iface, &mk) == 0)
+                    g->policy_mark = mk;
+            }
 
             fprintf(stderr, "групп %d, доменов %d, подсетей %d, "
                             "пропущено строк %d\n",

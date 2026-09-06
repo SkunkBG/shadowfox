@@ -4,6 +4,7 @@
 #include "config.h"
 #include "dnscap.h"
 #include "ipsets.h"
+#include "rci.h"
 #include "routing.h"
 #include "watchlist.h"
 
@@ -16,6 +17,7 @@ typedef struct {
     ips_t  ips;
     rt_t   rt;
     dcap_t cap;
+    rci_t  rci;
 
     int    rules_applied;
     int    capturing;
@@ -24,6 +26,7 @@ typedef struct {
     unsigned long matched;   /* адресов, попавших под правила */
     unsigned long flushes;
     unsigned long restores;
+    int           policies_pending;   /* политик без метки */
 } engine_t;
 
 void engine_init(engine_t *e);
