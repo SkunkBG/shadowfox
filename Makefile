@@ -31,7 +31,7 @@ CFLAGS_NATIVE  = $(COMMON_CFLAGS) $(NATIVE_EXTRA_CFLAGS)
 LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c
 
 BUILD = build
 
@@ -83,13 +83,16 @@ check:
 		src/jsonw.c -o $(BUILD)/check_jsonw
 	./$(BUILD)/check_jsonw
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_node.c \
-		src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/jsonw.c src/url.c src/util.c \
+		src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/jsonw.c src/url.c src/util.c \
 		-o $(BUILD)/check_node
 	./$(BUILD)/check_node
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_nodelist.c \
-		src/nodelist.c src/base64.c src/node.c src/xraycfg.c src/jsonw.c \
+		src/nodelist.c src/base64.c src/proc.c src/apply.c src/node.c src/xraycfg.c src/jsonw.c \
 		src/url.c src/util.c -o $(BUILD)/check_nodelist
 	./$(BUILD)/check_nodelist
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_apply.c \
+		src/apply.c src/proc.c src/util.c src/log.c -o $(BUILD)/check_apply
+	./$(BUILD)/check_apply
 
 ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \
