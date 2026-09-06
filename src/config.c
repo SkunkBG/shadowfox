@@ -29,6 +29,11 @@ void config_defaults(config_t *cfg)
        не копит адреса, давно переехавшие к другим сервисам. */
     cfg->ipset_timeout = 86400;
 
+    cfg->web_enabled = 1;
+    /* 2000 занят hrweb, 8080 у MagiTrickle, 92 был у neofit. */
+    cfg->web_port    = 8090;
+    str_copy(cfg->web_proxy, sizeof(cfg->web_proxy), "shadowfox");
+
     str_copy(cfg->policy, sizeof(cfg->policy), "ShadowFox");
     str_copy(cfg->proxy_iface, sizeof(cfg->proxy_iface), "Proxy1");
     /* 1300 у HydraRoute — берём соседний, чтобы не столкнуться. */
@@ -103,6 +108,31 @@ int config_set(config_t *cfg, const char *key, const char *value)
         return 0;
     }
 
+    if (!strcasecmp(key, "web")) {
+        cfg->web_enabled = parse_bool(value, cfg->web_enabled);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "webPort")) {
+        cfg->web_port = atoi(value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "webBind")) {
+        str_copy(cfg->web_bind, sizeof(cfg->web_bind), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "webToken")) {
+        str_copy(cfg->web_token, sizeof(cfg->web_token), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "webProxy")) {
+        str_copy(cfg->web_proxy, sizeof(cfg->web_proxy), value);
+        return 0;
+    }
+
     if (!strcasecmp(key, "ipsetTimeout")) {
         cfg->ipset_timeout = atoi(value);
         return 0;
@@ -143,6 +173,7 @@ int config_apply_args(config_t *cfg, int argc, char **argv)
             !strcmp(argv[i], "--fragment") ||
             !strcmp(argv[i], "--dry-run") ||
             !strcmp(argv[i], "--setup-proxy") ||
+            !strcmp(argv[i], "--setup-web") ||
             !strcmp(argv[i], "-s") || !strcmp(argv[i], "--status")) continue;
 
         if (!strncmp(argv[i], "--", 2) && i + 1 < argc &&
@@ -251,6 +282,19 @@ int config_write_default(const char *path)
         "# резолвить, выпадает сам, и набор не копит адреса, давно\n"
         "# переехавшие к другим сервисам. 0 отключает старение.\n"
         "ipsetTimeout=86400\n"
+        "\n"
+        "# Веб-интерфейс: http://<адрес роутера>:8090\n"
+        "web=yes\n"
+        "webPort=8090\n"
+        "\n"
+        "# Адрес, на котором слушать. Пусто — адрес интерфейса локальной\n"
+        "# сети. Слушать 0.0.0.0 нельзя.\n"
+        "webBind=\n"
+        "\n"
+        "# Необязательный токен: с ним страница требует ?token=... в\n"
+        "# адресе. Для доступа снаружи он не нужен — там пароль от\n"
+        "# роутера спрашивает сам роутер, см. shadowfoxd --setup-web\n"
+        "webToken=\n"
         "\n"
         "# Свой экземпляр Xray и своё прокси-подключение в Keenetic.\n"
         "# nodesFile — файл со ссылками vless:// либо подпиской. Пока его\n"

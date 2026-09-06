@@ -34,6 +34,7 @@ typedef struct engine {
     unsigned long matched;   /* адресов, попавших под правила */
     unsigned long flushes;
     unsigned long restores;
+    unsigned long marked_conns;
     int           policies_pending;   /* политик без метки */
     int           may_create_policy;
     int           ipset_timeout;

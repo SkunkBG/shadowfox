@@ -1,0 +1,174 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shadow Fox</title>
+<style>
+:root{--bg:#12151a;--card:#1a1f27;--line:#2a313d;--fg:#e6e9ee;--dim:#8b95a5;--ok:#3ddc84;--bad:#ff6b6b;--acc:#4aa3ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+h1{margin:0;font-size:19px;font-weight:650;letter-spacing:.2px}
+.ver{color:var(--dim);font-size:12px}
+main{max-width:900px;margin:0 auto;padding:20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+h2{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 20px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line)}
+.kv:last-child{border:0}
+.kv span:first-child{color:var(--dim)}
+.on{color:var(--ok)}.off{color:var(--bad)}
+textarea{width:100%;min-height:190px;background:#0e1116;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+button{background:var(--acc);color:#06121f;border:0;border-radius:7px;padding:9px 17px;font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.row{display:flex;gap:10px;align-items:center;margin-top:11px;flex-wrap:wrap}
+.msg{font-size:13px;color:var(--dim)}
+.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
+.hint{color:var(--dim);font-size:12.5px;margin:0 0 10px}
+code{background:#0e1116;padding:1px 5px;border-radius:4px;font-size:12.5px}
+table{width:100%;border-collapse:collapse}
+td{padding:6px 0;border-bottom:1px solid var(--line)}
+td:last-child{text-align:right;color:var(--dim)}
+tr:last-child td{border:0}
+</style>
+
+<header>
+  <h1>Shadow&nbsp;Fox</h1>
+  <span class="ver" id="ver"></span>
+</header>
+
+<main>
+  <section>
+    <h2>Состояние</h2>
+    <div class="grid" id="state"></div>
+  </section>
+
+  <section>
+    <h2>Группы</h2>
+    <table id="groups"></table>
+  </section>
+
+  <section>
+    <h2>Домены</h2>
+    <p class="hint">
+      Группа задаётся строкой <code>[имя]</code>, следом <code>interface = ...</code> —
+      политика Keenetic либо сетевой интерфейс. Дальше домены: обычная запись
+      охватывает и поддомены, <code>*.имя</code> только поддомены,
+      <code>=имя</code> точное совпадение.
+    </p>
+    <textarea id="domains" spellcheck="false"></textarea>
+    <div class="row">
+      <button data-save="domains">Сохранить и применить</button>
+      <span class="msg" id="m-domains"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Серверы</h2>
+    <p class="hint">
+      Ссылки <code>vless://</code> по одной в строке либо подписка целиком.
+      При нескольких серверах выбирается самый быстрый. Конфиг проверяется
+      ядром до применения: негодный не заменит рабочий.
+    </p>
+    <textarea id="nodes" spellcheck="false"></textarea>
+    <div class="row">
+      <button data-save="nodes">Сохранить и применить</button>
+      <span class="msg" id="m-nodes"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Подсети</h2>
+    <p class="hint">
+      Для сервисов с зашитыми адресами, которые не спрашивают DNS, —
+      там перехват ответов бессилен.
+    </p>
+    <textarea id="cidrs" spellcheck="false" style="min-height:120px"></textarea>
+    <div class="row">
+      <button data-save="cidrs">Сохранить и применить</button>
+      <span class="msg" id="m-cidrs"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const tok = new URLSearchParams(location.search).get('token');
+const url = p => tok ? p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(tok) : p;
+
+function yesno(v, yes, no) {
+  return '<span class="' + (v ? 'on' : 'off') + '">' + (v ? yes : no) + '</span>';
+}
+
+function render(d) {
+  $('#ver').textContent = d.version;
+
+  $('#state').innerHTML = [
+    ['Демон',    'работает, ' + d.uptime],
+    ['Своё ядро', d.xray_pid > 0 ? yesno(1, 'работает') : yesno(0, 'не запущено')],
+    ['Перехват',  d.capture ? 'на ' + d.iface : yesno(0, 'выключен')],
+    ['Пакетов',   d.seen],
+    ['Ответов',   d.parsed],
+    ['Адресов',   d.matched],
+    ['Правила',   d.rules ? yesno(1, 'установлены') : yesno(0, 'нет')],
+    ['Помечено',  d.marked + ' соединений']
+  ].map(([k, v]) => '<div class="kv"><span>' + k + '</span><span>' + v + '</span></div>').join('');
+
+  $('#groups').innerHTML = d.groups.length
+    ? d.groups.map(g =>
+        '<tr><td>' + esc(g.name) + ' &rarr; ' + esc(g.target) +
+        '</td><td>' + g.kind + ', адресов ' + g.addrs + '</td></tr>').join('')
+    : '<tr><td>групп нет</td><td></td></tr>';
+
+  $('#domains').value = d.domains;
+  $('#nodes').value   = d.nodes;
+  $('#cidrs').value   = d.cidrs;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+async function load() {
+  try {
+    const r = await fetch(url('/data'));
+    if (!r.ok) throw new Error('код ' + r.status);
+    render(await r.json());
+  } catch (e) {
+    document.body.insertAdjacentHTML('afterbegin',
+      '<p style="padding:12px 20px;color:#ff6b6b">Не удалось получить данные: ' +
+      esc(e.message) + '</p>');
+  }
+}
+
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-save]');
+  if (!b) return;
+
+  const what = b.dataset.save;
+  const msg  = $('#m-' + what);
+
+  b.disabled = true;
+  msg.className = 'msg';
+  msg.textContent = 'сохраняю…';
+
+  try {
+    const r = await fetch(url('/save?what=' + what), {
+      method: 'POST',
+      body: $('#' + what).value
+    });
+    const t = (await r.text()).trim();
+    msg.className = r.ok ? 'msg ok' : 'msg bad';
+    msg.textContent = t || (r.ok ? 'готово' : 'ошибка');
+    if (r.ok) setTimeout(load, 1200);
+  } catch (e) {
+    msg.className = 'msg bad';
+    msg.textContent = e.message;
+  }
+  b.disabled = false;
+});
+
+load();
+setInterval(load, 10000);
+</script>

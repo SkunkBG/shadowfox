@@ -9,6 +9,7 @@
 #include "shadowfox.h"
 #include "signals.h"
 #include "status.h"
+#include "webui.h"
 #include "util.h"
 
 #include <errno.h>
@@ -38,6 +39,7 @@ static void usage(FILE *out)
         "  -s, --status          показать состояние демона и выйти\n"
         "      --dry-run         показать план правил и выйти, ничего не меняя\n"
         "      --setup-proxy     напечатать команды для своего прокси в Keenetic\n"
+        "      --setup-web       напечатать команды для доступа по доменному имени\n"
         "      --fragment        включить фрагментацию TLS и шум UDP\n"
         "      --no-fragment     выключить их явно (и так выключены)\n"
         "      --log УРОВЕНЬ     off | error | warn | info | debug\n"
@@ -202,6 +204,39 @@ int main(int argc, char **argv)
             config_load_file(&st, st.conf_file);
             config_apply_args(&st, argc, argv);
             return status_print(&st);
+        } else if (!strcmp(argv[i], "--setup-web")) {
+            config_t sw;
+            config_defaults(&sw);
+            str_copy(sw.conf_file, sizeof(sw.conf_file), conf_path);
+            config_load_file(&sw, sw.conf_file);
+            config_apply_args(&sw, argc, argv);
+
+            char lan[64] = "";
+            if (sw.web_bind[0])
+                str_copy(lan, sizeof(lan), sw.web_bind);
+            else if (!iface_ipv4(sw.capture_iface, lan, sizeof(lan))) {
+                fprintf(stderr, "не узнать адрес на %s\n", sw.capture_iface);
+                return 1;
+            }
+
+            printf("# Публикация веб-интерфейса на поддомене твоего\n"
+                   "# доменного имени Keenetic. Роутер сам сделает HTTPS и\n"
+                   "# спросит логин с паролем — своей проверки входа у нас\n"
+                   "# нет и не нужно.\n\n");
+
+            printf("ndmc -c \"ip http proxy %s\"\n", sw.web_proxy);
+            printf("ndmc -c \"ip http proxy %s upstream http %s %d\"\n",
+                   sw.web_proxy, lan, sw.web_port);
+            printf("ndmc -c \"ip http proxy %s domain ndns\"\n", sw.web_proxy);
+            printf("ndmc -c \"ip http proxy %s ssl redirect\"\n", sw.web_proxy);
+            printf("ndmc -c \"ip http proxy %s security-level public\"\n", sw.web_proxy);
+            printf("ndmc -c \"ip http proxy %s auth\"\n", sw.web_proxy);
+            printf("ndmc -c \"system configuration save\"\n");
+
+            printf("\n# После этого интерфейс откроется по адресу\n"
+                   "#   https://%s.<твоё доменное имя>\n", sw.web_proxy);
+            printf("# и из дома, и из интернета — с паролем от роутера.\n");
+            return 0;
         } else if (!strcmp(argv[i], "--setup-proxy")) {
             config_t sp;
             config_defaults(&sp);
@@ -329,12 +364,24 @@ int main(int argc, char **argv)
     static engine_t engine;
     engine_init(&engine);
 
+    static http_t web;
+    http_init(&web);
+
     char eerr[256] = "";
     if (cfg.auto_start) {
         if (engine_start(&engine, &cfg, eerr, sizeof(eerr)) != 0)
             log_error("маршрутизация не поднята: %s", eerr);
     } else {
         log_info("autoStart выключен, правила не ставятся");
+    }
+
+    if (cfg.web_enabled) {
+        char werr[192] = "";
+        if (webui_open(&web, &cfg, werr, sizeof(werr)) == 0)
+            log_info("веб-интерфейс: http://%s:%d%s", web.bind_addr, web.port,
+                     cfg.web_token[0] ? " (нужен токен)" : "");
+        else
+            log_warn("веб-интерфейс не поднят: %s", werr);
     }
 
     while (!g_shutdown) {
@@ -357,6 +404,14 @@ int main(int argc, char **argv)
                     log_error("правила не переставлены: %s", eerr);
                 else
                     log_info("конфиг перечитан");
+
+                /* Адрес, порт или токен могли смениться. */
+                http_close(&web);
+                if (cfg.web_enabled) {
+                    char werr[192] = "";
+                    if (webui_open(&web, &cfg, werr, sizeof(werr)) != 0)
+                        log_warn("веб-интерфейс не поднят: %s", werr);
+                }
             } else {
                 log_error("конфиг с ошибками, оставляю прежний");
             }
@@ -375,18 +430,23 @@ int main(int argc, char **argv)
         /* Ждём либо пакет, либо секунду: накопленные адреса надо отдавать
            в ipset регулярно, даже когда в сети тихо. Сигнал прерывает
            ожидание, и мы обработаем его на следующем витке. */
-        int            fd = engine_fd(&engine);
-        struct timeval tv = { 1, 0 };
+        int            fd  = engine_fd(&engine);
+        int            wfd = http_fd(&web);
+        int            max = fd > wfd ? fd : wfd;
+        struct timeval tv  = { 1, 0 };
         fd_set         rd;
 
         FD_ZERO(&rd);
-        if (fd >= 0) FD_SET(fd, &rd);
-        select(fd >= 0 ? fd + 1 : 0, fd >= 0 ? &rd : NULL, NULL, NULL, &tv);
+        if (fd  >= 0) FD_SET(fd,  &rd);
+        if (wfd >= 0) FD_SET(wfd, &rd);
+        select(max >= 0 ? max + 1 : 0, max >= 0 ? &rd : NULL, NULL, NULL, &tv);
 
+        if (wfd >= 0) webui_poll(&web, &engine, &cfg);
         engine_tick(&engine, time(NULL));
     }
 
     log_info("завершение по сигналу, снимаю правила");
+    http_close(&web);
     engine_stop(&engine);
 
     log_info("поймано адресов %lu, пачек в ipset %lu, восстановлений %lu",

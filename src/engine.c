@@ -334,6 +334,14 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
         e->rules_applied = 0;
     }
 
+    /* Ссылки могли смениться вместе со списками, поэтому ядро
+       перезапускаем: иначе трафик пошёл бы через прежний сервер. */
+    if (e->xray_managed) {
+        sv_stop(&e->xray);
+        e->xray_managed = 0;
+    }
+    start_own_xray(e, cfg);
+
     if (!load_lists(e, cfg)) return 0;
     return apply_all(e, err, err_size, 1);
 }

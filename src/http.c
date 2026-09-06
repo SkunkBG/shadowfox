@@ -266,6 +266,14 @@ void http_poll(http_t *h,
         int c = accept(h->fd, NULL, NULL);
         if (c < 0) break;
 
+        /* Снимаем неблокирующий режим явно. В BSD и macOS принятый сокет
+           наследует его от слушающего, и тогда read возвращает «пока
+           нечего» ещё до того, как запрос доедет: соединение закрывалось
+           без ответа. В Linux наследования нет, поэтому на роутере это
+           не проявилось бы вовсе. Ждать даём таймауту ниже. */
+        int cf = fcntl(c, F_GETFL, 0);
+        if (cf != -1) fcntl(c, F_SETFL, cf & ~O_NONBLOCK);
+
         struct timeval tv = { 5, 0 };
         setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));

@@ -37,7 +37,11 @@ CFLAGS_NATIVE  = $(COMMON_CFLAGS) $(NATIVE_EXTRA_CFLAGS)
 LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c
+# Страница вшивается в бинарник: пересобираем её, когда меняется исходник.
+src/webpage.c: web/index.html tools/embed.sh
+	sh tools/embed.sh web/index.html web_page > $@
+
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/webpage.c
 
 BUILD = build
 
@@ -66,12 +70,12 @@ native: CFLAGS = $(CFLAGS_NATIVE)
 native: LDFLAGS = $(LDFLAGS_NATIVE)
 native: $(BUILD)/$(PROJECT)
 
-$(BUILD)/$(PROJECT)-%: $(SRCS) $(wildcard include/*.h) Makefile
+$(BUILD)/$(PROJECT)-%: src/webpage.c $(SRCS) $(wildcard include/*.h) Makefile
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) $(SRCS) -o $@ $(LDFLAGS)
 	@ls -l $@ | awk '{printf "  %-28s %8.1f КБ\n", "$@", $$5/1024}'
 
-$(BUILD)/$(PROJECT): $(SRCS) $(wildcard include/*.h) Makefile
+$(BUILD)/$(PROJECT): src/webpage.c $(SRCS) $(wildcard include/*.h) Makefile
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) $(SRCS) -o $@ $(LDFLAGS)
 
@@ -125,7 +129,7 @@ check:
 		src/rci.c src/util.c src/log.c -lpthread -o $(BUILD)/check_rci
 	./$(BUILD)/check_rci
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_http.c \
-		src/http.c src/util.c src/log.c -o $(BUILD)/check_http
+		src/http.c src/util.c src/log.c -lpthread -o $(BUILD)/check_http
 	./$(BUILD)/check_http
 
 ipk-all: all

@@ -2,8 +2,14 @@
 #include "http.h"
 #include "shadowfox.h"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <time.h>
+#include <unistd.h>
 
 static int failures = 0;
 
@@ -122,6 +128,77 @@ static void test_refuses_all_interfaces(void)
     CHECK(http_fd(&h) == -1, "закрытие");
 }
 
+static void reply(const http_req_t *r, int fd, void *ctx)
+{
+    (void)r; (void)ctx;
+    http_send_text(fd, 200, "text/plain; charset=utf-8", "ответ\n");
+}
+
+static int g_port;
+
+/* Клиент подключается, выжидает и только потом шлёт запрос. */
+static void *late_client(void *arg)
+{
+    (void)arg;
+
+    int c = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port   = htons((unsigned short)g_port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+
+    if (connect(c, (struct sockaddr *)&sa, sizeof(sa)) != 0) { close(c); return NULL; }
+
+    struct timespec ts = { 0, 150 * 1000 * 1000 };
+    nanosleep(&ts, NULL);
+
+    const char *req = "GET /x HTTP/1.1\r\nHost: t\r\n\r\n";
+    if (write(c, req, strlen(req)) < 0) { close(c); return NULL; }
+
+    static char buf[512];
+    ssize_t n = read(c, buf, sizeof(buf) - 1);
+    if (n > 0) buf[n] = '\0'; else buf[0] = '\0';
+    close(c);
+
+    return strstr(buf, "200 OK") ? (void *)1 : NULL;
+}
+
+/* Запрос, пришедший позже соединения, обязан быть обслужен.
+   В BSD принятый сокет наследует неблокирующий режим от слушающего, и
+   без явного снятия сервер закрывал такие соединения, не ответив. */
+static void test_late_request(void)
+{
+    http_t h;
+    char   err[128];
+
+    http_init(&h);
+    CHECK(http_open(&h, "127.0.0.1", 0, err, sizeof(err)) == 0,
+          "сервер поднят: %s", err);
+
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    getsockname(http_fd(&h), (struct sockaddr *)&sa, &sl);
+    g_port = ntohs(sa.sin_port);
+
+    pthread_t th;
+    pthread_create(&th, NULL, late_client, NULL);
+
+    /* Крутим приём, как это делает главный цикл демона. */
+    void *res = NULL;
+    for (int i = 0; i < 40; i++) {
+        http_poll(&h, reply, NULL);
+        struct timespec ts = { 0, 25 * 1000 * 1000 };
+        nanosleep(&ts, NULL);
+    }
+    pthread_join(th, &res);
+
+    CHECK(res != NULL, "запоздавший запрос обслужен");
+    CHECK(h.served >= 1, "соединение засчитано, обслужено %lu", h.served);
+
+    http_close(&h);
+}
+
 int main(void)
 {
     printf("check_http " VERSION "\n");
@@ -132,6 +209,7 @@ int main(void)
     test_token();
     test_garbage();
     test_refuses_all_interfaces();
+    test_late_request();
 
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);

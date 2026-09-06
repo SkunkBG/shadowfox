@@ -26,6 +26,13 @@ typedef struct {
     char        nodes_file[CFG_PATH_MAX];     /* ссылки или подписка */
     char        xray_config[CFG_PATH_MAX];    /* куда писать конфиг */
     char        xray_bin[CFG_PATH_MAX];       /* пусто — искать самим */
+
+    /* Веб-интерфейс. */
+    int         web_enabled;
+    int         web_port;
+    char        web_bind[64];                 /* пусто — адрес интерфейса ЛС */
+    char        web_token[64];                /* пусто — без проверки */
+    char        web_proxy[32];                /* имя в прокси роутера */
 } config_t;
 
 /* Заполняет cfg встроенными значениями по умолчанию. */
