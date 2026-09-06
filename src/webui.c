@@ -187,10 +187,21 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
         unsigned char addr[4];
         long          now = (long)time(NULL);
 
+        /* Страница может сказать, что только что заставила устройство
+           сделать запрос. Тогда молчание — уже улика, и ждать окно не
+           нужно. Без этого признака ждём: сразу после запуска «этого не
+           видели» значит лишь, что мы мало смотрели. Один раз такая
+           поспешность уже дала ложную тревогу. */
+        char probed[8] = "";
+        int  forced    = http_query_get(req, "probed", probed, sizeof(probed)) &&
+                         probed[0] == '1';
+        int  watched   = now - e->cap.watching_since >= DNS_CHECK_WINDOW;
+
         if (inet_pton(AF_INET, req->peer, addr) == 1) {
             if (dcap_seen_client(&e->cap, 4, addr, now, DNS_CHECK_WINDOW))
                 dns = "ok";
-            else if (dcap_client_count(&e->cap, now, DNS_CHECK_WINDOW) > 0)
+            else if ((forced || watched) &&
+                     dcap_client_count(&e->cap, now, DNS_CHECK_WINDOW) > 0)
                 dns = "bypass";
         }
     }

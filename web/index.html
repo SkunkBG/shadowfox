@@ -387,9 +387,9 @@ function draw(){
   $('#view').innerHTML = tab==='rules'?viewRules() : tab==='conn'?viewConn() : viewInfo();
 }
 
-async function load(){
+async function load(probed){
   try{
-    const r=await fetch(api('/data'));
+    const r=await fetch(api('/data' + (probed ? '?probed=1' : '')));
     if(!r.ok) throw new Error('код '+r.status);
     D=await r.json();
     draw();
@@ -515,9 +515,10 @@ function dnsWarn(){
         <li>на самом устройстве работает VPN или прокси.</li>
       </ul>
 
-      <p>Выключи то, что найдёшь, и нажми «Проверить снова». Проверка
-      пассивная: устройству надо сделать хоть один обычный запрос, чтобы
-      демон его увидел — открой любую страницу и вернись сюда.</p>
+      <p>Выключи то, что найдёшь, и нажми «Проверить снова»: страница
+      сама заставит устройство разрешить случайное имя и посмотрит,
+      прошёл ли этот запрос через роутер. Никуда этот запрос не ведёт —
+      такого имени не существует.</p>
     </div>
     <div class="bar" style="margin-top:18px">
       <button class="b" id="dns-recheck">Проверить снова</button>
@@ -526,8 +527,34 @@ function dnsWarn(){
   </div>`;
 
   $('#dns-close').onclick=()=>{ el.hidden=true; el.className=''; el.innerHTML=''; dnsShown=2; };
-  $('#dns-recheck').onclick=async()=>{ el.hidden=true; el.className=''; el.innerHTML='';
-    dnsShown=0; await load(); };
+
+  $('#dns-recheck').onclick=async ev=>{
+    const b=ev.target; b.disabled=true; b.textContent='проверяю…';
+    await probe();
+    el.hidden=true; el.className=''; el.innerHTML='';
+    dnsShown=0; await load(1);
+  };
+}
+
+/* Заставляем устройство спросить имя, чтобы проверка не гадала.
+   Берём случайное имя под доменом из собственных списков: такой запрос
+   ничего не открывает и никуда не ведёт — он вернёт «нет такого», но
+   пройдёт через тот DNS, которым устройство пользуется. Именно это мы и
+   хотим увидеть. Без этого «Проверить снова» просто перечитывала бы
+   старый ответ. */
+async function probe(){
+  const host=(D.domains||'').split('\n').map(s=>s.trim())
+    .find(s=>s && !/^[[#;]/.test(s) && !/=/.test(s) && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s));
+  if(!host) return;
+
+  const name='sf'+Math.random().toString(36).slice(2,10)+'.'+host.replace(/^[*.=]+/,'');
+  try{
+    await Promise.race([
+      fetch('http://'+name+'/', {mode:'no-cors', cache:'no-store'}).catch(()=>{}),
+      new Promise(r=>setTimeout(r,2500))
+    ]);
+  }catch(e){}
+  await new Promise(r=>setTimeout(r,600));
 }
 
 function gate(){

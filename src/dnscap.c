@@ -246,6 +246,7 @@ int dcap_open(dcap_t *c, const char *iface, char *err, unsigned err_size)
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
     c->fd = fd;
+    c->watching_since = (long)time(NULL);
     return 0;
 }
 

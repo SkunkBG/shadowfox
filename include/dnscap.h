@@ -39,6 +39,7 @@ typedef struct {
         long          last;        /* когда пришёл последний ответ */
     } clients[DCAP_CLIENTS_MAX];
     int           client_count;
+    long          watching_since;  /* когда начали смотреть */
 
     unsigned long drop_notip;      /* не IPv4/IPv6, не UDP, не порт 53 */
     unsigned long drop_empty;      /* настоящий ответ, но адресов в нём нет */
