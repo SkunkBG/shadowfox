@@ -69,9 +69,7 @@ int webui_needs_rebind(const http_t *h, const config_t *cfg)
     char addr[64];
     if (webui_addr(cfg, addr, sizeof(addr), NULL, 0) != 0) return 1;
 
-    return strcmp(h->bind_addr, addr) != 0 ||
-           h->port != cfg->web_port ||
-           strcmp(h->token, cfg->web_token) != 0;
+    return strcmp(h->bind_addr, addr) != 0 || h->port != cfg->web_port;
 }
 
 int webui_open(http_t *h, const config_t *cfg, char *err, unsigned err_size)
@@ -82,7 +80,10 @@ int webui_open(http_t *h, const config_t *cfg, char *err, unsigned err_size)
     if (webui_addr(cfg, addr, sizeof(addr), err, err_size) != 0) return -1;
 
     http_init(h);
-    str_copy(h->token, sizeof(h->token), cfg->web_token);
+
+    /* Токен слою HTTP не отдаём: он требовал бы заголовок на каждый
+       запрос, включая саму форму входа, и заданный webToken ломал бы
+       обычный вход по паролю. Разрешает доступ теперь один слой — этот. */
 
     return http_open(h, addr, cfg->web_port, err, err_size);
 }
@@ -189,6 +190,29 @@ static void mask_nodes(const char *in, char *out, size_t size)
     }
 }
 
+/* Строковое поле верхнего уровня из ответа RCI. Разбор нарочно грубый:
+   ответ короткий и свой, а тащить разборщик JSON ради трёх полей в
+   подвале несоразмерно. */
+static int json_field(const char *text, const char *name,
+                      char *out, unsigned out_size)
+{
+    char pat[64];
+    int  n = snprintf(pat, sizeof(pat), "\"%s\":\"", name);
+    if (n < 0 || (size_t)n >= sizeof(pat)) return 0;
+
+    const char *p = strstr(text, pat);
+    if (!p) return 0;
+    p += n;
+
+    unsigned i = 0;
+    while (*p && *p != '"' && i + 1 < out_size) {
+        if (*p == '\\' && p[1]) p++;      /* экранированное — как есть */
+        out[i++] = *p++;
+    }
+    out[i] = '\0';
+    return i > 0;
+}
+
 static void send_data(const http_req_t *req, int fd, struct engine *ce,
                       const config_t *cfg)
 {
@@ -278,25 +302,21 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
                 dns = "bypass";
         }
     }
-    /* Модель и версия прошивки — из роутера, для подвала страницы. */
-    char model[64] = "", osver[32] = "";
+    /* Модель и версия прошивки — из роутера, для подвала страницы.
+       Имена полей у разных прошивок разнятся, поэтому пробуем несколько
+       по очереди: пустой подвал лучше неверного, но лучше всего —
+       заполненный. */
+    char model[96] = "", osver[48] = "";
     {
-        char out[1024] = "";
+        char out[2048] = "";
         if (rci_request(&rci, "GET", "/rci/show/version", NULL, out, sizeof(out)) == 200) {
-            const char *d = strstr(out, "\"device\":\"");
-            if (d) {
-                d += 10;
-                unsigned i = 0;
-                while (d[i] && d[i] != '"' && i + 1 < sizeof(model)) { model[i] = d[i]; i++; }
-                model[i] = '\0';
-            }
-            const char *t = strstr(out, "\"title\":\"");
-            if (t) {
-                t += 9;
-                unsigned i = 0;
-                while (t[i] && t[i] != '"' && i + 1 < sizeof(osver)) { osver[i] = t[i]; i++; }
-                osver[i] = '\0';
-            }
+            static const char *models[]  = { "description", "device", "model", NULL };
+            static const char *versions[] = { "title", "release", "version", NULL };
+
+            for (int i = 0; models[i] && !model[0]; i++)
+                json_field(out, models[i], model, sizeof(model));
+            for (int i = 0; versions[i] && !osver[0]; i++)
+                json_field(out, versions[i], osver, sizeof(osver));
         }
     }
     json_kv_str(&j, "model", model);
@@ -669,8 +689,17 @@ static void handle(const http_req_t *req, int fd, void *ctx)
     /* Заданный токен остаётся запасным входом: если проверка пароля на
        какой-то прошивке не сработает, доступ к интерфейсу не потеряется.
        По умолчанию он пуст, и тогда единственный путь — пароль роутера. */
-    int allowed = session_valid(req) ||
-                  (c->cfg->web_token[0] && !strcmp(c->cfg->web_token, req->token));
+    /* Запасной токен принимаем и заголовком, и в строке запроса: по
+       ссылке им пользоваться проще, а именно ради простоты он и нужен —
+       это путь на случай, если проверка пароля почему-то не работает. */
+    int allowed = session_valid(req);
+
+    if (!allowed && c->cfg->web_token[0]) {
+        char q[64] = "";
+        http_query_get(req, "token", q, sizeof(q));
+        allowed = !strcmp(c->cfg->web_token, req->token) ||
+                  (q[0] && !strcmp(c->cfg->web_token, q));
+    }
 
     if (!strcmp(req->path, "/logout")) {
         session_drop(req);
