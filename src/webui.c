@@ -2,6 +2,7 @@
 
 #include "digest.h"
 #include "ndmauth.h"
+#include "proc.h"
 
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -231,7 +232,6 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_str(&j, "uptime", uptime);
 
     json_kv_int(&j, "xray_pid", e->xray.pid);
-    json_kv_bool(&j, "core_on", !engine_core_off(cfg));
     json_kv_bool(&j, "capture", e->capturing);
     json_kv_str(&j, "iface", cfg->capture_iface);
     json_kv_int(&j, "seen", (long)e->cap.seen);
@@ -376,6 +376,55 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
         return;
     }
 
+    http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
+}
+
+/* Серверы DNS роутера. Берём из его же running-config через ndmc:
+   точного пути в RCI я не знаю, а выдумывать нельзя. Из вывода отбираем
+   только строки про DNS — там же лежит хеш пароля администратора, и
+   отдавать наружу всё подряд недопустимо. */
+static void send_dns(int fd)
+{
+    char bin[] = "/opt/bin/ndmc";
+    char arg[] = "-c";
+    char cmd[] = "show running-config";
+
+    if (access(bin, X_OK) != 0) {
+        char alt[] = "/usr/bin/ndmc";
+        if (access(alt, X_OK) == 0) memcpy(bin, alt, sizeof(alt));
+    }
+
+    static char out[64 * 1024];
+    char *argv[] = { bin, arg, cmd, NULL };
+
+    char buf[16 * 1024];
+    json_t j;
+    json_init(&j, buf, sizeof(buf));
+    json_obj_open(&j);
+
+    int rc = proc_run(argv, out, sizeof(out), 10);
+
+    json_kv_bool(&j, "ok", rc == 0);
+    json_key(&j, "servers");
+    json_arr_open(&j);
+
+    if (rc == 0) {
+        for (char *line = strtok(out, "\n"); line; line = strtok(NULL, "\n")) {
+            char *t = str_trim(line);
+            if (strncmp(t, "ip name-server", 14) == 0 ||
+                strncmp(t, "dns-proxy", 9) == 0 ||
+                strncmp(t, "ip dns-proxy", 12) == 0)
+                json_str(&j, t);
+        }
+    }
+
+    json_arr_close(&j);
+    json_obj_close(&j);
+
+    if (json_done(&j) != 0) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "не поместилось\n");
+        return;
+    }
     http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
 }
 
@@ -730,21 +779,8 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         return;
     }
 
-    if (!strcmp(req->path, "/core") && !strcmp(req->method, "POST")) {
-        char st[8] = "";
-        http_query_get(req, "state", st, sizeof(st));
-        int on = !strcmp(st, "on");
-
-        char cerr[192] = "";
-        if (engine_core_set(c->engine, c->cfg, on, cerr, sizeof(cerr)) != 0) {
-            log_warn("веб: не переключить ядро: %s", cerr);
-            http_send_text(fd, 500, "text/plain; charset=utf-8", cerr);
-        } else {
-            log_info("веб: ядро %s, запрос с %s", on ? "включено" : "выключено",
-                     req->peer);
-            http_send_text(fd, 200, "text/plain; charset=utf-8",
-                           on ? "ядро включено\n" : "ядро выключено\n");
-        }
+    if (!strcmp(req->path, "/dns")) {
+        send_dns(fd);
         return;
     }
 

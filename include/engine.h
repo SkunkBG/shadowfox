@@ -53,18 +53,6 @@ void engine_stop(engine_t *e);
 /* Перечитывает списки и переставляет правила. */
 int  engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size);
 
-/* Включает и выключает своё ядро по просьбе из интерфейса. Выбор
-   запоминается файлом в каталоге настроек: иначе перезапуск демона
-   молча поднял бы то, что выключили руками.
-   Возвращает 0 при успехе. */
-int  engine_core_set(engine_t *e, const config_t *cfg, int on,
-                     char *err, unsigned err_size);
-
-/* Выключено ли ядро волей пользователя. */
-int  engine_core_off(const config_t *cfg);
-
-/* Восстанавливает правила после того, как роутер переписал netfilter.
-   Вызывается по SIGUSR1 из ndm-хуков. */
 int  engine_restore(engine_t *e, char *err, unsigned err_size);
 
 /* Откладывает восстановление на пару секунд. Правка netfilter сама

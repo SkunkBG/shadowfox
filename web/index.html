@@ -58,10 +58,9 @@ aside nav button.on{background:var(--acc-soft);color:var(--acc);font-weight:600}
 .sep{height:1px;background:var(--line);margin:14px 8px}
 .core{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
   border:1px solid var(--bad);color:var(--bad);background:none;border-radius:12px;
-  padding:13px;cursor:pointer;font:inherit;font-size:14.5px;font-weight:600}
+  padding:13px;cursor:pointer;font:inherit;font-size:14.5px;font-weight:600;
+  text-decoration:none}
 .core:hover{background:#ff5f5f14}
-.core.on{border-color:var(--ok);color:var(--ok)}
-.core.on:hover{background:#3ddc8414}
 .core svg{width:19px;height:19px}
 
 /* ---- правая часть ---- */
@@ -299,7 +298,7 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
     <a class="srow" href="https://github.com/SkunkBG/shadowfox"
        target="_blank" rel="noopener" id="gh"></a>
     <div class="sep"></div>
-    <button class="core" id="core"></button>
+    <a class="core" href="/logout" id="exit"></a>
   </aside>
 
   <div class="side2">
@@ -560,6 +559,21 @@ function viewConn(){
            <span class="msg" id="m-nodes"></span></div>`}
   </div>
 
+  <div class="card"><h3>DNS роутера</h3>
+    <p>Маршрутизация по доменам опирается на DNS-ответы, которые роутер
+    отдаёт сети. Если провайдерский резолвер подменяет адреса, в наборы
+    попадёт подделка, и заворачивать будет нечего. Поэтому вышестоящие
+    серверы лучше держать свои.</p>
+    <div id="dnsbox" class="note">${UI.i}читаю настройки роутера…</div>
+    <p style="margin:14px 0 0">Меняются они в панели роутера:
+    <b>Параметры системы → Профили DNS</b>. Там же включается DNS-over-TLS
+    и DNS-over-HTTPS, чтобы запросы самого роутера наружу шли закрыто.</p>
+    <p style="margin:8px 0 0">Снятый флажок <b>«Разрешён транзит запросов»</b>
+    в настройках профиля заворачивает на роутер и тех, кому DNS прописали
+    вручную. На DNS-over-HTTPS внутри браузера он не действует — там запрос
+    идёт по HTTPS, и его не видит никто.</p>
+  </div>
+
   ${fold('pol','Как настроить политику доступа',
     `<p>В панели роутера: <b>Приоритеты подключений → Политики доступа</b>.
      Политика <code>${esc(POL)}</code> должна содержать <b>только</b> подключение
@@ -624,8 +638,7 @@ function viewInfo(){
       <p style="display:flex;align-items:center;gap:9px;margin:0 0 8px">
         <i class="dot ${core?'ok':'bad'}"></i>
         <b style="color:var(--${core?'ok':'bad'})">${core?'Работает':'Не запущено'}</b></p>
-      <p style="margin:0">${D.core_on?'Отдельный процесс Shadow Fox на порту '+D.socks_port
-                                     :'Выключено из интерфейса'}</p>
+      <p style="margin:0">Отдельный процесс Shadow Fox на порту ${D.socks_port}</p>
     </div>
   </div>
 
@@ -689,15 +702,33 @@ function chrome(){
 
   const core=D.xray_pid>0;
   $('#corestate').innerHTML=`<i class="dot ${core?'ok':'bad'}"></i>${
-    core?'Ядро работает':D.core_on?'Ядро не запущено':'Ядро выключено'}`;
-  $('#core').className='core'+(D.core_on?'':' on');
-  $('#core').innerHTML=UI.power+(D.core_on?'Выключить ядро':'Включить ядро');
+    core?'Ядро работает':'Ядро не запущено'}`;
+  $('#exit').innerHTML=UI.power+'Выход';
 }
 
 function draw(){
   chrome();
   $('#view').innerHTML = tab==='rules'?viewRules() : tab==='conn'?viewConn() : viewInfo();
   showBar();
+  if(tab==='conn') loadDns();
+}
+
+/* Настройки DNS спрашиваем отдельно и только когда открыт этот раздел:
+   для них демон запускает ndmc, и делать это каждые десять секунд ради
+   строчки в карточке незачем. */
+async function loadDns(){
+  const box=$('#dnsbox'); if(!box) return;
+  try{
+    const r=await fetch(api('/dns'));
+    const d=await r.json();
+    if(!d.ok || !d.servers.length){
+      box.innerHTML=UI.i+'Не удалось прочитать настройки DNS роутера';
+      return;
+    }
+    box.className='';
+    box.innerHTML='<label style="margin-top:0">Сейчас у роутера</label><pre>'+
+      d.servers.map(esc).join('\n')+'</pre>';
+  }catch(e){ box.innerHTML=UI.i+'Не удалось прочитать настройки DNS роутера'; }
 }
 
 async function load(probed){
@@ -854,17 +885,6 @@ document.addEventListener('click',async ev=>{
            draw(); return; }
 
   if(ev.target.closest('#theme')||ev.target.closest('#theme2')) return flipTheme();
-
-  const coreBtn=ev.target.closest('#core');
-  if(coreBtn){
-    const on=!D.core_on;
-    if(!on && !confirm('Выключить своё ядро? Трафик правил перестанет ходить через сервер.'))
-      return;
-    coreBtn.disabled=true;
-    const r=await fetch(api('/core?state='+(on?'on':'off')),{method:'POST'});
-    coreBtn.disabled=false;
-    if(!r.ok) alert(await r.text());
-    await load(); return; }
 
   const f=ev.target.closest('[data-fold]');
   if(f && ev.target.closest('button') && !ev.target.closest('.body')){
