@@ -37,7 +37,7 @@ CFLAGS_NATIVE  = $(COMMON_CFLAGS) $(NATIVE_EXTRA_CFLAGS)
 LDFLAGS_STATIC = $(COMMON_LDFLAGS) -static -static-libgcc -no-pie
 LDFLAGS_NATIVE =
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/engine.c src/rci.c src/status.c src/http.c
 
 BUILD = build
 
@@ -124,6 +124,9 @@ check:
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_rci.c \
 		src/rci.c src/util.c src/log.c -lpthread -o $(BUILD)/check_rci
 	./$(BUILD)/check_rci
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_http.c \
+		src/http.c src/util.c src/log.c -o $(BUILD)/check_http
+	./$(BUILD)/check_http
 
 ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \
