@@ -151,6 +151,16 @@ ndm_result_t ndm_check_password(const char *host, int port,
         return NDM_UNAVAILABLE;
     }
 
+    if (code != 401) {
+        char d1[160] = "";
+        ndm_header(resp, "X-Detail", d1, sizeof(d1));
+        if (err) {
+            if (d1[0]) snprintf(err, err_size, "роутер: %d, %s", code, d1);
+            else       snprintf(err, err_size, "роутер ответил кодом %d на запрос входа", code);
+        }
+        return NDM_UNAVAILABLE;
+    }
+
     char realm[128] = "", challenge[128] = "";
     if (!ndm_header(resp, "X-NDM-Realm", realm, sizeof(realm)) ||
         !ndm_header(resp, "X-NDM-Challenge", challenge, sizeof(challenge))) {
@@ -191,6 +201,14 @@ ndm_result_t ndm_check_password(const char *host, int port,
         return NDM_DENIED;
     }
 
-    if (err) snprintf(err, err_size, "роутер ответил кодом %d", code);
+    /* Роутер объясняет отказ заголовком X-Detail. Голый код заставляет
+       гадать, а причина всё это время лежит в ответе. */
+    char detail[160] = "";
+    ndm_header(resp, "X-Detail", detail, sizeof(detail));
+
+    if (err) {
+        if (detail[0]) snprintf(err, err_size, "роутер: %d, %s", code, detail);
+        else           snprintf(err, err_size, "роутер ответил кодом %d", code);
+    }
     return NDM_UNAVAILABLE;
 }
