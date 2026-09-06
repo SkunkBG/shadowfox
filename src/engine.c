@@ -36,7 +36,8 @@ int engine_fd(const engine_t *e)
 /* Пойманный ответ: раскладываем адреса по группам. */
 static void on_reply(const dns_reply_t *r, void *ctx)
 {
-    engine_t *e = ctx;
+    engine_t *e       = ctx;
+    int       matched = 0;
 
     for (int i = 0; i < r->answer_count; i++) {
         const dns_answer_t *a = &r->answers[i];
@@ -53,10 +54,18 @@ static void on_reply(const dns_reply_t *r, void *ctx)
 
         ips_queue_add(&e->ips, &e->wl, group, a->family, text);
         e->matched++;
+        matched++;
 
         log_debug("%s -> %s в группу %s", r->question, text,
                   e->wl.groups[group].name);
     }
+
+    /* Имя, не попавшее ни в один список, тоже полезно видеть: когда
+       совпадений нет вовсе, только так и понять, какие домены вообще
+       приходят и на чём именно расходится сопоставление. */
+    if (!matched)
+        log_debug("мимо списков: %s (%d адрес(ов))",
+                  r->question, r->answer_count);
 }
 
 static int load_lists(engine_t *e, const config_t *cfg)
