@@ -1,0 +1,142 @@
+#include "ipsets.h"
+#include "log.h"
+#include "proc.h"
+#include "util.h"
+
+#include <arpa/inet.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+static const char *IPSET_CANDIDATES[] = {
+    "/opt/sbin/ipset",
+    "/usr/sbin/ipset",
+    "/sbin/ipset",
+    NULL
+};
+
+void ips_init(ips_t *s, const char *bin)
+{
+    memset(s, 0, sizeof(*s));
+    s->timeout = 15;
+    if (bin && *bin) str_copy(s->bin, sizeof(s->bin), bin);
+    else             ips_find_bin(s->bin, sizeof(s->bin));
+}
+
+int ips_find_bin(char *dst, unsigned dst_size)
+{
+    if (!dst || !dst_size) return 0;
+    dst[0] = '\0';
+
+    for (int i = 0; IPSET_CANDIDATES[i]; i++) {
+        if (access(IPSET_CANDIDATES[i], X_OK) == 0) {
+            str_copy(dst, dst_size, IPSET_CANDIDATES[i]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+const char *ips_pending(const ips_t *s)
+{
+    return s ? s->batch : "";
+}
+
+static void queue(ips_t *s, const char *fmt, ...)
+{
+    if (!s) return;
+
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(s->batch + s->used, sizeof(s->batch) - s->used, fmt, ap);
+    va_end(ap);
+
+    if (n < 0 || (unsigned)n >= sizeof(s->batch) - s->used) {
+        /* Не влезло — обрезаем до последней целой строки и считаем потерю.
+           Молча оборванная команда была бы хуже: ipset restore отверг бы
+           всю пачку целиком. */
+        s->batch[s->used] = '\0';
+        s->overflows++;
+        return;
+    }
+
+    s->used += (unsigned)n;
+    s->queued++;
+}
+
+void ips_queue_create(ips_t *s, const wl_t *w)
+{
+    if (!s || !w) return;
+
+    for (int i = 0; i < w->group_count; i++) {
+        /* -exist делает создание идемпотентным: после перезапуска демона
+           наборы уже есть, и это нормальная ситуация, а не ошибка. */
+        queue(s, "create %s hash:net family inet -exist\n",  w->groups[i].ipset4);
+        queue(s, "create %s hash:net family inet6 -exist\n", w->groups[i].ipset6);
+    }
+}
+
+void ips_queue_add(ips_t *s, const wl_t *w, int group, int family,
+                   const char *text)
+{
+    if (!s || !w || !text || !*text) return;
+    if (group < 0 || group >= w->group_count) return;
+    if (family != 4 && family != 6) return;
+
+    const char *set = (family == 4) ? w->groups[group].ipset4
+                                    : w->groups[group].ipset6;
+    queue(s, "add %s %s -exist\n", set, text);
+}
+
+void ips_queue_cidrs(ips_t *s, const wl_t *w)
+{
+    if (!s || !w) return;
+
+    for (int i = 0; i < w->cidr_count; i++) {
+        const wl_cidr_t *c = &w->cidrs[i];
+        if (c->group >= w->group_count) continue;
+
+        char text[64];
+        if (!inet_ntop_prefix(c, text, sizeof(text))) continue;
+
+        const char *set = (c->family == 4) ? w->groups[c->group].ipset4
+                                           : w->groups[c->group].ipset6;
+        queue(s, "add %s %s -exist\n", set, text);
+    }
+}
+
+int ips_flush(ips_t *s, char *err, unsigned err_size)
+{
+    if (!s) return -1;
+    if (!s->used) return 0;
+
+    if (!s->bin[0]) {
+        if (err && err_size) str_copy(err, err_size, "не найден ipset");
+        return -1;
+    }
+
+    char bin[IPS_BIN_MAX];
+    str_copy(bin, sizeof(bin), s->bin);
+
+    char  out[1024];
+    char *argv[] = { bin, "restore", "-exist", NULL };
+    int   rc     = proc_run_input(argv, s->batch, out, sizeof(out), s->timeout);
+
+    unsigned sent = s->queued;
+
+    /* Очередь сбрасываем в любом случае: копить команды, которые ipset
+       уже отверг, значит отвергать и все следующие пачки. */
+    s->batch[0] = '\0';
+    s->used     = 0;
+    s->queued   = 0;
+
+    if (rc != 0) {
+        if (err && err_size)
+            snprintf(err, err_size, "ipset restore вернул %d: %s", rc, out);
+        return -1;
+    }
+
+    s->applied += sent;
+    return 0;
+}

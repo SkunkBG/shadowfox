@@ -12,4 +12,10 @@
    либо -1 если запустить не удалось. */
 int proc_run(char *const argv[], char *out, size_t out_size, int timeout_sec);
 
+/* То же, но input подаётся программе на stdin и поток закрывается.
+   Нужно, чтобы кормить `ipset restore` пачкой команд разом вместо
+   запуска отдельного процесса на каждый адрес. */
+int proc_run_input(char *const argv[], const char *input,
+                   char *out, size_t out_size, int timeout_sec);
+
 #endif /* SHADOWFOX_PROC_H */

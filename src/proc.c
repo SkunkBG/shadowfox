@@ -11,16 +11,30 @@
 
 int proc_run(char *const argv[], char *out, size_t out_size, int timeout_sec)
 {
+    return proc_run_input(argv, NULL, out, out_size, timeout_sec);
+}
+
+int proc_run_input(char *const argv[], const char *input,
+                   char *out, size_t out_size, int timeout_sec)
+{
     if (!argv || !argv[0]) return -1;
     if (out && out_size) out[0] = '\0';
 
     int pipefd[2];
     if (pipe(pipefd) != 0) return -1;
 
+    int infd[2] = { -1, -1 };
+    if (input && pipe(infd) != 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return -1;
+    }
+
     pid_t pid = fork();
     if (pid < 0) {
         close(pipefd[0]);
         close(pipefd[1]);
+        if (infd[0] >= 0) { close(infd[0]); close(infd[1]); }
         return -1;
     }
 
@@ -32,10 +46,16 @@ int proc_run(char *const argv[], char *out, size_t out_size, int timeout_sec)
         dup2(pipefd[1], STDERR_FILENO);
         if (pipefd[1] > STDERR_FILENO) close(pipefd[1]);
 
-        int null = open("/dev/null", O_RDONLY);
-        if (null >= 0) {
-            dup2(null, STDIN_FILENO);
-            if (null > STDERR_FILENO) close(null);
+        if (input) {
+            close(infd[1]);
+            dup2(infd[0], STDIN_FILENO);
+            if (infd[0] > STDERR_FILENO) close(infd[0]);
+        } else {
+            int null = open("/dev/null", O_RDONLY);
+            if (null >= 0) {
+                dup2(null, STDIN_FILENO);
+                if (null > STDERR_FILENO) close(null);
+            }
         }
 
         execv(argv[0], argv);
@@ -43,6 +63,22 @@ int proc_run(char *const argv[], char *out, size_t out_size, int timeout_sec)
     }
 
     close(pipefd[1]);
+
+    if (input) {
+        close(infd[0]);
+        /* Пишем всё разом и закрываем: пачка команд для ipset restore
+           заведомо меньше буфера трубы, а закрытие говорит программе,
+           что ввод кончился. SIGPIPE у нас игнорируется, так что
+           умерший потомок даст ошибку записи, а не смерть демона. */
+        size_t len = strlen(input);
+        size_t off = 0;
+        while (off < len) {
+            ssize_t n = write(infd[1], input + off, len - off);
+            if (n <= 0) break;
+            off += (size_t)n;
+        }
+        close(infd[1]);
+    }
 
     /* Читаем неблокирующе, чтобы таймаут работал даже когда потомок
        молчит и не закрывает трубу. */

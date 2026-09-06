@@ -215,6 +215,20 @@ static int load(wl_t *w, const char *path, int cidrs)
 int wl_load_domains(wl_t *w, const char *path) { return load(w, path, 0); }
 int wl_load_cidrs(wl_t *w, const char *path)   { return load(w, path, 1); }
 
+const char *inet_ntop_prefix(const wl_cidr_t *c, char *dst, unsigned size)
+{
+    if (!c || !dst || size < 8) return NULL;
+
+    char addr[INET6_ADDRSTRLEN];
+    int  af = (c->family == 4) ? AF_INET : AF_INET6;
+
+    if (!inet_ntop(af, c->addr, addr, sizeof(addr))) return NULL;
+
+    int n = snprintf(dst, size, "%s/%u", addr, (unsigned)c->prefix);
+    if (n < 0 || (unsigned)n >= size) return NULL;
+    return dst;
+}
+
 int wl_match_domain(const wl_t *w, const char *host)
 {
     if (!w || !host || !*host) return -1;

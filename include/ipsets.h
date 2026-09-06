@@ -1,0 +1,48 @@
+#ifndef SHADOWFOX_IPSETS_H
+#define SHADOWFOX_IPSETS_H
+
+#include "watchlist.h"
+
+/* Работа с наборами ipset.
+
+   Команды не выполняются по одной: они копятся в буфере и уходят одной
+   пачкой через `ipset restore`. Иначе на каждый разрезолвленный адрес
+   пришлось бы порождать процесс, а их в час пик десятки в секунду. */
+
+#define IPS_BATCH_BYTES 16384
+#define IPS_BIN_MAX     128
+
+typedef struct {
+    char     bin[IPS_BIN_MAX];              /* путь к ipset */
+    char     batch[IPS_BATCH_BYTES];
+    unsigned used;
+    int      timeout;                       /* секунд на запуск ipset */
+    unsigned queued;                        /* команд в текущей пачке */
+    unsigned applied;                       /* применено всего */
+    unsigned overflows;                     /* сколько раз буфер переполнялся */
+} ips_t;
+
+void ips_init(ips_t *s, const char *bin);
+
+/* Ищет ipset среди известных путей. Возвращает 1, если нашёлся. */
+int  ips_find_bin(char *dst, unsigned dst_size);
+
+/* Ставит в очередь создание наборов всех групп. Существующие не трогает. */
+void ips_queue_create(ips_t *s, const wl_t *w);
+
+/* Ставит в очередь добавление адреса в набор группы.
+   family — 4 или 6, text — адрес в обычной записи. */
+void ips_queue_add(ips_t *s, const wl_t *w, int group, int family,
+                   const char *text);
+
+/* Ставит в очередь наполнение наборов подсетями из ip.list. */
+void ips_queue_cidrs(ips_t *s, const wl_t *w);
+
+/* Отдаёт накопленное `ipset restore`. Возвращает 0 при успехе.
+   Пустая очередь — успех без запуска процесса. */
+int  ips_flush(ips_t *s, char *err, unsigned err_size);
+
+/* Содержимое текущей очереди — для тестов и отладки. */
+const char *ips_pending(const ips_t *s);
+
+#endif /* SHADOWFOX_IPSETS_H */

@@ -1,7 +1,7 @@
 Package: @PKG@
 Version: @VERSION@
 Architecture: @ARCH@
-Depends: libc
+Depends: libc, ipset
 Installed-Size: @INSTALLED_SIZE@
 Maintainer: @MAINTAINER@
 Section: net

@@ -88,4 +88,8 @@ int wl_match_ip(const wl_t *w, int family, const unsigned char *addr);
 
 const char *wl_domain_text(const wl_t *w, int index);
 
+/* Печатает подсеть в привычном виде "192.0.2.0/24".
+   Возвращает dst либо NULL, если не поместилось. */
+const char *inet_ntop_prefix(const wl_cidr_t *c, char *dst, unsigned size);
+
 #endif /* SHADOWFOX_WATCHLIST_H */
