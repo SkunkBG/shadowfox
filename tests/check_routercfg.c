@@ -5,7 +5,7 @@
    отличаются от строк других секций — единственный признак принадлеж-
    ности это отступ под заголовком. Мой первый вариант искал строки,
    начинающиеся с «dns-proxy», и не показал бы ни одного сервера. */
-#include "dnscfg.h"
+#include "routercfg.h"
 #include "shadowfox.h"
 
 #include <stdio.h>
@@ -48,7 +48,7 @@ static char REAL[] =
 
 int main(void)
 {
-    printf("check_dnscfg " VERSION "\n");
+    printf("check_routercfg " VERSION "\n");
 
     char        text[sizeof(REAL)];
     const char *out[32];
@@ -134,6 +134,60 @@ int main(void)
         char t2[sizeof(tail)];
         memcpy(t2, tail, sizeof(tail));
         CHECK(dns_isp_interfaces(t2, ifs, 8) == 1, "последняя секция учтена");
+    }
+
+    /* Интерфейсы политик. Взято из настоящего конфига: три политики,
+       у каждой свой набор строк permit/no permit. */
+    {
+        static char pol[] =
+            "interface Proxy1\n"
+            "    enable\n"
+            "!\n"
+            "ip policy HydraRoute\n"
+            "    permit global Proxy0\n"
+            "    no permit global ISP\n"
+            "    no permit global Proxy1\n"
+            "!\n"
+            "ip policy xkeen\n"
+            "    description xkeen\n"
+            "    permit global ISP\n"
+            "    no permit global Proxy0\n"
+            "    no permit global Proxy1\n"
+            "!\n"
+            "ip policy ShadowFox\n"
+            "    permit global Proxy1\n"
+            "    no permit global Proxy0\n"
+            "    no permit global ISP\n"
+            "!\n"
+            "ip http ssl enable\n";
+
+        char        buf[sizeof(pol)];
+        const char *g[8];
+
+        memcpy(buf, pol, sizeof(pol));
+        int k = policy_globals(buf, g, 8);
+
+        CHECK(k == 3, "интерфейсов: %d, ждали 3", k);
+        CHECK(k > 0 && !strcmp(g[0], "Proxy0"), "первый: %s", k ? g[0] : "-");
+        CHECK(k > 1 && !strcmp(g[1], "ISP"),    "второй: %s", k > 1 ? g[1] : "-");
+        CHECK(k > 2 && !strcmp(g[2], "Proxy1"), "третий: %s", k > 2 ? g[2] : "-");
+
+        /* Повторов быть не должно: каждый упомянут по нескольку раз. */
+        for (int i = 0; i < k; i++)
+            for (int j = i + 1; j < k; j++)
+                CHECK(strcmp(g[i], g[j]) != 0, "повтор: %s", g[i]);
+
+        /* Строки вне секции политики не считаются. */
+        static char stray[] =
+            "system\n"
+            "    permit global Proxy9\n";
+        char s2[sizeof(stray)];
+        memcpy(s2, stray, sizeof(stray));
+        CHECK(policy_globals(s2, g, 8) == 0, "вне политики не считается");
+
+        /* Описание политики за интерфейс не принимаем. */
+        for (int i = 0; i < k; i++)
+            CHECK(strcmp(g[i], "xkeen") != 0, "описание попало в список");
     }
 
     if (failures) {

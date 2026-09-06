@@ -3,7 +3,7 @@
 #include "digest.h"
 #include "ndmauth.h"
 #include "proc.h"
-#include "dnscfg.h"
+#include "routercfg.h"
 
 #define DNS_LINES_MAX 32
 
@@ -610,6 +610,73 @@ static void apply_dns(const http_req_t *req, int fd)
               report, strlen(report));
 }
 
+/* Политика доступа целиком: создать, разрешить своё подключение и
+   запретить остальные. Форма команд взята из running-config роутера —
+   там политики записаны ровно так. Список интерфейсов тоже берём у
+   него: он зависит от того, что настроено, и выдумывать его нельзя. */
+static void apply_policy(const http_req_t *req, int fd, const config_t *cfg)
+{
+    char bin[192] = "";
+    if (!ndmc_path(bin, sizeof(bin))) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8",
+                       "ndmc не найден, настройки роутера не тронуты\n");
+        return;
+    }
+
+    char arg[] = "-c";
+
+    /* Что вообще есть, между чем выбирать. */
+    static char cfgtext[64 * 1024];
+    char        show[] = "show running-config";
+    char       *sargv[] = { bin, arg, show, NULL };
+
+    const char *globals[DNS_LINES_MAX];
+    int         gn = 0;
+
+    if (proc_run(sargv, cfgtext, sizeof(cfgtext), 10) == 0)
+        gn = policy_globals(cfgtext, globals, DNS_LINES_MAX);
+
+    static char cmds[DNS_LINES_MAX + 4][160];
+    int         n = 0;
+
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip policy %s", cfg->policy);
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip policy %s permit global %s",
+             cfg->policy, cfg->proxy_iface);
+
+    for (int i = 0; i < gn && n < DNS_LINES_MAX + 2; i++) {
+        if (!strcmp(globals[i], cfg->proxy_iface)) continue;
+        snprintf(cmds[n++], sizeof(cmds[0]), "ip policy %s no permit global %s",
+                 cfg->policy, globals[i]);
+    }
+
+    snprintf(cmds[n++], sizeof(cmds[0]), "system configuration save");
+
+    static char report[4 * 1024];
+    int used = 0, failed = 0;
+
+    for (int i = 0; i < n; i++) {
+        char  cmd[160];
+        str_copy(cmd, sizeof(cmd), cmds[i]);
+        char *argv[] = { bin, arg, cmd, NULL };
+        char  out[512] = "";
+
+        int rc = proc_run(argv, out, sizeof(out), 15);
+        if (rc != 0) failed++;
+        log_info("веб: ndmc «%s» -> %d", cmds[i], rc);
+
+        int k = snprintf(report + used, sizeof(report) - (size_t)used,
+                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", cmds[i]);
+        if (k < 0 || (size_t)k >= sizeof(report) - (size_t)used) break;
+        used += k;
+    }
+
+    log_info("веб: политика %s настроена, сбоев %d, запрос с %s",
+             cfg->policy, failed, req->peer);
+
+    http_send(fd, failed ? 500 : 200, "text/plain; charset=utf-8",
+              report, strlen(report));
+}
+
 static void save(const http_req_t *req, int fd, const config_t *cfg)
 {
     char what[32];
@@ -979,18 +1046,7 @@ static void handle(const http_req_t *req, int fd, void *ctx)
     }
 
     if (!strcmp(req->path, "/policy") && !strcmp(req->method, "POST")) {
-        rci_t r;
-        rci_init(&r);
-
-        if (rci_policy_create(&r, c->cfg->policy) != 0) {
-            log_warn("веб: не создать политику %s", c->cfg->policy);
-            http_send_text(fd, 500, "text/plain; charset=utf-8",
-                           "роутер не создал политику\n");
-        } else {
-            log_info("веб: политика %s создана, запрос с %s",
-                     c->cfg->policy, req->peer);
-            http_send_text(fd, 200, "text/plain; charset=utf-8", "создана\n");
-        }
+        apply_policy(req, fd, c->cfg);
         return;
     }
 

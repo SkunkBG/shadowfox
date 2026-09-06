@@ -1,7 +1,11 @@
-#ifndef SHADOWFOX_DNSCFG_H
-#define SHADOWFOX_DNSCFG_H
+#ifndef SHADOWFOX_ROUTERCFG_H
+#define SHADOWFOX_ROUTERCFG_H
 
-/* Разбор running-config роутера в части DNS.
+/* Разбор running-config роутера.
+
+   Он печатает команды, которыми конфигурация воспроизводится, поэтому
+   по нему можно и читать текущее состояние, и узнавать точную форму
+   команд, не изобретая её.
 
    Вышестоящие серверы записаны внутри секции dns-proxy строками вида
    «tls upstream 8.8.8.8 sni dns.google». Сами по себе такие строки ничем
@@ -18,4 +22,9 @@ int dns_upstreams(char *text, const char **out, int max);
    (есть «ip dhcp client») и без «ip no name-servers». text изменяется. */
 int dns_isp_interfaces(char *text, const char **out, int max);
 
-#endif /* SHADOWFOX_DNSCFG_H */
+/* Имена интерфейсов, встречающихся в политиках доступа строками
+   «permit global <имя>». Это и есть список тех, между которыми политика
+   выбирает. Без повторов; text изменяется. */
+int policy_globals(char *text, const char **out, int max);
+
+#endif /* SHADOWFOX_ROUTERCFG_H */

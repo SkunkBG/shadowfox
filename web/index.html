@@ -610,6 +610,18 @@ function viewConn(){
     идёт по HTTPS, и его не видит никто.</p>
   </div>
 
+  ${fold('pol','Подключение и политика доступа',
+    `<p>Цепочка такая: правило указывает на политику, политика разрешает
+     подключение, подключение ведёт на порт нашего ядра. Без любого звена
+     метка ставится, а заворачивать некуда — и молча себя это не проявит.</p>
+     <p>Кнопка «Настроить» на карточке справа делает вторую часть сама:
+     создаёт политику <code>${esc(POL)}</code>, разрешает в ней
+     <code>${esc(P)}</code> и запрещает остальные подключения. Список
+     подключений берётся у роутера, а не выдумывается.</p>
+     <p>Само подключение создаётся в консоли роутера по одной команде —
+     <code>ndmc</code> несколько сразу не принимает:</p>
+     <pre>${esc(cmds)}</pre>`)}
+
   ${fold('dom','Домены, IP и подсети',
     `<p>В группах правил пишется по одной записи в строке. Поддомены попадают
      сами: <code>googlevideo.com</code> ловит и <code>rr1.googlevideo.com</code>.</p>
@@ -625,7 +637,8 @@ function viewConn(){
            D.proxy_ready?P+' создано':P+' не создано')}
     ${stat(UI.shield,'Политика доступа',D.policy_ready,
            D.policy_ready?POL+' готова':POL+' не настроена',
-           D.policy_ready?'':`<button class="b sm" id="mkpolicy">Создать</button>`)}
+           `<button class="b sm ${D.policy_ready?'ghost':''}"
+             id="mkpolicy">Настроить</button>`)}
     <div class="msg" id="m-policy" style="margin:-6px 0 14px 60px"></div>
 
     ${fold('dnscmd','Поставить чистые серверы',
@@ -1037,12 +1050,15 @@ document.addEventListener('click',async ev=>{
 
   if(ev.target.id==='mkpolicy'){
     const btn=ev.target, m=$('#m-policy');
-    btn.disabled=true; m.className='msg'; m.textContent='создаю…';
+    if(!confirm('Настроить политику '+D.policy_name+' в роутере?\n'+
+                'В ней будет разрешено только подключение '+D.proxy_name+
+                ', остальные запрещены.')) return;
+    btn.disabled=true; m.className='msg'; m.textContent='настраиваю…';
     try{
       const r=await fetch(api('/policy'),{method:'POST'});
       const t=(await r.text()).trim();
       m.className=r.ok?'msg ok':'msg bad';
-      m.textContent=r.ok?'создана — теперь добавь в неё подключение Shadow-Fox':t;
+      m.innerHTML=r.ok?'готово':'<pre style="margin-top:8px">'+esc(t)+'</pre>';
       if(r.ok) setTimeout(load,1500);
     }catch(e){ m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }

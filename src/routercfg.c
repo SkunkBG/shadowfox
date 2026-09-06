@@ -1,4 +1,4 @@
-#include "dnscfg.h"
+#include "routercfg.h"
 #include "util.h"
 
 #include <string.h>
@@ -72,6 +72,42 @@ int dns_isp_interfaces(char *text, const char **out, int max)
     }
 
     if (name && wan && !ignored && n < max) out[n++] = name;
+    return n;
+}
+
+/* Интерфейсы, между которыми выбирают политики доступа.
+
+   В running-config они перечислены внутри секций «ip policy» строками
+   «permit global Proxy1» и «no permit global ISP». Список router-
+   специфичный, поэтому берём его у самого роутера, а не выдумываем. */
+int policy_globals(char *text, const char **out, int max)
+{
+    int n = 0, inside = 0;
+
+    for (char *line = strtok(text, "\n"); line; line = strtok(NULL, "\n")) {
+        int   indented = (line[0] == ' ' || line[0] == '\t');
+        char *t = str_trim(line);
+        if (!*t) continue;
+
+        if (!indented) {
+            inside = !strncmp(t, "ip policy ", 10);
+            continue;
+        }
+        if (!inside) continue;
+
+        const char *p = t;
+        if (!strncmp(p, "no ", 3)) p += 3;
+        if (strncmp(p, "permit global ", 14) != 0) continue;
+
+        p += 14;
+        while (*p == ' ') p++;
+        if (!*p) continue;
+
+        int seen = 0;
+        for (int i = 0; i < n; i++) if (!strcmp(out[i], p)) { seen = 1; break; }
+        if (!seen && n < max) out[n++] = p;
+    }
+
     return n;
 }
 
