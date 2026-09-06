@@ -3,172 +3,175 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Shadow Fox</title>
 <style>
-:root{--bg:#12151a;--card:#1a1f27;--line:#2a313d;--fg:#e6e9ee;--dim:#8b95a5;--ok:#3ddc84;--bad:#ff6b6b;--acc:#4aa3ff}
+:root{--bg:#12151a;--card:#1a1f27;--line:#2a313d;--fg:#e6e9ee;--dim:#8b95a5;--ok:#3ddc84;--bad:#ff6b6b;--warn:#ffc861;--acc:#4aa3ff}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-h1{margin:0;font-size:19px;font-weight:650;letter-spacing:.2px}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:12px}
+h1{margin:0;font-size:18px;font-weight:650}
 .ver{color:var(--dim);font-size:12px}
-main{max-width:900px;margin:0 auto;padding:20px}
-section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
-h2{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 20px}
-.kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line)}
-.kv:last-child{border:0}
-.kv span:first-child{color:var(--dim)}
-.on{color:var(--ok)}.off{color:var(--bad)}
-textarea{width:100%;min-height:190px;background:#0e1116;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
-button{background:var(--acc);color:#06121f;border:0;border-radius:7px;padding:9px 17px;font:inherit;font-weight:600;cursor:pointer}
+main{max-width:820px;margin:0 auto;padding:20px 20px 60px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.head{display:flex;align-items:center;gap:11px;padding:14px 16px;cursor:pointer;user-select:none}
+.num{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:#243040;color:var(--dim);flex:0 0 auto}
+.step.done .num{background:var(--ok);color:#06210f}
+.step.todo .num{background:var(--warn);color:#2a1c00}
+.title{font-weight:600;flex:1}
+.state{font-size:12.5px;color:var(--dim)}
+.step.done .state{color:var(--ok)}
+.step.todo .state{color:var(--warn)}
+.body{padding:0 16px 16px;display:none}
+.step.open .body{display:block}
+p.hint{color:var(--dim);font-size:13px;margin:0 0 11px}
+textarea{width:100%;min-height:150px;background:#0e1116;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+pre{background:#0e1116;border:1px solid var(--line);border-radius:8px;padding:11px;overflow-x:auto;font:12.5px/1.6 ui-monospace,Menlo,monospace;margin:0 0 11px;color:#cfd6e0}
+button{background:var(--acc);color:#06121f;border:0;border-radius:7px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}
-button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
-.row{display:flex;gap:10px;align-items:center;margin-top:11px;flex-wrap:wrap}
+.row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .msg{font-size:13px;color:var(--dim)}
 .msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
-.hint{color:var(--dim);font-size:12.5px;margin:0 0 10px}
 code{background:#0e1116;padding:1px 5px;border-radius:4px;font-size:12.5px}
-table{width:100%;border-collapse:collapse}
-td{padding:6px 0;border-bottom:1px solid var(--line)}
-td:last-child{text-align:right;color:var(--dim)}
-tr:last-child td{border:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:2px 18px;padding:14px 16px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.kv span:first-child{color:var(--dim)}
 </style>
 
-<header>
-  <h1>Shadow&nbsp;Fox</h1>
-  <span class="ver" id="ver"></span>
-</header>
-
-<main>
-  <section>
-    <h2>Состояние</h2>
-    <div class="grid" id="state"></div>
-  </section>
-
-  <section>
-    <h2>Группы</h2>
-    <table id="groups"></table>
-  </section>
-
-  <section>
-    <h2>Домены</h2>
-    <p class="hint">
-      Группа задаётся строкой <code>[имя]</code>, следом <code>interface = ...</code> —
-      политика Keenetic либо сетевой интерфейс. Дальше домены: обычная запись
-      охватывает и поддомены, <code>*.имя</code> только поддомены,
-      <code>=имя</code> точное совпадение.
-    </p>
-    <textarea id="domains" spellcheck="false"></textarea>
-    <div class="row">
-      <button data-save="domains">Сохранить и применить</button>
-      <span class="msg" id="m-domains"></span>
-    </div>
-  </section>
-
-  <section>
-    <h2>Серверы</h2>
-    <p class="hint">
-      Ссылки <code>vless://</code> по одной в строке либо подписка целиком.
-      При нескольких серверах выбирается самый быстрый. Конфиг проверяется
-      ядром до применения: негодный не заменит рабочий.
-    </p>
-    <textarea id="nodes" spellcheck="false"></textarea>
-    <div class="row">
-      <button data-save="nodes">Сохранить и применить</button>
-      <span class="msg" id="m-nodes"></span>
-    </div>
-  </section>
-
-  <section>
-    <h2>Подсети</h2>
-    <p class="hint">
-      Для сервисов с зашитыми адресами, которые не спрашивают DNS, —
-      там перехват ответов бессилен.
-    </p>
-    <textarea id="cidrs" spellcheck="false" style="min-height:120px"></textarea>
-    <div class="row">
-      <button data-save="cidrs">Сохранить и применить</button>
-      <span class="msg" id="m-cidrs"></span>
-    </div>
-  </section>
-</main>
+<header><h1>Shadow&nbsp;Fox</h1><span class="ver" id="ver"></span></header>
+<main id="app">загружаю…</main>
 
 <script>
-const $ = s => document.querySelector(s);
-const tok = new URLSearchParams(location.search).get('token');
-const url = p => tok ? p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(tok) : p;
+const $=s=>document.querySelector(s);
+const tok=new URLSearchParams(location.search).get('token');
+const url=p=>tok?p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(tok):p;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let opened=null;
 
-function yesno(v, yes, no) {
-  return '<span class="' + (v ? 'on' : 'off') + '">' + (v ? yes : no) + '</span>';
+function step(n,done,title,state,body){
+  const cls=done?'done':'todo';
+  const open=(opened===null?!done:opened===n)?' open':'';
+  return `<div class="step ${cls}${open}" data-n="${n}">
+    <div class="head"><div class="num">${done?'✓':n}</div>
+    <div class="title">${title}</div><div class="state">${state}</div></div>
+    <div class="body">${body}</div></div>`;
 }
 
-function render(d) {
-  $('#ver').textContent = d.version;
-
-  $('#state').innerHTML = [
-    ['Демон',    'работает, ' + d.uptime],
-    ['Своё ядро', d.xray_pid > 0 ? yesno(1, 'работает') : yesno(0, 'не запущено')],
-    ['Перехват',  d.capture ? 'на ' + d.iface : yesno(0, 'выключен')],
-    ['Пакетов',   d.seen],
-    ['Ответов',   d.parsed],
-    ['Адресов',   d.matched],
-    ['Правила',   d.rules ? yesno(1, 'установлены') : yesno(0, 'нет')],
-    ['Помечено',  d.marked + ' соединений']
-  ].map(([k, v]) => '<div class="kv"><span>' + k + '</span><span>' + v + '</span></div>').join('');
-
-  $('#groups').innerHTML = d.groups.length
-    ? d.groups.map(g =>
-        '<tr><td>' + esc(g.name) + ' &rarr; ' + esc(g.target) +
-        '</td><td>' + g.kind + ', адресов ' + g.addrs + '</td></tr>').join('')
-    : '<tr><td>групп нет</td><td></td></tr>';
-
-  $('#domains').value = d.domains;
-  $('#nodes').value   = d.nodes;
-  $('#cidrs').value   = d.cidrs;
+function editor(id,val,label){
+  return `<textarea id="${id}" spellcheck="false">${esc(val)}</textarea>
+  <div class="row"><button data-save="${id}">${label}</button>
+  <span class="msg" id="m-${id}"></span></div>`;
 }
 
-function esc(s) {
-  return String(s).replace(/[&<>"]/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function render(d){
+  $('#ver').textContent=d.version;
+  const P=d.proxy_name, POL=d.policy_name, port=d.socks_port;
+
+  const cmds=[
+    `ndmc -c "interface ${P}"`,
+    `ndmc -c "interface ${P} description Shadow-Fox"`,
+    `ndmc -c "interface ${P} security-level public"`,
+    `ndmc -c "interface ${P} ip global 1"`,
+    `ndmc -c "interface ${P} proxy protocol socks5"`,
+    `ndmc -c "interface ${P} proxy upstream ${location.hostname} ${port}"`,
+    `ndmc -c "interface ${P} proxy socks5-udp"`,
+    `ndmc -c "interface ${P} up"`,
+    `ndmc -c "system configuration save"`
+  ].join('\n');
+
+  $('#app').innerHTML=
+    step(1,!!d.xray_bin,'Ядро Xray',
+      d.xray_bin?esc(d.xray_bin):'не найдено',
+      d.xray_bin
+        ? `<p class="hint">Ядро уже установлено, ставить ничего не нужно.
+           Shadow Fox запускает свой отдельный процесс на порту ${port},
+           чужой не трогает.</p>`
+        : `<p class="hint">Ядра нет. Установи его в консоли роутера:</p>
+           <pre>opkg install xray</pre>`)
+
+  + step(2,d.have_link,'Сервер',
+      d.have_link?'ссылка задана':'ссылки нет',
+      `<p class="hint">Вставь ссылку <code>vless://</code> из панели. Несколько
+       ссылок по одной в строке — выберется самый быстрый сервер. Подписка
+       целиком тоже принимается. Конфиг проверяется ядром перед применением:
+       негодный не заменит рабочий.</p>`
+      + editor('nodes',d.nodes,'Сохранить и запустить'))
+
+  + step(3,d.proxy_ready,'Подключение в роутере',
+      d.proxy_ready?`${esc(P)} создано`:`${esc(P)} не создано`,
+      `<p class="hint">Роутеру нужно подключение, через которое пойдёт трафик.
+       Выполни эти команды в консоли роутера — они меняют его настройки,
+       поэтому делаются вручную:</p><pre>${esc(cmds)}</pre>`)
+
+  + step(4,d.policy_ready,'Политика доступа',
+      d.policy_ready?`${esc(POL)} готова`:`${esc(POL)} не настроена`,
+      `<p class="hint">В панели роутера: <b>Приоритеты подключений →
+       Политики доступа</b>. Создай политику <code>${esc(POL)}</code> и
+       включи в неё <b>только</b> подключение Shadow-Fox.<br>
+       Без этого шага политика получит метку, но заворачивать трафик будет
+       некуда, и молча себя это не проявит.</p>`)
+
+  + step(5,d.groups.length>0,'Домены',
+      d.groups.length?`групп ${d.groups.length}`:'список пуст',
+      `<p class="hint">Строка <code>[имя]</code> открывает группу, следом
+       <code>interface = ${esc(POL)}</code>. Дальше домены, по одному в
+       строке: обычная запись охватывает и поддомены,
+       <code>*.имя</code> только поддомены, <code>=имя</code> точное
+       совпадение.</p>`
+      + editor('domains',d.domains,'Сохранить и применить'))
+
+  + step(6,true,'Подсети','необязательно',
+      `<p class="hint">Для сервисов с зашитыми адресами, которые не спрашивают
+       DNS: там перехват ответов бессилен.</p>`
+      + editor('cidrs',d.cidrs,'Сохранить и применить'))
+
+  + `<div class="step"><div class="stats">
+      ${kv('Демон','работает, '+d.uptime)}
+      ${kv('Своё ядро',d.xray_pid>0?'работает':'не запущено')}
+      ${kv('Перехват',d.capture?'на '+esc(d.iface):'выключен')}
+      ${kv('Пакетов',d.seen)}
+      ${kv('Ответов',d.parsed)}
+      ${kv('Адресов',d.matched)}
+      ${kv('Правила',d.rules?'установлены':'нет')}
+      ${kv('Помечено',d.marked+' соединений')}
+     </div></div>`;
 }
 
-async function load() {
-  try {
-    const r = await fetch(url('/data'));
-    if (!r.ok) throw new Error('код ' + r.status);
+const kv=(k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+
+async function load(){
+  try{
+    const r=await fetch(url('/data'));
+    if(!r.ok) throw new Error('код '+r.status);
     render(await r.json());
-  } catch (e) {
-    document.body.insertAdjacentHTML('afterbegin',
-      '<p style="padding:12px 20px;color:#ff6b6b">Не удалось получить данные: ' +
-      esc(e.message) + '</p>');
+  }catch(e){
+    $('#app').innerHTML='<p style="color:#ff6b6b">Не удалось получить данные: '
+      +esc(e.message)+'</p>';
   }
 }
 
-document.addEventListener('click', async ev => {
-  const b = ev.target.closest('[data-save]');
-  if (!b) return;
-
-  const what = b.dataset.save;
-  const msg  = $('#m-' + what);
-
-  b.disabled = true;
-  msg.className = 'msg';
-  msg.textContent = 'сохраняю…';
-
-  try {
-    const r = await fetch(url('/save?what=' + what), {
-      method: 'POST',
-      body: $('#' + what).value
-    });
-    const t = (await r.text()).trim();
-    msg.className = r.ok ? 'msg ok' : 'msg bad';
-    msg.textContent = t || (r.ok ? 'готово' : 'ошибка');
-    if (r.ok) setTimeout(load, 1200);
-  } catch (e) {
-    msg.className = 'msg bad';
-    msg.textContent = e.message;
+document.addEventListener('click',async ev=>{
+  const h=ev.target.closest('.head');
+  if(h){
+    const s=h.parentElement;
+    opened=s.classList.contains('open')?-1:+s.dataset.n;
+    document.querySelectorAll('.step').forEach(x=>x.classList.remove('open'));
+    if(opened>0) s.classList.add('open');
+    return;
   }
-  b.disabled = false;
+
+  const b=ev.target.closest('[data-save]');
+  if(!b) return;
+
+  const what=b.dataset.save, msg=$('#m-'+what);
+  b.disabled=true; msg.className='msg'; msg.textContent='сохраняю…';
+  try{
+    const r=await fetch(url('/save?what='+what),{method:'POST',body:$('#'+what).value});
+    const t=(await r.text()).trim();
+    msg.className=r.ok?'msg ok':'msg bad';
+    msg.textContent=t||(r.ok?'готово':'ошибка');
+    if(r.ok) setTimeout(load,1500);
+  }catch(e){ msg.className='msg bad'; msg.textContent=e.message; }
+  b.disabled=false;
 });
 
 load();
-setInterval(load, 10000);
+setInterval(()=>{ if(!document.querySelector('textarea:focus')) load(); },10000);
 </script>

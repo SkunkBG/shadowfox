@@ -1,8 +1,10 @@
 #include "webui.h"
+#include "apply.h"
 #include "engine.h"
 #include "ipsets.h"
 #include "jsonw.h"
 #include "log.h"
+#include "rci.h"
 #include "util.h"
 #include "watchlist.h"
 
@@ -16,6 +18,8 @@
 
 extern const unsigned char web_page[];
 extern const size_t        web_page_len;
+
+static long slurp(const char *path, char *dst, size_t size);
 
 typedef struct {
     struct engine  *engine;
@@ -99,6 +103,39 @@ static void send_data(int fd, struct engine *ce, const config_t *cfg)
     json_kv_int(&j, "matched", (long)e->matched);
     json_kv_bool(&j, "rules", e->rules_applied);
     json_kv_int(&j, "marked", (long)e->marked_conns);
+
+    /* Что уже сделано, а что нет: без этого со страницы непонятно,
+       какой шаг настройки следующий. */
+    char xbin[APPLY_PATH_MAX] = "";
+    if (cfg->xray_bin[0]) str_copy(xbin, sizeof(xbin), cfg->xray_bin);
+    else                  apply_find_xray(xbin, sizeof(xbin));
+    json_kv_str(&j, "xray_bin", xbin);
+
+    json_kv_str(&j, "policy_name", cfg->policy);
+    json_kv_str(&j, "proxy_name", cfg->proxy_iface);
+    json_kv_int(&j, "socks_port", cfg->socks_port);
+
+    /* Есть ли политика и подключение на роутере. */
+    rci_t rci;
+    rci_init(&rci);
+
+    unsigned mark = 0;
+    json_kv_bool(&j, "policy_ready",
+                 rci_policy_mark(&rci, cfg->policy, &mark) == 0 && mark != 0);
+
+    char ipath[128], iout[256];
+    snprintf(ipath, sizeof(ipath), "/rci/show/interface/%s", cfg->proxy_iface);
+    int icode = rci_request(&rci, "GET", ipath, NULL, iout, sizeof(iout));
+    json_kv_bool(&j, "proxy_ready", icode == 200 && !strstr(iout, "\"code\""));
+
+    /* Есть ли хоть одна ссылка на сервер. */
+    int have_link = 0;
+    {
+        static char nodes[8192];
+        if (slurp(cfg->nodes_file, nodes, sizeof(nodes)) > 0)
+            have_link = strstr(nodes, "://") != NULL;
+    }
+    json_kv_bool(&j, "have_link", have_link);
 
     json_key(&j, "groups");
     json_arr_open(&j);
