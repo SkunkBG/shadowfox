@@ -21,7 +21,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make check
+      - name: Юнит-тесты и сборка целиком
+        shell: bash
+        run: |
+          set -o pipefail
+          make check 2>&1 | tee /tmp/check.log
+
+      # Логи шагов через API без прав администратора не читаются: они
+      # отдают 403. Поэтому хвост уходит двумя путями — в сводку запуска,
+      # где его видно человеку, и аннотацией, которая доступна по API без
+      # всяких прав. Иначе разбор падения превращается в пересылку
+      # снимков экрана туда-обратно.
+      - name: Показать, на чём упало
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo '### Хвост проверок'
+            echo '```'
+            tail -60 /tmp/check.log 2>/dev/null || echo 'лог не создан'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          msg=$(tail -40 /tmp/check.log 2>/dev/null |
+                python3 -c "import sys; print(sys.stdin.read()
+                    .replace('%','%25').replace('\r','%0D').replace('\n','%0A'))")
+          echo "::error title=Хвост проверок::$msg"
 
   build:
     name: Сборка под Keenetic
