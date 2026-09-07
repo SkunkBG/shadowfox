@@ -5,6 +5,7 @@
 
 #include <arpa/inet.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -222,4 +223,63 @@ int ips_flush(ips_t *s, char *err, unsigned err_size)
 
     s->applied += sent;
     return 0;
+}
+
+/* Разбор `ipset list -t`: у каждого набора идёт строка Name, следом
+   Header с параметрами. Нас интересует только timeout — остальное у
+   набора менять не приходится. */
+int ips_headers_differ(const char *text, const wl_t *w, int timeout)
+{
+    if (!text || !w) return 1;
+
+    char name[WL_SETNAME_MAX] = "";
+
+    const char *line = text;
+    for (;;) {
+        const char *nl  = strchr(line, '\n');
+        size_t      len = nl ? (size_t)(nl - line) : strlen(line);
+
+        if (len > 6 && !strncmp(line, "Name: ", 6)) {
+            size_t n = len - 6;
+            if (n >= sizeof(name)) n = sizeof(name) - 1;
+            memcpy(name, line + 6, n);
+            name[n] = '\0';
+        } else if (len > 8 && !strncmp(line, "Header: ", 8) && name[0]) {
+            /* Наш ли это набор. Чужие в глаза не смотрим. */
+            int ours = 0;
+            for (int i = 0; i < w->group_count && !ours; i++) {
+                if (!strcmp(name, w->groups[i].ipset4)) ours = 1;
+                if (!strcmp(name, w->groups[i].ipset6)) ours = 1;
+            }
+
+            if (ours) {
+                int have = 0;
+                const char *t = memmem(line, len, "timeout ", 8);
+                if (t) have = atoi(t + 8);
+                if (have != timeout) return 1;
+            }
+            name[0] = '\0';
+        }
+
+        if (!nl) break;
+        line = nl + 1;
+    }
+
+    return 0;
+}
+
+int ips_timeout_differs(ips_t *s, const wl_t *w, int timeout)
+{
+    if (!s || !w || !s->bin[0]) return 1;
+
+    char binbuf[IPS_BIN_MAX];
+    str_copy(binbuf, sizeof(binbuf), s->bin);
+
+    char list[] = "list", terse[] = "-t";
+    char *argv[] = { binbuf, list, terse, NULL };
+
+    static char out[32768];
+    if (proc_run(argv, out, sizeof(out), 10) != 0) return 1;
+
+    return ips_headers_differ(out, w, timeout);
 }

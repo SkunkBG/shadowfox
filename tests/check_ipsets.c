@@ -209,6 +209,50 @@ static void test_overflow_keeps_whole_lines(void)
     CHECK(len == 0 || q[len - 1] == '\n', "очередь кончается целой строкой");
 }
 
+/* Разбор `ipset list -t`. Ошибка здесь тихая и дорогая с обеих сторон:
+   решим «совпадает», когда нет, — получим набор, который не принимает
+   записи; решим «не совпадает», когда совпадает, — сотрём все
+   накопленные адреса при каждом сохранении списка. */
+static void test_headers(void)
+{
+    wl_t w;
+    load_lists(&w);
+
+    const char *ours4 = w.groups[0].ipset4;
+
+    char text[2048];
+
+    /* Время жизни совпадает — пересоздавать незачем. */
+    snprintf(text, sizeof(text),
+             "Name: %s\n"
+             "Type: hash:net\n"
+             "Header: family inet hashsize 1024 maxelem 65536 timeout 86400\n"
+             "Number of entries: 78\n",
+             ours4);
+    CHECK(ips_headers_differ(text, &w, 86400) == 0, "совпадающее время жизни");
+
+    /* Другое время жизни — надо пересоздать. */
+    CHECK(ips_headers_differ(text, &w, 3600) == 1, "другое время жизни");
+
+    /* Набор без времени жизни, а мы хотим с ним. */
+    snprintf(text, sizeof(text),
+             "Name: %s\n"
+             "Header: family inet hashsize 1024 maxelem 65536\n",
+             ours4);
+    CHECK(ips_headers_differ(text, &w, 86400) == 1, "набор без времени жизни");
+    CHECK(ips_headers_differ(text, &w, 0) == 0, "и это не расхождение, если 0");
+
+    /* Чужие наборы не наше дело: у соседа по роутеру свои параметры. */
+    CHECK(ips_headers_differ(
+              "Name: чужой_набор\n"
+              "Header: family inet hashsize 1024 timeout 60\n",
+              &w, 86400) == 0, "чужой набор не учитывается");
+
+    /* Пусто — значит наших наборов ещё нет, создадутся с нуля. */
+    CHECK(ips_headers_differ("", &w, 86400) == 0, "пустой вывод");
+    CHECK(ips_headers_differ(NULL, &w, 86400) == 1, "NULL — пересоздать");
+}
+
 int main(void)
 {
     printf("check_ipsets " VERSION "\n");
@@ -223,6 +267,7 @@ int main(void)
     test_flush_feeds_stdin();
     test_flush_reports_failure();
     test_overflow_keeps_whole_lines();
+    test_headers();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);
