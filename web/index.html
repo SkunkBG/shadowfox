@@ -685,9 +685,12 @@ function viewConn(){
            D.xray_bin?'<span></span>':`<button class="b sm" id="getxray">Установить</button>`)}
     <div class="msg" id="m-xray" style="margin:-6px 0 14px 60px"></div>
     ${D.xray_bin?'':`<div class="note" style="margin:-8px 0 14px 60px">${UI.i}
-      Своя сборка, только VLESS-клиент, около 8 МБ</div>`}
+      Своя сборка Xray, около 10 МБ</div>`}
     ${stat(UI.router,'Подключение роутера',D.proxy_ready,
-           D.proxy_ready?P+' создано':P+' не создано')}
+           D.proxy_ready?P+' создано':P+' не создано',
+           `<button class="b sm ${D.proxy_ready?'ghost':''}"
+             id="mkproxy">Создать</button>`)}
+    <div class="msg" id="m-proxy" style="margin:-6px 0 14px 60px"></div>
     ${stat(UI.shield,'Политика доступа',D.policy_ready,
            D.policy_ready?POL+' готова':POL+' не настроена',
            `<button class="b sm ${D.policy_ready?'ghost':''}"
@@ -728,9 +731,9 @@ function viewConn(){
     <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
 
     <h4>Ядро Xray</h4>
-    <p>В фидах Entware ядра нет, поэтому мы собираем своё: только
-    VLESS-клиент, около 8 мегабайт после сжатия. Оно лежит в нашем же
-    фиде и ставится кнопкой на карточке ядра.</p>
+    <p>В фидах Entware ядра нет, поэтому мы собираем своё — апстрим без
+    изменений, около 10 мегабайт. Оно лежит в нашем же фиде и ставится
+    кнопкой на карточке ядра.</p>
     <p>Ставится оно в <code>/opt/sbin/shadowfox-xray</code> и не конфликтует
     со штатным пакетом, если тот когда-нибудь появится: обе сборки могут
     стоять рядом.</p>
@@ -745,8 +748,10 @@ function viewConn(){
     часть сама: создаёт политику <code>${esc(POL)}</code>, разрешает в ней
     <code>${esc(P)}</code> и запрещает остальные подключения. Список
     подключений берётся у роутера, а не выдумывается.</p>
-    <p>Само подключение создаётся в консоли роутера по одной команде —
-    <code>ndmc</code> несколько сразу не принимает:</p>
+    <p>Кнопка <b>«Создать»</b> на карточке подключения делает первую часть:
+    заводит <code>${esc(P)}</code> как прокси SOCKS5 на порт ядра. Те же
+    команды можно выполнить руками — <code>ndmc</code> принимает их по
+    одной:</p>
     <pre>${esc(cmds)}</pre>
   </div>
 `;
@@ -1244,6 +1249,20 @@ document.addEventListener('click',async ev=>{
       }
       m.className='msg bad';
       m.textContent='ядро не появилось — смотри /opt/var/log/shadowfox-xray-install.log';
+    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    btn.disabled=false; return; }
+
+  if(ev.target.id==='mkproxy'){
+    const btn=ev.target, m=$('#m-proxy');
+    if(!confirm('Создать подключение '+D.proxy_name+' в роутере?\n'+
+                'Это прокси SOCKS5 на порт '+D.socks_port+', где слушает ядро.')) return;
+    btn.disabled=true; m.className='msg'; m.textContent='создаю…';
+    try{
+      const r=await fetch(api('/proxy'),{method:'POST'});
+      const t=(await r.text()).trim();
+      m.className=r.ok?'msg ok':'msg bad';
+      m.innerHTML=r.ok?'готово':'<pre style="margin-top:8px">'+esc(t)+'</pre>';
+      if(r.ok) setTimeout(load,1500);
     }catch(e){ m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 

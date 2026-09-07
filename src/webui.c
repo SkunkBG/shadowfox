@@ -519,6 +519,40 @@ static int chosen(const char *list, const char *key)
     return 0;
 }
 
+/* Прогон списка команд через ndmc. Три места делают одно и то же:
+   выполнить по очереди, записать каждую в журнал и вернуть отчёт
+   строками «ok» и «СБОЙ» — по нему на странице видно, какая именно
+   команда не прошла, а не просто «не получилось». */
+static void ndmc_run_plan(char *bin, const char **plan, int n,
+                          const char *what, const char *peer, int fd)
+{
+    static char report[8 * 1024];
+    int used = 0, failed = 0;
+
+    for (int i = 0; i < n; i++) {
+        char arg[] = "-c";
+        char cmd[192];
+        str_copy(cmd, sizeof(cmd), plan[i]);
+
+        char *argv[] = { bin, arg, cmd, NULL };
+        char  out[512] = "";
+        int   rc = proc_run(argv, out, sizeof(out), 15);
+
+        if (rc != 0) failed++;
+        log_info("веб: ndmc «%s» -> %d", plan[i], rc);
+
+        int k = snprintf(report + used, sizeof(report) - (size_t)used,
+                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", plan[i]);
+        if (k < 0 || (size_t)k >= sizeof(report) - (size_t)used) break;
+        used += k;
+    }
+
+    log_info("веб: %s, сбоев %d, запрос с %s", what, failed, peer);
+
+    http_send(fd, failed ? 500 : 200, "text/plain; charset=utf-8",
+              report, strlen(report));
+}
+
 static void apply_dns(const http_req_t *req, int fd)
 {
     char bin[192] = "";
@@ -587,32 +621,60 @@ static void apply_dns(const http_req_t *req, int fd)
     plan[count++] = "service dns-proxy";
     plan[count++] = "system configuration save";
 
-    static char report[8 * 1024];
-    int  used = 0, failed = 0;
+    ndmc_run_plan(bin, plan, count, "серверы DNS установлены", req->peer, fd);
+}
 
-    for (int i = 0; i < count; i++) {
-        char arg[] = "-c";
-        char cmd[128];
-        str_copy(cmd, sizeof(cmd), plan[i]);
+/* Своё подключение на роутере: прокси-клиент SOCKS5, смотрящий в наше
+   ядро. Форма команд взята из running-config рабочей настройки — там
+   подключение записано ровно так.
 
-        char *argv[] = { bin, arg, cmd, NULL };
-        char  out[512] = "";
-        int   rc = proc_run(argv, out, sizeof(out), 15);
-
-        if (rc != 0) failed++;
-        log_info("веб: ndmc «%s» -> %d", plan[i], rc);
-
-        int n = snprintf(report + used, sizeof(report) - (size_t)used,
-                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", plan[i]);
-        if (n < 0 || (size_t)n >= sizeof(report) - (size_t)used) break;
-        used += n;
+   Адрес берём с интерфейса локальной сети, а не подставляем 127.0.0.1:
+   прокси-клиент Keenetic ходит на LAN-адрес роутера, на петлю он не
+   пойдёт. Порт — тот же, что слушает ядро. */
+static void apply_proxy(const http_req_t *req, int fd, const config_t *cfg)
+{
+    char bin[192] = "";
+    if (!ndmc_path(bin, sizeof(bin))) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8",
+                       "ndmc не найден, настройки роутера не тронуты\n");
+        return;
     }
 
-    log_info("веб: серверы DNS установлены, сбоев %d, запрос с %s",
-             failed, req->peer);
+    char lan[64] = "";
+    if (!iface_ipv4(cfg->capture_iface, lan, sizeof(lan))) {
+        char msg[192];
+        snprintf(msg, sizeof(msg),
+                 "не узнать адрес роутера на %s — подключение не создано\n",
+                 cfg->capture_iface);
+        http_send_text(fd, 500, "text/plain; charset=utf-8", msg);
+        return;
+    }
 
-    http_send(fd, failed ? 500 : 200, "text/plain; charset=utf-8",
-              report, strlen(report));
+    static char cmds[9][160];
+    const char *plan[9];
+    int n = 0;
+
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s", cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s description Shadow-Fox",
+             cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s security-level public",
+             cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s ip global 1",
+             cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s proxy protocol socks5",
+             cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s proxy upstream %s %d",
+             cfg->proxy_iface, lan, cfg->socks_port);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s proxy socks5-udp",
+             cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "interface %s up", cfg->proxy_iface);
+    snprintf(cmds[n++], sizeof(cmds[0]), "system configuration save");
+
+    for (int i = 0; i < n; i++) plan[i] = cmds[i];
+
+    char what[96];
+    snprintf(what, sizeof(what), "подключение %s создано", cfg->proxy_iface);
+    ndmc_run_plan(bin, plan, n, what, req->peer, fd);
 }
 
 /* Политика доступа целиком: создать, разрешить своё подключение и
@@ -656,30 +718,12 @@ static void apply_policy(const http_req_t *req, int fd, const config_t *cfg)
 
     snprintf(cmds[n++], sizeof(cmds[0]), "system configuration save");
 
-    static char report[4 * 1024];
-    int used = 0, failed = 0;
+    const char *plan[DNS_LINES_MAX + 4];
+    for (int i = 0; i < n; i++) plan[i] = cmds[i];
 
-    for (int i = 0; i < n; i++) {
-        char  cmd[160];
-        str_copy(cmd, sizeof(cmd), cmds[i]);
-        char *argv[] = { bin, arg, cmd, NULL };
-        char  out[512] = "";
-
-        int rc = proc_run(argv, out, sizeof(out), 15);
-        if (rc != 0) failed++;
-        log_info("веб: ndmc «%s» -> %d", cmds[i], rc);
-
-        int k = snprintf(report + used, sizeof(report) - (size_t)used,
-                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", cmds[i]);
-        if (k < 0 || (size_t)k >= sizeof(report) - (size_t)used) break;
-        used += k;
-    }
-
-    log_info("веб: политика %s настроена, сбоев %d, запрос с %s",
-             cfg->policy, failed, req->peer);
-
-    http_send(fd, failed ? 500 : 200, "text/plain; charset=utf-8",
-              report, strlen(report));
+    char what[96];
+    snprintf(what, sizeof(what), "политика %s настроена", cfg->policy);
+    ndmc_run_plan(bin, plan, n, what, req->peer, fd);
 }
 
 /* ---- обновление пакета ---- */
@@ -1225,6 +1269,11 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/policy") && !strcmp(req->method, "POST")) {
         apply_policy(req, fd, c->cfg);
+        return;
+    }
+
+    if (!strcmp(req->path, "/proxy") && !strcmp(req->method, "POST")) {
+        apply_proxy(req, fd, c->cfg);
         return;
     }
 
