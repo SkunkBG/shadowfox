@@ -672,7 +672,7 @@ static void apply_proxy(const http_req_t *req, int fd, const config_t *cfg)
 
     for (int i = 0; i < n; i++) plan[i] = cmds[i];
 
-    char what[96];
+    char what[160];
     snprintf(what, sizeof(what), "подключение %s создано", cfg->proxy_iface);
     ndmc_run_plan(bin, plan, n, what, req->peer, fd);
 }
@@ -721,7 +721,9 @@ static void apply_policy(const http_req_t *req, int fd, const config_t *cfg)
     const char *plan[DNS_LINES_MAX + 4];
     for (int i = 0; i < n; i++) plan[i] = cmds[i];
 
-    char what[96];
+    /* 160, а не 96: имя политики берётся из конфига и бывает в 63
+       символа, а кириллица в UTF-8 вдвое длиннее в байтах. */
+    char what[160];
     snprintf(what, sizeof(what), "политика %s настроена", cfg->policy);
     ndmc_run_plan(bin, plan, n, what, req->peer, fd);
 }
