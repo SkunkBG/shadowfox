@@ -312,6 +312,36 @@ static void test_counters(void)
     CHECK(marked == 0 && restored == 0, "NULL не ломает разбор");
 }
 
+/* План на предельное число групп обязан помещаться. Раньше предел стоял
+   в 128 команд и переполнялся на тринадцатой группе с IPv6, а
+   переполненный план отвергается целиком — не маршрутизировалась ни
+   одна группа. */
+static void test_full_house_fits(void)
+{
+    char path[160];
+    snprintf(path, sizeof(path), "%s/full.conf", g_dir);
+
+    FILE *f = fopen(path, "w");
+    for (int i = 0; i < WL_GROUPS_MAX; i++)
+        fprintf(f, "[g%d]\ninterface = Proxy%d\nexample%d.net\n", i, i, i);
+    fclose(f);
+
+    wl_t w;
+    wl_init(&w);
+    wl_load_domains(&w, path);
+    CHECK(w.group_count == WL_GROUPS_MAX, "групп %d", w.group_count);
+    for (int i = 0; i < w.group_count; i++) w.groups[i].target = WL_TARGET_IFACE;
+
+    rt_t r;  setup(&r, 1);
+    rt_plan_t p;
+    rt_plan_apply(&p, &r, &w);
+    CHECK(p.overflow == 0, "план на %d групп с IPv6 не поместился: %d команд",
+          WL_GROUPS_MAX, p.count);
+
+    rt_plan_remove(&p, &r, &w);
+    CHECK(p.overflow == 0, "план снятия не поместился: %d", p.count);
+}
+
 int main(void)
 {
     printf("check_routing " VERSION "\n");
@@ -327,6 +357,7 @@ int main(void)
     test_idempotent_shape();
     test_policy_target();
     test_policy_without_mark();
+    test_full_house_fits();
     test_counters();
 
     char cmd[160];

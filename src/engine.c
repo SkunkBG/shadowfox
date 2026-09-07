@@ -275,6 +275,12 @@ static int load_lists(engine_t *e, const config_t *cfg)
     char domains[CFG_PATH_MAX + 32];
     char cidrs[CFG_PATH_MAX + 32];
 
+    /* Память известных адресов хранит номер группы, а номера после
+       перечитывания могут перераспределиться. Со старыми записями
+       добавления подавлялись бы не для той группы. Цена сброса — один
+       лишний обрыв на первый ClientHello к уже разложенному адресу. */
+    e->known_count = 0;
+
     snprintf(domains, sizeof(domains), "%s/domain.conf", cfg->conf_dir);
     snprintf(cidrs,   sizeof(cidrs),   "%s/ip.list",     cfg->conf_dir);
 
@@ -298,49 +304,55 @@ static int load_lists(engine_t *e, const config_t *cfg)
    сохранены, правила стоят, а адресов ноль». */
 static void sync_capture(engine_t *e, const config_t *cfg)
 {
-    int want = e->wl.group_count > 0;
-    if (want == e->capturing) return;
+    /* Два перехвата сверяются по отдельности. Раньше ранний выход
+       смотрел только на DNS: sniCapture=no по SIGHUP не выключал
+       сокет, а не открывшийся при старте SNI никто не пробовал открыть
+       снова — при живом DNS всё выглядело исправным. */
+    int have     = e->wl.group_count > 0;
+    int want_dns = have;
+    int want_sni = have && cfg->sni_capture;
 
-    if (!want) {
+    if (!want_dns && e->capturing) {
         dcap_close(&e->cap);
         e->capturing = 0;
+        log_info("перехват DNS остановлен: доменов не осталось");
+    }
+    if (!want_sni && e->sniffing) {
         scap_close(&e->sni);
         e->sniffing = 0;
-        log_info("перехват остановлен: доменов не осталось");
-        return;
+        log_info("перехват SNI остановлен: %s",
+                 have ? "выключен в конфиге" : "доменов не осталось");
     }
 
-    char cap_err[160] = "";
-    if (dcap_open(&e->cap, cfg->capture_iface, cap_err, sizeof(cap_err)) == 0) {
-        e->capturing = 1;
-        log_info("перехват DNS на %s%s",
-                 cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах",
-                 e->cap.filtered ? "" : " (без фильтра ядра)");
-    } else {
-        /* Без перехвата домены наполняться не будут, но подсети из
-           ip.list работают. Останавливаться из-за этого неправильно. */
-        log_warn("перехват DNS недоступен: %s. Домены наполняться не будут, "
-                 "подсети из ip.list работают", cap_err);
+    if (want_dns && !e->capturing) {
+        char cap_err[160] = "";
+        if (dcap_open(&e->cap, cfg->capture_iface, cap_err, sizeof(cap_err)) == 0) {
+            e->capturing = 1;
+            log_info("перехват DNS на %s%s",
+                     cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах",
+                     e->cap.filtered ? "" : " (без фильтра ядра)");
+        } else {
+            /* Без перехвата домены наполняться не будут, но подсети из
+               ip.list работают. Останавливаться из-за этого неправильно. */
+            log_warn("перехват DNS недоступен: %s. Домены наполняться не будут, "
+                     "подсети из ip.list работают", cap_err);
+        }
     }
 
     /* Перехват SNI — второй канал, не замена первому. DNS даёт адрес
        заранее, до первого соединения; SNI видит то, чего DNS не видит
        вовсе: тёплый кеш устройства, свой DoH у клиента, зашитый адрес.
-       Поэтому один без другого не отключается и отказ одного не мешает
-       другому. */
-    if (!cfg->sni_capture) {
-        log_info("перехват SNI выключен в конфиге");
-        return;
-    }
-
-    char sni_err[160] = "";
-    if (scap_open(&e->sni, cfg->capture_iface, sni_err, sizeof(sni_err)) == 0) {
-        e->sniffing = 1;
-        log_info("перехват SNI на %s",
-                 cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах");
-    } else {
-        log_warn("перехват SNI недоступен: %s. Останутся слепые зоны: "
-                 "тёплый кеш, свой DoH у клиента, зашитые адреса", sni_err);
+       Поэтому отказ одного не мешает другому. */
+    if (want_sni && !e->sniffing) {
+        char sni_err[160] = "";
+        if (scap_open(&e->sni, cfg->capture_iface, sni_err, sizeof(sni_err)) == 0) {
+            e->sniffing = 1;
+            log_info("перехват SNI на %s",
+                     cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах");
+        } else {
+            log_warn("перехват SNI недоступен: %s. Останутся слепые зоны: "
+                     "тёплый кеш, свой DoH у клиента, зашитые адреса", sni_err);
+        }
     }
 }
 
@@ -517,12 +529,23 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     if (sv_start(&e->xray) == 0) e->xray_managed = 1;
 }
 
+/* Всё, что движок берёт из конфига, — в одном месте. Раньше это делал
+   только engine_start, а engine_reload — нет: правишь createPolicy,
+   ipsetTimeout или ipv6, шлёшь SIGHUP, и демон продолжает жить со
+   старыми значениями до полного перезапуска. */
+static void adopt_config(engine_t *e, const config_t *cfg)
+{
+    e->cfg               = cfg;
+    e->rt.ipv6           = cfg->ipv6 && e->rt.ip6tables[0];
+    e->may_create_policy = cfg->create_policy;
+    e->ipset_timeout     = cfg->ipset_timeout;
+}
+
 int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
 {
     if (!e || !cfg) return -1;
 
     e->started_at = time(NULL);
-    e->cfg        = cfg;
 
     if (!ips_find_bin(e->ips.bin, sizeof(e->ips.bin))) {
         if (err) str_copy(err, err_size, "не найден ipset");
@@ -532,9 +555,7 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
         if (err) str_copy(err, err_size, "не найдены iptables или ip");
         return -1;
     }
-    e->rt.ipv6          = cfg->ipv6 && e->rt.ip6tables[0];
-    e->may_create_policy = cfg->create_policy;
-    e->ipset_timeout     = cfg->ipset_timeout;
+    adopt_config(e, cfg);
 
     /* Своё ядро поднимаем до правил: пока оно не слушает, заворачивать
        туда трафик бессмысленно. */
@@ -584,6 +605,14 @@ void engine_stop(engine_t *e)
 int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
 {
     if (!e || !cfg) return -1;
+
+    /* Движок мог так и не запуститься — autoStart=no. Тогда SIGHUP от
+       первого же сохранения приходил в недособранный движок: без путей
+       к iptables план исполнял литерал «<нет:iptables>», а файл
+       состояния не писался никогда. Первое перечитывание — это старт. */
+    if (!e->cfg) return engine_start(e, cfg, err, err_size);
+
+    adopt_config(e, cfg);
 
     /* Старые правила снимаем по старым спискам: после перечитывания
        имена групп могут поменяться, и снимать станет нечего. */

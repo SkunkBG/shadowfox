@@ -305,6 +305,9 @@ int main(int argc, char **argv)
             rt_find_bins(&preview.rt);
             ips_find_bin(preview.ips.bin, sizeof(preview.ips.bin));
             preview.rt.ipv6 = dry.ipv6 && preview.rt.ip6tables[0];
+            /* Иначе превью печатало наборы без timeout — ровно тот
+               вариант, что в бою ломает демон. */
+            preview.ipset_timeout = dry.ipset_timeout;
 
             char dpath[CFG_PATH_MAX + 32], ipath[CFG_PATH_MAX + 32];
             snprintf(dpath, sizeof(dpath), "%s/domain.conf", dry.conf_dir);
