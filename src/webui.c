@@ -814,6 +814,33 @@ static void do_update(const http_req_t *req, int fd)
                    "обновление запущено\n");
 }
 
+#define XRAY_LOG "/opt/var/log/shadowfox-xray-install.log"
+
+/* Установка ядра. Тянет мегабайты, поэтому запускается отвязанным
+   процессом: иначе служба замерла бы на несколько минут и перестала
+   ловить DNS. Страница ждёт появления ядра, спрашивая состояние. */
+static void install_xray(const http_req_t *req, int fd)
+{
+    char bin[192] = "";
+    if (!opkg_path(bin, sizeof(bin))) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "opkg не найден\n");
+        return;
+    }
+
+    char command[512];
+    snprintf(command, sizeof(command),
+             "sleep 1; { date; %s update; %s install xray; date; } > %s 2>&1",
+             bin, bin, XRAY_LOG);
+
+    if (spawn_detached(command) != 0) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "не запустить\n");
+        return;
+    }
+
+    log_info("веб: запущена установка ядра, запрос с %s", req->peer);
+    http_send_text(fd, 200, "text/plain; charset=utf-8", "установка запущена\n");
+}
+
 static void save(const http_req_t *req, int fd, const config_t *cfg)
 {
     char what[32];
@@ -1179,6 +1206,11 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/data")) {
         send_data(req, fd, c->engine, c->cfg);
+        return;
+    }
+
+    if (!strcmp(req->path, "/xray") && !strcmp(req->method, "POST")) {
+        install_xray(req, fd);
         return;
     }
 
