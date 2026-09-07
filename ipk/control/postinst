@@ -25,10 +25,18 @@ mkdir -p /opt/etc/shadowfox
 # было бы два источника правды, и они уже расходились: в образце
 # из пакета не хватало ключей. И opkg при каждом обновлении ругался
 # на изменённый conffile и складывал рядом shadowfox.conf-opkg.
+keep=/opt/etc/shadowfox/.shadowfox.conf.keep
 if [ ! -f /opt/etc/shadowfox/shadowfox.conf ]; then
-    /opt/bin/shadowfoxd --genconfig /opt/etc/shadowfox >/dev/null 2>&1 || \
-        echo "[WARN] не удалось записать /opt/etc/shadowfox/shadowfox.conf"
+    if [ -f "$keep" ]; then
+        # opkg удалил конфиг как устаревший файл старого пакета, см. preinst.
+        mv "$keep" /opt/etc/shadowfox/shadowfox.conf
+        echo "[ИНФО] настройки возвращены из копии, сделанной перед обновлением"
+    else
+        /opt/bin/shadowfoxd --genconfig /opt/etc/shadowfox >/dev/null 2>&1 || \
+            echo "[WARN] не удалось записать /opt/etc/shadowfox/shadowfox.conf"
+    fi
 fi
+rm -f "$keep"
 # Остаток от прежней схемы, когда образец ехал в пакете.
 rm -f /opt/etc/shadowfox/shadowfox.conf-opkg
 

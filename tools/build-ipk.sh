@@ -74,7 +74,7 @@ for arch in "$@"; do
         -e "s|@MAINTAINER@|$MAINTAINER|g" \
         "$ROOT/ipk/control/control.in" > "$STAGE/control/control"
 
-    for f in conffiles postinst prerm; do
+    for f in conffiles preinst postinst prerm; do
         [ -f "$ROOT/ipk/control/$f" ] || continue
         cp "$ROOT/ipk/control/$f" "$STAGE/control/$f"
     done
@@ -114,7 +114,7 @@ for arch in "$@"; do
             fi
         done < "$STAGE/control/conffiles"
     fi
-    chmod 0755 "$STAGE/control/postinst" "$STAGE/control/prerm" 2>/dev/null || true
+    chmod 0755 "$STAGE/control/preinst" "$STAGE/control/postinst" "$STAGE/control/prerm" 2>/dev/null || true
 
     cp "$ROOT/ipk/debian-binary" "$STAGE/debian-binary"
 
