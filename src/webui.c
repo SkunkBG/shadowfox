@@ -1141,21 +1141,32 @@ static void send_login(int fd, const char *message)
         ":root{color-scheme:dark light}"
         "@font-face{font-family:Cinzel;font-weight:600;font-display:swap;"
         "src:url(/cinzel.woff2) format('woff2')}"
-        "body{margin:0;min-height:100vh;display:grid;place-items:center;"
+        /* Флекс с отступами, а не grid с центрированием: при открытой
+           клавиатуре форма выше окна, и центрирование обрезает её
+           сверху — доскроллить до логина уже нельзя. */
+        "body{margin:0;min-height:100vh;min-height:100svh;display:flex;"
+        "align-items:center;justify-content:center;padding:24px 16px;"
+        "box-sizing:border-box;-webkit-text-size-adjust:100%%;"
         "background:#0d1014;color:#e8ecf2;"
         "font:14px/1.55 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}"
         "form{background:#151a21;border:1px solid #28303b;border-radius:16px;"
-        "padding:28px 30px 26px;width:min(400px,92vw)}"
-        "img{display:block;margin:0 auto 6px;max-width:60%%;height:auto}"
+        "padding:28px 30px 26px;width:min(400px,100%%);box-sizing:border-box}"
+        "img{display:block;margin:0 auto 6px;width:min(168px,42%%);height:auto}"
         "h1{margin:0 0 4px;text-align:center;color:#22c8e6;"
         "font:600 26px/1.1 Cinzel,'Times New Roman',Georgia,serif;"
         "letter-spacing:.03em}"
         "p{margin:0 0 18px;color:#8b95a5;font-size:13px;text-align:center}"
         "label{display:block;color:#8b95a5;font-size:12.5px;margin:12px 0 5px}"
+        /* 16px не для красоты: Safari на iPhone увеличивает страницу при
+           фокусе на поле мельче шестнадцати, и форма уезжает за край.
+           Размер шрифта задан отдельно от семейства — сокращение
+           «font: 14px/1.4 inherit» неверно, inherit там не семейство. */
         "input{width:100%%;box-sizing:border-box;background:#0d1014;color:#e8ecf2;"
-        "border:1px solid #28303b;border-radius:7px;padding:10px;font:14px/1.4 inherit}"
+        "border:1px solid #28303b;border-radius:7px;padding:11px 10px;"
+        "font-family:inherit;font-size:16px;line-height:1.4}"
         "button{width:100%%;margin-top:20px;background:#22b8d6;color:#04222a;border:0;"
-        "border-radius:8px;padding:11px;font:650 14px/1 inherit;cursor:pointer}"
+        "border-radius:8px;padding:12px;font-family:inherit;font-size:15px;"
+        "font-weight:650;line-height:1;cursor:pointer}"
         ".bad{color:#ff6b6b;font-size:13px;margin-top:14px}"
         "</style>"
         "<form method=post action=/login>"
