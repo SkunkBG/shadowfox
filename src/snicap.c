@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define IP_PROTO_TCP 6
@@ -82,11 +83,21 @@ static int parse_sni_ext(const unsigned char *p, size_t off, size_t ext_end,
     return -2;
 }
 
-int scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out)
-{
-    if (!pkt || !out || len < 40) return -1;
+/* Заголовки IP и TCP: 5-tuple, номер последовательности и нагрузка.
+   -1 — не наш пакет (не TCP, не 443, фрагмент). */
+typedef struct {
+    unsigned char        family;
+    unsigned char        src[16], dst[16];
+    unsigned             sport, dport;
+    unsigned             seq;
+    const unsigned char *payload;
+    size_t               plen;
+} tcp_view_t;
 
-    memset(out, 0, sizeof(*out));
+static int tcp_view(const unsigned char *pkt, size_t len, tcp_view_t *v)
+{
+    if (!pkt || !v || len < 40) return -1;
+    memset(v, 0, sizeof(*v));
 
     unsigned version = pkt[0] >> 4;
     size_t   ip_hlen;
@@ -99,9 +110,9 @@ int scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out)
         /* Фрагмент: заголовка TCP в нём может не быть вовсе. */
         if ((rd16(pkt + 6) & 0x1fff) != 0) return -1;
 
-        out->family = 4;
-        memcpy(out->src, pkt + 12, 4);
-        memcpy(out->dst, pkt + 16, 4);
+        v->family = 4;
+        memcpy(v->src, pkt + 12, 4);
+        memcpy(v->dst, pkt + 16, 4);
     } else if (version == 6) {
         ip_hlen = 40;
         if (len < ip_hlen + 20) return -1;
@@ -110,9 +121,9 @@ int scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out)
            бывает, а гадать по цепочке — лишний код на горячем пути. */
         if (pkt[6] != IP_PROTO_TCP) return -1;
 
-        out->family = 6;
-        memcpy(out->src, pkt + 8,  16);
-        memcpy(out->dst, pkt + 24, 16);
+        v->family = 6;
+        memcpy(v->src, pkt + 8,  16);
+        memcpy(v->dst, pkt + 24, 16);
     } else {
         return -1;
     }
@@ -120,58 +131,85 @@ int scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out)
     const unsigned char *tcp = pkt + ip_hlen;
     size_t tcp_avail = len - ip_hlen;
 
-    out->sport = rd16(tcp);
-    out->dport = rd16(tcp + 2);
-    if (out->dport != TLS_PORT) return -1;
+    v->sport = rd16(tcp);
+    v->dport = rd16(tcp + 2);
+    if (v->dport != TLS_PORT) return -1;
+
+    v->seq = (unsigned)tcp[4] << 24 | (unsigned)tcp[5] << 16 |
+             (unsigned)tcp[6] << 8  | (unsigned)tcp[7];
 
     size_t tcp_hlen = (size_t)(tcp[12] >> 4) * 4;
     if (tcp_hlen < 20 || tcp_avail < tcp_hlen) return -1;
 
-    const unsigned char *p = tcp + tcp_hlen;
-    size_t avail = tcp_avail - tcp_hlen;
+    v->payload = tcp + tcp_hlen;
+    v->plen    = tcp_avail - tcp_hlen;
+    return 0;
+}
 
+/* Разбор ClientHello из нагрузки TLS. 0 — имя найдено; -1 — это не
+   ClientHello; -2 — похоже, но не сошлось; -3 — данные кончились раньше
+   конца записи, продолжение в следующем сегменте. */
+static int tls_client_hello(const unsigned char *p, size_t avail, sni_hit_t *out)
+{
     /* Запись TLS: тип, версия, длина; затем сообщение handshake. */
-    if (avail < 43) return -1;
+    if (avail < 6) return -1;
     if (p[0] != TLS_HANDSHAKE) return -1;
     if (p[5] != TLS_CLIENT_HELLO) return -1;
 
-    /* Дальше уже точно ClientHello, и всякий отказ — это разбор,
-       который не сошёлся, а не чужой пакет. */
     size_t rec_end = 5 + (size_t)rd16(p + 3);
-    size_t end     = rec_end < avail ? rec_end : avail;
+    int    more    = rec_end > avail;   /* запись длиннее того, что есть */
+    size_t end     = more ? avail : rec_end;
+
+    /* Дальше уже точно ClientHello. Нехватка данных внутри записи —
+       это -3, а не -2: продолжение ещё может прийти. */
+#define NEED(n) do { if (off + (n) > end) return more ? -3 : -2; } while (0)
 
     /* 5 запись + 4 handshake + 2 версия + 32 random. */
     size_t off = 43;
-
-    if (off + 1 > end) return -2;
-    off += 1 + p[off];                       /* session_id */
-
-    if (off + 2 > end) return -2;
-    off += 2 + rd16(p + off);                /* cipher_suites */
-
-    if (off + 1 > end) return -2;
-    off += 1 + p[off];                       /* compression_methods */
-
-    if (off + 2 > end) return -2;
+    NEED(1);  off += 1 + p[off];                       /* session_id */
+    NEED(2);  off += 2 + rd16(p + off);                /* cipher_suites */
+    NEED(1);  off += 1 + p[off];                       /* compression_methods */
+    NEED(2);
     size_t ext_end = off + 2 + rd16(p + off);
-    if (ext_end > end) ext_end = end;        /* ClientHello мог не влезть
-                                                в один сегмент */
     off += 2;
+    if (ext_end > rec_end) return -2;                  /* врёт про длину */
 
     while (off + 4 <= ext_end) {
+        if (off + 4 > end) return more ? -3 : -2;
         unsigned type = rd16(p + off);
         size_t   elen = rd16(p + off + 2);
         off += 4;
 
         if (off + elen > ext_end) return -2;
+        if (off + elen > end)      return more ? -3 : -2;
 
         if (type == TLS_EXT_SERVER_NAME)
             return parse_sni_ext(p, off, off + elen, out);
 
         off += elen;
     }
+#undef NEED
 
-    return -2;
+    /* Расширения кончились, а имени нет: если запись обрывается — оно
+       может быть дальше, иначе его нет вовсе. */
+    return (more && off < ext_end) ? -3 : -2;
+}
+
+int scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out)
+{
+    if (!pkt || !out) return -1;
+    memset(out, 0, sizeof(*out));
+
+    tcp_view_t v;
+    if (tcp_view(pkt, len, &v) != 0) return -1;
+
+    out->family = v.family;
+    memcpy(out->src, v.src, 16);
+    memcpy(out->dst, v.dst, 16);
+    out->sport = v.sport;
+    out->dport = v.dport;
+
+    return tls_client_hello(v.payload, v.plen, out);
 }
 
 /* Фильтр ядра: TCP на порт назначения 443, где полезная нагрузка
@@ -194,48 +232,66 @@ int scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out)
 
    Смещения считаются от сетевого уровня, а не от кадра Ethernet: у
    SOCK_DGRAM ядро не возвращает канальный заголовок перед фильтрацией.
-   На этом здесь уже обжигались с фильтром DNS. */
+   На этом здесь уже обжигались с фильтром DNS.
+
+   Кроме ClientHello фильтр пропускает короткие сегменты с первым байтом
+   не 0x17 — это продолжения приветствия, не поместившегося в один
+   сегмент. Данные приложения после рукопожатия — всегда записи 0x17;
+   произвольным байтом начинаются только хвосты больших записей, и
+   ограничение в 640 байт отсекает почти все из них. Остаток отсеивает
+   демон одним сравнением номера последовательности. */
 static const scap_insn_t SNI_FILTER[] = {
     /* 0 */  { 0x30,  0,  0, 0x00000000 },  /* A = pkt[0] */
     /* 1 */  { 0x54,  0,  0, 0x000000f0 },  /* A &= 0xf0 — версия IP */
-    /* 2 */  { 0x15, 17,  0, 0x00000060 },  /* IPv6 -> 20 */
+    /* 2 */  { 0x15, 22,  0, 0x00000060 },  /* IPv6 -> 25 */
 
     /* IPv4 */
-    /* 3 */  { 0x15,  0, 30, 0x00000040 },  /* не IPv4 -> отказ */
+    /* 3 */  { 0x15,  0, 41, 0x00000040 },  /* не IPv4 -> отказ */
     /* 4 */  { 0x30,  0,  0, 0x00000009 },  /* протокол */
-    /* 5 */  { 0x15,  0, 28, 0x00000006 },  /* TCP? */
+    /* 5 */  { 0x15,  0, 39, 0x00000006 },  /* TCP? */
     /* 6 */  { 0x28,  0,  0, 0x00000006 },  /* флаги и смещение фрагмента */
-    /* 7 */  { 0x45, 26,  0, 0x00001fff },  /* фрагмент -> отказ */
+    /* 7 */  { 0x45, 37,  0, 0x00001fff },  /* фрагмент -> отказ */
     /* 8 */  { 0xb1,  0,  0, 0x00000000 },  /* X = длина IP-заголовка */
     /* 9 */  { 0x48,  0,  0, 0x00000002 },  /* порт назначения */
-    /* 10 */ { 0x15,  0, 23, 0x000001bb },  /* 443? */
+    /* 10 */ { 0x15,  0, 34, 0x000001bb },  /* 443? */
     /* 11 */ { 0x50,  0,  0, 0x0000000c },  /* смещение данных TCP */
     /* 12 */ { 0x54,  0,  0, 0x000000f0 },
     /* 13 */ { 0x74,  0,  0, 0x00000002 },  /* A = длина заголовка TCP */
     /* 14 */ { 0x0c,  0,  0, 0x00000000 },  /* A += X */
     /* 15 */ { 0x07,  0,  0, 0x00000000 },  /* X = A — начало нагрузки */
-    /* 16 */ { 0x50,  0,  0, 0x00000000 },
-    /* 17 */ { 0x15,  0, 16, 0x00000016 },  /* запись handshake? */
+    /* 16 */ { 0x50,  0,  0, 0x00000000 },  /* первый байт нагрузки */
+    /* 17 */ { 0x15,  0,  2, 0x00000016 },  /* не handshake -> 20 */
     /* 18 */ { 0x50,  0,  0, 0x00000005 },
-    /* 19 */ { 0x15, 13, 14, 0x00000001 },  /* ClientHello? */
+    /* 19 */ { 0x15, 24, 25, 0x00000001 },  /* ClientHello? берём : отказ */
+    /* 20 */ { 0x15, 24,  0, 0x00000017 },  /* данные приложения -> отказ */
+    /* 21 */ { 0x28,  0,  0, 0x00000002 },  /* полная длина IP */
+    /* 22 */ { 0x1c,  0,  0, 0x00000000 },  /* A -= X: длина нагрузки */
+    /* 23 */ { 0x25, 21,  0, 0x00000280 },  /* длиннее 640 -> отказ */
+    /* 24 */ { 0x15, 20, 19, 0x00000000 },  /* пустая -> отказ, иначе берём */
 
     /* IPv6: заголовок фиксированный, 40 байт */
-    /* 20 */ { 0x30,  0,  0, 0x00000006 },  /* следующий заголовок */
-    /* 21 */ { 0x15,  0, 12, 0x00000006 },  /* TCP? */
-    /* 22 */ { 0x28,  0,  0, 0x0000002a },  /* порт назначения, 40 + 2 */
-    /* 23 */ { 0x15,  0, 10, 0x000001bb },  /* 443? */
-    /* 24 */ { 0x30,  0,  0, 0x00000034 },  /* смещение данных, 40 + 12 */
-    /* 25 */ { 0x54,  0,  0, 0x000000f0 },
-    /* 26 */ { 0x74,  0,  0, 0x00000002 },
-    /* 27 */ { 0x04,  0,  0, 0x00000028 },  /* A += 40 */
-    /* 28 */ { 0x07,  0,  0, 0x00000000 },  /* X = начало нагрузки */
-    /* 29 */ { 0x50,  0,  0, 0x00000000 },
-    /* 30 */ { 0x15,  0,  3, 0x00000016 },  /* запись handshake? */
-    /* 31 */ { 0x50,  0,  0, 0x00000005 },
-    /* 32 */ { 0x15,  0,  1, 0x00000001 },  /* ClientHello? */
+    /* 25 */ { 0x30,  0,  0, 0x00000006 },  /* следующий заголовок */
+    /* 26 */ { 0x15,  0, 18, 0x00000006 },  /* TCP? */
+    /* 27 */ { 0x28,  0,  0, 0x0000002a },  /* порт назначения, 40 + 2 */
+    /* 28 */ { 0x15,  0, 16, 0x000001bb },  /* 443? */
+    /* 29 */ { 0x30,  0,  0, 0x00000034 },  /* смещение данных, 40 + 12 */
+    /* 30 */ { 0x54,  0,  0, 0x000000f0 },
+    /* 31 */ { 0x74,  0,  0, 0x00000002 },
+    /* 32 */ { 0x04,  0,  0, 0x00000028 },  /* A += 40 */
+    /* 33 */ { 0x07,  0,  0, 0x00000000 },  /* X = начало нагрузки */
+    /* 34 */ { 0x50,  0,  0, 0x00000000 },
+    /* 35 */ { 0x15,  0,  2, 0x00000016 },  /* не handshake -> 38 */
+    /* 36 */ { 0x50,  0,  0, 0x00000005 },
+    /* 37 */ { 0x15,  6,  7, 0x00000001 },  /* ClientHello? берём : отказ */
+    /* 38 */ { 0x15,  6,  0, 0x00000017 },  /* данные приложения -> отказ */
+    /* 39 */ { 0x28,  0,  0, 0x00000004 },  /* длина нагрузки IPv6 */
+    /* 40 */ { 0x04,  0,  0, 0x00000028 },  /* + 40 */
+    /* 41 */ { 0x1c,  0,  0, 0x00000000 },  /* - X: длина нагрузки TCP */
+    /* 42 */ { 0x25,  2,  0, 0x00000280 },  /* длиннее 640 -> отказ */
+    /* 43 */ { 0x15,  1,  0, 0x00000000 },  /* пустая -> отказ */
 
-    /* 33 */ { 0x06,  0,  0, 0x0000ffff },  /* берём пакет */
-    /* 34 */ { 0x06,  0,  0, 0x00000000 },  /* отказ */
+    /* 44 */ { 0x06,  0,  0, 0x0000ffff },  /* берём пакет */
+    /* 45 */ { 0x06,  0,  0, 0x00000000 },  /* отказ */
 };
 
 
@@ -364,11 +420,137 @@ void scap_close(scap_t *c)
     c->filtered = 0;
 }
 
+static int same_flow(const tcp_view_t *v, unsigned char family,
+                     const unsigned char *src, const unsigned char *dst,
+                     unsigned sport, unsigned dport)
+{
+    size_t alen = family == 4 ? 4 : 16;
+    return v->family == family && v->sport == sport && v->dport == dport &&
+           memcmp(v->src, src, alen) == 0 && memcmp(v->dst, dst, alen) == 0;
+}
+
+static void fill_hit(sni_hit_t *h, const tcp_view_t *v)
+{
+    h->family = v->family;
+    memcpy(h->src, v->src, 16);
+    memcpy(h->dst, v->dst, 16);
+    h->sport = v->sport;
+    h->dport = v->dport;
+}
+
+int scap_handle(scap_t *c, const unsigned char *pkt, size_t len, int pkttype,
+                long now, void (*cb)(const sni_hit_t *, void *), void *ctx)
+{
+    if (!c || !pkt) return 0;
+
+    c->seen++;
+
+#ifdef __linux__
+    if (pkttype >= 0 && pkttype != PACKET_HOST) {
+        c->drop_foreign++;
+        return 0;
+    }
+#else
+    (void)pkttype;
+#endif
+
+    /* Старые склейки сгорают: продолжение, которое не пришло за две
+       секунды, уже не придёт. */
+    for (int i = 0; i < SCAP_PARTIAL_MAX; i++) {
+        if (c->partial[i].len && now - c->partial[i].at > SCAP_PARTIAL_TTL) {
+            c->partial[i].len = 0;
+            c->partial_lost++;
+        }
+    }
+
+    tcp_view_t v;
+    if (tcp_view(pkt, len, &v) != 0 || v.plen == 0) {
+        c->drop_nottls++;
+        return 0;
+    }
+
+    sni_hit_t hit;
+    memset(&hit, 0, sizeof(hit));
+    fill_hit(&hit, &v);
+
+    /* Продолжение ожидающего приветствия? Сверяем поток и номер
+       последовательности: чужой сегмент к нам не приклеится. */
+    for (int i = 0; i < SCAP_PARTIAL_MAX; i++) {
+        if (!c->partial[i].len) continue;
+        if (!same_flow(&v, c->partial[i].family, c->partial[i].src,
+                       c->partial[i].dst, c->partial[i].sport, c->partial[i].dport))
+            continue;
+        if (v.seq != c->partial[i].next_seq) continue;
+
+        if (c->partial[i].len + v.plen > SCAP_PARTIAL_BYTES) {
+            c->partial[i].len = 0;
+            c->partial_lost++;
+            c->drop_bad++;
+            return 0;
+        }
+        memcpy(c->partial[i].data + c->partial[i].len, v.payload, v.plen);
+        c->partial[i].len      += v.plen;
+        c->partial[i].next_seq += (unsigned)v.plen;
+        c->partial[i].at        = now;
+
+        int r = tls_client_hello(c->partial[i].data, c->partial[i].len, &hit);
+        if (r == -3) return 0;                 /* ждём ещё */
+
+        c->partial[i].len = 0;
+        if (r != 0) { c->partial_lost++; c->drop_bad++; return 0; }
+
+        c->reassembled++;
+        c->parsed++;
+        if (cb) cb(&hit, ctx);
+        return 1;
+    }
+
+    int r = tls_client_hello(v.payload, v.plen, &hit);
+
+    if (r == -1) { c->drop_nottls++; return 0; }
+
+    if (r == -3) {
+        /* Приветствие обрывается на границе сегмента — откладываем хвост
+           и ждём продолжение. Свободный либо самый старый слот. */
+        if (v.plen > SCAP_PARTIAL_BYTES) { c->drop_bad++; return 0; }
+
+        int slot = 0;
+        for (int i = 0; i < SCAP_PARTIAL_MAX; i++) {
+            if (!c->partial[i].len) { slot = i; break; }
+            if (c->partial[i].at < c->partial[slot].at) slot = i;
+        }
+        if (c->partial[slot].len) c->partial_lost++;
+
+        c->partial[slot].family = v.family;
+        memcpy(c->partial[slot].src, v.src, 16);
+        memcpy(c->partial[slot].dst, v.dst, 16);
+        c->partial[slot].sport    = v.sport;
+        c->partial[slot].dport    = v.dport;
+        c->partial[slot].next_seq = v.seq + (unsigned)v.plen;
+        c->partial[slot].len      = v.plen;
+        c->partial[slot].at       = now;
+        memcpy(c->partial[slot].data, v.payload, v.plen);
+        c->partial_kept++;
+        return 0;
+    }
+
+    if (r != 0) {
+        c->drop_bad++;
+        log_debug("ClientHello не разобран, %zu байт", len);
+        return 0;
+    }
+
+    c->parsed++;
+    if (cb) cb(&hit, ctx);
+    return 1;
+}
+
 int scap_poll(scap_t *c, void (*cb)(const sni_hit_t *, void *), void *ctx)
 {
     if (!c || c->fd < 0) return 0;
 
-    int handled = 0;
+    int  handled = 0;
+    long now     = (long)time(NULL);
 
     /* Читаем всё, что накопилось, но не бесконечно: при шторме пакетов
        демон обязан вернуться в главный цикл и обработать сигналы. */
@@ -376,32 +558,7 @@ int scap_poll(scap_t *c, void (*cb)(const sni_hit_t *, void *), void *ctx)
         int     pkttype = -1;
         ssize_t n = cap_read(c->fd, c->buf, sizeof(c->buf), &pkttype);
         if (n <= 0) break;
-
-        c->seen++;
-
-#ifdef __linux__
-        if (pkttype >= 0 && pkttype != PACKET_HOST) {
-            c->drop_foreign++;
-            continue;
-        }
-#endif
-
-        sni_hit_t hit;
-        int       why = scap_extract(c->buf, (size_t)n, &hit);
-
-        if (why != 0) {
-            if (why == -1) {
-                c->drop_nottls++;
-            } else {
-                c->drop_bad++;
-                log_debug("ClientHello не разобран, %zd байт", n);
-            }
-            continue;
-        }
-
-        c->parsed++;
-        handled++;
-        if (cb) cb(&hit, ctx);
+        handled += scap_handle(c, c->buf, (size_t)n, pkttype, now, cb, ctx);
     }
 
     return handled;

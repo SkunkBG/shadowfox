@@ -63,6 +63,10 @@ static int bpf_run(const scap_insn_t *f, unsigned n,
         case 0x74: A >>= k; break;                   /* rsh #k */
         case 0x04: A += k; break;                    /* add #k */
         case 0x0c: A += X; break;                    /* add x */
+        case 0x1c: A -= X; break;                    /* sub x */
+        case 0x25:                                   /* jgt #k */
+            pc += (A > k) ? i->jt : i->jf;
+            break;
         case 0x07: X = A; break;                     /* tax */
         case 0x15:                                   /* jeq #k */
             pc += (A == k) ? i->jt : i->jf;
@@ -97,7 +101,19 @@ static int filter_takes(const unsigned char *pkt, size_t len)
 /* ---- сборка пакетов ---- */
 
 /* ClientHello с заданным именем. Возвращает длину. */
+static size_t make_hello_pad(unsigned char *b, const char *name, int with_sni,
+                             size_t pad);
+
 static size_t make_hello(unsigned char *b, const char *name, int with_sni)
+{
+    return make_hello_pad(b, name, with_sni, 0);
+}
+
+/* pad — байт заполнения (расширение padding, тип 21) ПЕРЕД server_name:
+   так имя уезжает за границу сегмента, как у Chrome с перемешанными
+   расширениями и постквантовым ключом. */
+static size_t make_hello_pad(unsigned char *b, const char *name, int with_sni,
+                             size_t pad)
 {
     size_t nlen = name ? strlen(name) : 0;
     size_t i    = 0;
@@ -125,6 +141,13 @@ static size_t make_hello(unsigned char *b, const char *name, int with_sni)
     b[i++] = 0x00; b[i++] = 0x2b;      /* supported_versions */
     b[i++] = 0x00; b[i++] = 0x03;
     b[i++] = 0x02; b[i++] = 0x03; b[i++] = 0x04;
+
+    if (pad) {
+        b[i++] = 0x00; b[i++] = 0x15;                     /* padding */
+        b[i++] = (unsigned char)(pad >> 8);
+        b[i++] = (unsigned char)pad;
+        memset(b + i, 0, pad); i += pad;
+    }
 
     if (with_sni) {
         b[i++] = 0x00; b[i++] = 0x00;                     /* server_name */
@@ -154,9 +177,18 @@ static size_t make_hello(unsigned char *b, const char *name, int with_sni)
     return i;
 }
 
+static size_t wrap4_seq(unsigned char *b, const unsigned char *pay, size_t plen,
+                        unsigned dport, unsigned proto, unsigned frag, unsigned seq);
+
 /* IPv4 + TCP + нагрузка. */
 static size_t wrap4(unsigned char *b, const unsigned char *pay, size_t plen,
                     unsigned dport, unsigned proto, unsigned frag)
+{
+    return wrap4_seq(b, pay, plen, dport, proto, frag, 1000);
+}
+
+static size_t wrap4_seq(unsigned char *b, const unsigned char *pay, size_t plen,
+                        unsigned dport, unsigned proto, unsigned frag, unsigned seq)
 {
     size_t total = 20 + 20 + plen;
 
@@ -173,6 +205,8 @@ static size_t wrap4(unsigned char *b, const unsigned char *pay, size_t plen,
     b[20] = 0xC0; b[21] = 0x00;                        /* порт источника */
     b[22] = (unsigned char)(dport >> 8);
     b[23] = (unsigned char)dport;
+    b[24] = (unsigned char)(seq >> 24); b[25] = (unsigned char)(seq >> 16);
+    b[26] = (unsigned char)(seq >> 8);  b[27] = (unsigned char)seq;
     b[32] = 0x50;                                      /* 20 байт заголовка */
     b[33] = 0x18;                                      /* PSH ACK */
 
@@ -340,6 +374,33 @@ static void test_filter(void)
     /* Пустая квитанция без нагрузки: самый частый пакет на 443. */
     len = wrap4(pkt, hello, 0, 443, 6, 0);
     CHECK(!filter_takes(pkt, len), "фильтр пропустил пустую квитанцию");
+
+    /* Продолжение приветствия: короткий сегмент с произвольным первым
+       байтом. Его фильтр обязан пропустить — иначе склейке нечего
+       склеивать. */
+    unsigned char cont[400];
+    memset(cont, 0x5a, sizeof(cont));
+    len = wrap4(pkt, cont, sizeof(cont), 443, 6, 0);
+    CHECK(filter_takes(pkt, len), "фильтр не пропустил продолжение IPv4");
+    len = wrap6(pkt, cont, sizeof(cont), 443);
+    CHECK(filter_takes(pkt, len), "фильтр не пропустил продолжение IPv6");
+
+    /* А длинный сегмент с произвольным байтом — это хвост большой записи
+       при отдаче, таких тысячи: не пропускать. */
+    unsigned char big[900];
+    memset(big, 0x5a, sizeof(big));
+    len = wrap4(pkt, big, sizeof(big), 443, 6, 0);
+    CHECK(!filter_takes(pkt, len), "фильтр пропустил длинный чужой сегмент");
+    len = wrap6(pkt, big, sizeof(big), 443);
+    CHECK(!filter_takes(pkt, len), "фильтр пропустил длинный чужой сегмент IPv6");
+
+    /* Ровно на границе: 640 берём, 641 нет. */
+    unsigned char edge[641];
+    memset(edge, 0x5a, sizeof(edge));
+    len = wrap4(pkt, edge, 640, 443, 6, 0);
+    CHECK(filter_takes(pkt, len), "640 байт — берём");
+    len = wrap4(pkt, edge, 641, 443, 6, 0);
+    CHECK(!filter_takes(pkt, len), "641 байт — нет");
 }
 
 /* Заголовок TCP с опциями: начало нагрузки смещается, и фильтр обязан
@@ -364,6 +425,71 @@ static void test_filter_tcp_options(void)
     sni_hit_t hit;
     CHECK(scap_extract(big, blen, &hit) == 0, "разбор не учёл опции TCP");
     CHECK(strcmp(hit.name, "youtube.com") == 0, "имя «%s»", hit.name);
+}
+
+/* ---- склейка из двух сегментов ---- */
+
+static int   g_hits;
+static char  g_name[SCAP_NAME_MAX];
+
+static void on_hit(const sni_hit_t *h, void *ctx)
+{
+    (void)ctx;
+    g_hits++;
+    memcpy(g_name, h->name, sizeof(g_name));
+}
+
+/* Приветствие с именем за границей первого сегмента: 1500 байт
+   заполнения перед server_name. Первый сегмент — 1400 байт, как MSS. */
+static void test_reassembly(void)
+{
+    unsigned char hello[2048], p1[2048], p2[2048];
+    size_t hlen = make_hello_pad(hello, "youtube.com", 1, 1500);
+    CHECK(hlen > 1400, "приветствие длиннее сегмента: %zu", hlen);
+
+    size_t first = 1400, rest = hlen - first;
+    size_t l1 = wrap4_seq(p1, hello, first, 443, 6, 0, 5000);
+    size_t l2 = wrap4_seq(p2, hello + first, rest, 443, 6, 0, 5000 + (unsigned)first);
+
+    /* Один первый сегмент — не разбирается, а откладывается. */
+    sni_hit_t hit;
+    CHECK(scap_extract(p1, l1, &hit) == -3, "один сегмент — нужно продолжение");
+
+    scap_t c;
+    scap_init(&c);
+    g_hits = 0; g_name[0] = '\0';
+
+    CHECK(scap_handle(&c, p1, l1, 0, 100, on_hit, NULL) == 0, "первый сегмент ждёт");
+    CHECK(c.partial_kept == 1, "отложено одно: %lu", c.partial_kept);
+    CHECK(g_hits == 0, "рано");
+
+    CHECK(scap_handle(&c, p2, l2, 0, 100, on_hit, NULL) == 1, "второй сегмент собрал");
+    CHECK(g_hits == 1 && strcmp(g_name, "youtube.com") == 0, "имя после склейки: «%s»", g_name);
+    CHECK(c.reassembled == 1, "склеено одно: %lu", c.reassembled);
+    CHECK(c.partial_lost == 0, "потерь нет: %lu", c.partial_lost);
+
+    /* Слот освобождён: то же продолжение второй раз — уже чужое. */
+    CHECK(scap_handle(&c, p2, l2, 0, 100, on_hit, NULL) == 0, "повтор не приклеился");
+    CHECK(g_hits == 1, "второго вызова нет");
+
+    /* Чужой номер последовательности не приклеивается. */
+    scap_init(&c); g_hits = 0;
+    size_t l3 = wrap4_seq(p2, hello + first, rest, 443, 6, 0, 7777);
+    scap_handle(&c, p1, l1, 0, 100, on_hit, NULL);
+    CHECK(scap_handle(&c, p2, l3, 0, 100, on_hit, NULL) == 0, "не тот seq — не склеилось");
+    CHECK(g_hits == 0, "имени нет");
+    CHECK(c.partial_kept == 1 && c.reassembled == 0, "ожидание остаётся");
+
+    /* Срок жизни: через три секунды ожидание сгорает. */
+    unsigned char other[64]; memset(other, 0x5a, sizeof(other));
+    unsigned char p3[256];
+    size_t l4 = wrap4_seq(p3, other, sizeof(other), 443, 6, 0, 1);
+    scap_handle(&c, p3, l4, 0, 104, on_hit, NULL);
+    CHECK(c.partial_lost == 1, "сгорело по сроку: %lu", c.partial_lost);
+
+    /* Продолжение, пришедшее после срока, уже не собирается. */
+    CHECK(scap_handle(&c, p2, l2, 0, 104, on_hit, NULL) == 0, "после срока не собирается");
+    CHECK(g_hits == 0, "и имени нет");
 }
 
 static void test_open_reports_platform(void)
@@ -394,6 +520,7 @@ int main(void)
 
     test_filter();
     test_filter_tcp_options();
+    test_reassembly();
     test_open_reports_platform();
 
     if (failures) {

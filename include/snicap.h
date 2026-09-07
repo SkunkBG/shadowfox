@@ -24,6 +24,16 @@
 #define SCAP_IFACE_MAX 32
 #define SCAP_BUF_BYTES 2048
 
+/* Незавершённые приветствия. С постквантовым обменом ключей ClientHello
+   вырос до ~1,7 КБ и перестал помещаться в один сегмент, а Chrome ещё и
+   перемешивает расширения — имя сервера может оказаться во втором. Хвост
+   первого сегмента держим по 5-tuple до прихода продолжения. Восьми
+   слотов хватает: таких приветствий единицы в секунду, живут они
+   миллисекунды. */
+#define SCAP_PARTIAL_MAX   8
+#define SCAP_PARTIAL_BYTES 4096
+#define SCAP_PARTIAL_TTL   2      /* секунд */
+
 /* 253 — предел длины имени в DNS, плюс завершающий ноль. */
 #define SCAP_NAME_MAX  256
 
@@ -50,6 +60,22 @@ typedef struct {
     unsigned long drop_nottls;     /* не TCP/443 или не ClientHello */
     unsigned long drop_bad;        /* похоже на ClientHello, но не сошлось */
     unsigned long drop_foreign;    /* не адресован роутеру: чужой или мост */
+
+    /* Склейка. «Начато» без «склеено» — продолжение так и не пришло или
+       не сошлось по номеру последовательности. */
+    unsigned long partial_kept;    /* приветствий, ушедших ждать продолжения */
+    unsigned long reassembled;     /* из них собрано и разобрано */
+    unsigned long partial_lost;    /* сгорело по сроку или не сошлось */
+
+    struct {
+        unsigned char  family;
+        unsigned char  src[16], dst[16];
+        unsigned       sport, dport;
+        unsigned       next_seq;   /* какой seq ждём следующим */
+        size_t         len;
+        long           at;
+        unsigned char  data[SCAP_PARTIAL_BYTES];
+    } partial[SCAP_PARTIAL_MAX];
 
     unsigned char buf[SCAP_BUF_BYTES];
 } scap_t;
@@ -80,13 +106,21 @@ void scap_close(scap_t *c);
    TLS handshake, ClientHello и в нём расширение server_name.
 
    Возвращает 0 при успехе, -1 если это не наш пакет, -2 если пакет
-   похож на ClientHello, но разбор не сошёлся.
+   похож на ClientHello, но разбор не сошёлся, -3 если приветствие
+   обрывается на границе сегмента — продолжение в следующем.
 
    Вынесено отдельно от сокета намеренно: разбор проверяется тестами на
    любой машине, а сокет живёт только на Linux. Данные тут приходят из
    сети и полностью подконтрольны клиенту, поэтому каждый шаг проверяет
    границы, а имя — состав символов. */
 int  scap_extract(const unsigned char *pkt, size_t len, sni_hit_t *out);
+
+/* Один пакет: разбор, склейка с ожидающим продолжением, вызов cb.
+   pkttype — направление из sockaddr_ll, -1 если неизвестно; now — время
+   для срока жизни склеек. Отдельно от сокета, чтобы проверяться тестами.
+   Возвращает 1, если имя разобрано. */
+int  scap_handle(scap_t *c, const unsigned char *pkt, size_t len, int pkttype,
+                 long now, void (*cb)(const sni_hit_t *, void *), void *ctx);
 
 /* Читает готовые пакеты и вызывает cb на каждое разобранное имя.
    Возвращает число разобранных. */

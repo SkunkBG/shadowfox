@@ -72,7 +72,10 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "sni_bad=%lu\n"
         "dns_foreign=%lu\n"
         "sni_foreign=%lu\n"
-        "sni_throttled=%lu\n",
+        "sni_throttled=%lu\n"
+        "sni_kept=%lu\n"
+        "sni_reasm=%lu\n"
+        "sni_partlost=%lu\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
@@ -81,7 +84,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         (long)e->xray.pid, e->xray.restarts, cfg->socks_port,
         e->sniffing, e->sni.seen, e->sni.parsed,
         e->sni_names, e->sni_new, e->sni_broken, e->sni.drop_bad,
-        e->cap.drop_foreign, e->sni.drop_foreign, e->sni_throttled);
+        e->cap.drop_foreign, e->sni.drop_foreign, e->sni_throttled,
+        e->sni.partial_kept, e->sni.reassembled, e->sni.partial_lost);
 
     fclose(f);
     rename(tmp, path);
@@ -323,6 +327,14 @@ int status_print(const config_t *cfg)
         long bad = status_num(spath, "sni_bad");
         if (bad > 0)
             printf("              не разобрано ClientHello: %ld\n", bad);
+
+        /* Приветствия, не поместившиеся в один сегмент. «Начато» заметно
+           больше «склеено» — продолжения не доходят или не сходятся по
+           номеру последовательности. */
+        long kept = status_num(spath, "sni_kept");
+        if (kept > 0)
+            printf("              в двух сегментах: начато %ld, склеено %ld, потеряно %ld\n",
+                   kept, status_num(spath, "sni_reasm"), status_num(spath, "sni_partlost"));
 
         /* Чужое — пакеты не роутеру и не от него: мост, широковещание,
            подделка. Придержанные обрывы при потоке — признак поддельных
