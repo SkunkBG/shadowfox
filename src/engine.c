@@ -220,16 +220,6 @@ static void on_sni(const sni_hit_t *h, void *ctx)
     e->sni_new++;
     ips_queue_add(&e->ips, &e->wl, group, h->family, dst);
 
-    /* Отдаём набору сразу, а не с общей пачкой: сейчас мы оборвём
-       соединение, и приложение переустановит его через доли секунды.
-       Если адрес к тому моменту ещё не в наборе, метки снова не будет,
-       и вся затея окажется впустую. */
-    char err[160] = "";
-    if (ips_flush(&e->ips, err, sizeof(err)) != 0)
-        log_warn("ipset после SNI: %s", err);
-    else
-        e->flushes++;
-
     log_info("SNI %s -> %s в группу %s", h->name, dst, e->wl.groups[group].name);
 
     /* Бюджет обрывов. Обрыв делается по 5-tuple из пакета, а пакет в
@@ -248,7 +238,56 @@ static void on_sni(const sni_hit_t *h, void *ctx)
         return;
     }
 
-    break_conn(e, h, src, dst);
+    /* Не рвём здесь: сначала весь проход, один сброс набора, потом
+       обрывы — см. flush_pending_breaks. */
+    if (e->pending_count < ENG_PENDING_MAX) {
+        int k = e->pending_count++;
+        e->pending[k].family = h->family;
+        memcpy(e->pending[k].src, h->src, 16);
+        memcpy(e->pending[k].dst, h->dst, 16);
+        e->pending[k].sport = h->sport;
+        e->pending[k].dport = h->dport;
+    } else {
+        e->pending_lost++;
+    }
+}
+
+/* После прохода по пакетам: один ipset restore на всё накопленное,
+   и только потом обрывы. Порядок важен: приложение переустановит
+   соединение через доли секунды, и адрес к этому моменту обязан быть
+   в наборе, иначе метки снова не будет. */
+static void flush_pending_breaks(engine_t *e)
+{
+    if (!e->pending_count) return;
+
+    char err[160] = "";
+    if (ips_flush(&e->ips, err, sizeof(err)) != 0) {
+        log_warn("ipset после SNI: %s", err);
+    } else {
+        e->flushes++;
+        for (int i = 0; i < e->pending_count; i++) {
+            sni_hit_t h;
+            memset(&h, 0, sizeof(h));
+            h.family = e->pending[i].family;
+            memcpy(h.src, e->pending[i].src, 16);
+            memcpy(h.dst, e->pending[i].dst, 16);
+            h.sport = e->pending[i].sport;
+            h.dport = e->pending[i].dport;
+
+            char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+            int  af = (h.family == 4) ? AF_INET : AF_INET6;
+            if (!inet_ntop(af, h.src, src, sizeof(src))) continue;
+            if (!inet_ntop(af, h.dst, dst, sizeof(dst))) continue;
+            break_conn(e, &h, src, dst);
+        }
+    }
+
+    if (e->pending_lost) {
+        log_warn("обрывов отложено больше %d за проход, %d не сделано",
+                 ENG_PENDING_MAX, e->pending_lost);
+        e->pending_lost = 0;
+    }
+    e->pending_count = 0;
 }
 
 /* Версия ядра — спросив у самого бинарника.
@@ -704,7 +743,10 @@ void engine_tick(engine_t *e, time_t now)
     note_xray_version(e, now);
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
-    if (e->sniffing)  scap_poll(&e->sni, on_sni, e);
+    if (e->sniffing) {
+        scap_poll(&e->sni, on_sni, e);
+        flush_pending_breaks(e);
+    }
 
     /* Подхватываем падение своего ядра и перезапускаем с паузой. */
     if (e->xray_managed) sv_tick(&e->xray, now);

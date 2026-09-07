@@ -158,6 +158,12 @@ static int json_field(const char *text, const char *name,
     return i > 0;
 }
 
+/* Кеш ответов роутера для /data; сбрасывается кнопками, которые меняют
+   политику или подключение, — иначе карточка не позеленела бы до минуты. */
+static time_t g_rci_at;
+static int    g_rci_policy, g_rci_proxy;
+static char   g_rci_model[96], g_rci_osver[48];
+
 static void send_data(const http_req_t *req, int fd, struct engine *ce,
                       const config_t *cfg)
 {
@@ -206,17 +212,41 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_int(&j, "socks_port", cfg->socks_port);
 
     /* Есть ли политика и подключение на роутере. */
-    rci_t rci;
-    rci_init(&rci);
+    /* Обращения к роутеру — не на каждый опрос страницы. Страница
+       спрашивает каждые десять секунд, а каждое обращение к RCI — это
+       соединение с таймаутом в пять секунд; при занятом ndm один опрос
+       держал демон до пятнадцати секунд. Готовность политики и
+       подключения освежаем раз в минуту, модель и прошивку — один раз. */
+    time_t t_now = time(NULL);
+    if (t_now - g_rci_at >= 60) {
+        g_rci_at = t_now;
 
-    unsigned mark = 0;
-    json_kv_bool(&j, "policy_ready",
-                 rci_policy_mark(&rci, cfg->policy, &mark) == 0 && mark != 0);
+        rci_t rci;
+        rci_init(&rci);
 
-    char ipath[128], iout[256];
-    snprintf(ipath, sizeof(ipath), "/rci/show/interface/%s", cfg->proxy_iface);
-    int icode = rci_request(&rci, "GET", ipath, NULL, iout, sizeof(iout));
-    json_kv_bool(&j, "proxy_ready", icode == 200 && !strstr(iout, "\"code\""));
+        unsigned mark = 0;
+        g_rci_policy = rci_policy_mark(&rci, cfg->policy, &mark) == 0 && mark != 0;
+
+        char ipath[128], iout[256];
+        snprintf(ipath, sizeof(ipath), "/rci/show/interface/%s", cfg->proxy_iface);
+        int icode = rci_request(&rci, "GET", ipath, NULL, iout, sizeof(iout));
+        g_rci_proxy = icode == 200 && !strstr(iout, "\"code\"");
+
+        if (!g_rci_model[0]) {
+            char out[2048] = "";
+            if (rci_request(&rci, "GET", "/rci/show/version", NULL, out, sizeof(out)) == 200) {
+                static const char *models[]   = { "description", "device", "model", NULL };
+                static const char *versions[] = { "title", "release", "version", NULL };
+                for (int i = 0; models[i] && !g_rci_model[0]; i++)
+                    json_field(out, models[i], g_rci_model, sizeof(g_rci_model));
+                for (int i = 0; versions[i] && !g_rci_osver[0]; i++)
+                    json_field(out, versions[i], g_rci_osver, sizeof(g_rci_osver));
+            }
+        }
+    }
+
+    json_kv_bool(&j, "policy_ready", g_rci_policy);
+    json_kv_bool(&j, "proxy_ready", g_rci_proxy);
 
     /* Есть ли хоть одна ссылка на сервер. */
     int have_link = 0;
@@ -261,21 +291,8 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
        Имена полей у разных прошивок разнятся, поэтому пробуем несколько
        по очереди: пустой подвал лучше неверного, но лучше всего —
        заполненный. */
-    char model[96] = "", osver[48] = "";
-    {
-        char out[2048] = "";
-        if (rci_request(&rci, "GET", "/rci/show/version", NULL, out, sizeof(out)) == 200) {
-            static const char *models[]  = { "description", "device", "model", NULL };
-            static const char *versions[] = { "title", "release", "version", NULL };
-
-            for (int i = 0; models[i] && !model[0]; i++)
-                json_field(out, models[i], model, sizeof(model));
-            for (int i = 0; versions[i] && !osver[0]; i++)
-                json_field(out, versions[i], osver, sizeof(osver));
-        }
-    }
-    json_kv_str(&j, "model", model);
-    json_kv_str(&j, "osver", osver);
+    json_kv_str(&j, "model", g_rci_model);
+    json_kv_str(&j, "osver", g_rci_osver);
 
     json_kv_str(&j, "dns", dns);
     json_kv_str(&j, "peer", req->peer);
@@ -499,6 +516,7 @@ static void ndmc_run_plan(char *bin, const char **plan, int n,
     }
 
     log_info("веб: %s, сбоев %d, запрос с %s", what, failed, peer);
+    g_rci_at = 0;   /* настройки роутера менялись — страница переспросит */
 
     http_send(fd, failed ? 500 : 200, "text/plain; charset=utf-8",
               report, strlen(report));

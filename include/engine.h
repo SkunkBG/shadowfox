@@ -21,6 +21,7 @@
    через час работы. 8192 записи по 24 байта — под 200 КБ, роутер
    выдержит. */
 #define ENG_KNOWN_MAX 8192
+#define ENG_PENDING_MAX 64
 
 typedef struct engine {
     wl_t   wl;
@@ -68,6 +69,19 @@ typedef struct engine {
     unsigned long sni_throttled; /* обрывов не сделано: бюджет исчерпан */
     time_t        break_sec;     /* секунда, за которую считаем обрывы */
     int           break_in_sec;
+
+    /* Обрывы, отложенные до конца прохода по пакетам. Раньше на каждый
+       новый адрес внутри цикла чтения делались два порождения процесса
+       — ipset restore и conntrack; одна вкладка с сорока доменами
+       блокировала цикл на секунды. Теперь адреса копятся, набор
+       сбрасывается один раз, и уже потом обрывы. */
+    struct {
+        unsigned char family;
+        unsigned char src[16], dst[16];
+        unsigned      sport, dport;
+    } pending[ENG_PENDING_MAX];
+    int           pending_count;
+    int           pending_lost;   /* не поместилось — просто не оборвём */
     char          ct_bin[128];   /* путь к conntrack, пустой — не искали */
     int           ct_checked;
     int           ct_warned;
