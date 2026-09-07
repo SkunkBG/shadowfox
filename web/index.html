@@ -46,6 +46,8 @@ aside nav button{display:flex;align-items:center;gap:13px;width:100%;
   background:none;border:0;border-radius:12px;padding:12px 14px;cursor:pointer;
   color:var(--dim);font:inherit;font-size:15px;text-align:left}
 aside nav button svg{width:21px;height:21px;flex:0 0 auto}
+.emo{font-size:20px;line-height:1;width:24px;flex:0 0 auto;text-align:center;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
 aside nav button:hover{color:var(--fg);background:var(--panel)}
 aside nav button.on{background:var(--acc-soft);color:var(--acc);font-weight:600}
 .grow{flex:1}
@@ -835,11 +837,14 @@ function disclaimer(){ return `
 function chrome(){
   $('#ver').textContent=D.version;
 
-  const nav={conn:['Подключения',UI.conn],rules:['Правила',UI.rules],
-             info:['Информация',UI.info]};
+  /* Значки разделов — смайлы: их рисует шрифт устройства, поэтому они
+     цветные и одинаково узнаваемы везде. 🔀 для правил выбран за смысл:
+     это перенаправление потоков, то есть ровно маршрутизация. */
+  const nav={conn:['Подключения','🔌'],rules:['Правила','🔀'],
+             info:['Информация','ℹ️']};
   document.querySelectorAll('aside nav button').forEach(b=>{
     const [t,ic]=nav[b.dataset.tab];
-    b.innerHTML=ic+t;
+    b.innerHTML='<span class="emo">'+ic+'</span>'+t;
     b.classList.toggle('on',b.dataset.tab===tab);
   });
 
