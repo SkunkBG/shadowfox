@@ -41,6 +41,8 @@ extern const unsigned char web_logo[];
 extern const size_t        web_logo_len;
 extern const unsigned char web_font[];
 extern const size_t        web_font_len;
+extern const unsigned char web_loginjs[];
+extern const size_t        web_loginjs_len;
 
 static long slurp(const char *path, char *dst, size_t size);
 
@@ -1069,18 +1071,25 @@ static struct {
     long until;
 } g_sessions[SESSIONS_MAX];
 
+/* Случайные байты из /dev/urandom. Возвращает 1, если получилось;
+   предсказуемая метка сессии или nonce пустила бы посторонних, поэтому
+   при неудаче лучше не выдать ничего. */
+static int random_bytes(unsigned char *dst, size_t n)
+{
+    FILE *f = fopen("/dev/urandom", "rb");
+    if (!f) return 0;
+    size_t got = fread(dst, 1, n, f);
+    fclose(f);
+    return got == n;
+}
+
 static void session_new(char *out, unsigned out_size)
 {
     unsigned char raw[20];
-    FILE *f = fopen("/dev/urandom", "rb");
-    if (!f || fread(raw, 1, sizeof(raw), f) != sizeof(raw)) {
-        /* Предсказуемая метка пустила бы посторонних, поэтому лучше
-           не выдать никакой. */
-        if (f) fclose(f);
+    if (!random_bytes(raw, sizeof(raw))) {
         out[0] = '\0';
         return;
     }
-    fclose(f);
 
     char hex[41];
     hex_encode(raw, sizeof(raw), hex);
@@ -1231,7 +1240,11 @@ static void send_login(int fd, const char *message)
         "<label>Пароль</label>"
         "<input name=password type=password autocomplete=current-password>"
         "<button>Войти</button>"
-        "%s%s%s</form>",
+        "<div class=bad id=msg hidden></div>"
+        "<noscript><div class=bad>Для входа нужен JavaScript: ответ роутеру "
+        "считается в браузере, чтобы пароль не уходил по сети</div></noscript>"
+        "%s%s%s</form>"
+        "<script src=/login.js></script>",
         message && *message ? "<div class=bad>" : "",
         message && *message ? safe : "",
         message && *message ? "</div>" : "");
@@ -1278,6 +1291,92 @@ static login_peer_t *peer_slot(const char *peer, long now)
     return oldest;
 }
 
+/* Начатые входы: страница получила realm и challenge, но ответ ещё не
+   прислала. Слот живёт две минуты. Nonce — чтобы страница вернула
+   именно свой challenge, а не чужой из соседнего слота. */
+static int random_bytes(unsigned char *dst, size_t n);
+
+#define AUTH_PENDING_MAX 8
+#define AUTH_PENDING_TTL 120
+
+typedef struct {
+    char          nonce[33];
+    ndm_pending_t p;
+    long          at;
+} auth_pending_t;
+
+static auth_pending_t g_auth[AUTH_PENDING_MAX];
+
+static int router_host(const config_t *cfg, char *host, size_t size)
+{
+    if (cfg->router_host[0]) { str_copy(host, size, cfg->router_host); return 1; }
+    return iface_ipv4(cfg->capture_iface, host, size);
+}
+
+/* Первый шаг входа. Пароль страница не шлёт: она берёт отсюда realm и
+   challenge, считает ответ сама и присылает его в /login. */
+static void auth_begin(const http_req_t *req, int fd, const config_t *cfg)
+{
+    long now = (long)time(NULL);
+
+    char buf[1024];
+    json_t j;
+    json_init(&j, buf, sizeof(buf));
+    json_obj_open(&j);
+
+    login_peer_t *lp = peer_slot(req->peer, now);
+    if (lp->until > now) {
+        json_kv_bool(&j, "ok", 0);
+        json_kv_str(&j, "why", "слишком много неудачных попыток, подожди минуту");
+        goto out;
+    }
+
+    char host[64] = "";
+    if (!router_host(cfg, host, sizeof(host))) {
+        json_kv_bool(&j, "ok", 0);
+        json_kv_str(&j, "why", "не узнать адрес роутера, задай routerHost");
+        goto out;
+    }
+
+    ndm_pending_t p;
+    char          err[160] = "";
+    if (ndm_begin(host, cfg->router_port, &p, err, sizeof(err)) != NDM_OK) {
+        json_kv_bool(&j, "ok", 0);
+        json_kv_str(&j, "why", err[0] ? err : "роутер не ответил");
+        goto out;
+    }
+
+    /* Свободный либо самый старый слот. */
+    auth_pending_t *slot = &g_auth[0];
+    for (int i = 0; i < AUTH_PENDING_MAX; i++) {
+        if (!g_auth[i].nonce[0] || now - g_auth[i].at > AUTH_PENDING_TTL) { slot = &g_auth[i]; break; }
+        if (g_auth[i].at < slot->at) slot = &g_auth[i];
+    }
+
+    unsigned char rnd[16];
+    if (!random_bytes(rnd, sizeof(rnd))) {
+        json_kv_bool(&j, "ok", 0);
+        json_kv_str(&j, "why", "нет случайных чисел");
+        goto out;
+    }
+    hex_encode(rnd, sizeof(rnd), slot->nonce);
+    slot->p  = p;
+    slot->at = now;
+
+    json_kv_bool(&j, "ok", 1);
+    json_kv_str(&j, "realm", p.realm);
+    json_kv_str(&j, "challenge", p.challenge);
+    json_kv_str(&j, "nonce", slot->nonce);
+
+out:
+    json_obj_close(&j);
+    if (json_done(&j) != 0) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "не поместилось\n");
+        return;
+    }
+    http_send(fd, 200, "application/json; charset=utf-8", buf, strlen(buf));
+}
+
 static void do_login(const http_req_t *req, int fd, const config_t *cfg)
 {
     long now = (long)time(NULL);
@@ -1302,29 +1401,42 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
         return;
     }
 
-    char login[128] = "", password[128] = "";
-    form_field(req->body, req->body_len, "login", login, sizeof(login));
-    form_field(req->body, req->body_len, "password", password, sizeof(password));
+    char login[128] = "", answer[80] = "", nonce[40] = "";
+    form_field(req->body, req->body_len, "login",  login,  sizeof(login));
+    form_field(req->body, req->body_len, "answer", answer, sizeof(answer));
+    form_field(req->body, req->body_len, "nonce",  nonce,  sizeof(nonce));
 
     if (!login[0]) { send_login(fd, "Введи логин"); return; }
+
+    /* Пароля здесь больше нет: приходит ответ, посчитанный на странице.
+       Если пришёл сам пароль — старая форма из кеша — просим обновить. */
+    if (!answer[0] || !nonce[0]) {
+        send_login(fd, "Страница устарела — обнови её и войди снова");
+        return;
+    }
+
+    auth_pending_t *slot = NULL;
+    for (int i = 0; i < AUTH_PENDING_MAX; i++)
+        if (g_auth[i].nonce[0] && !strcmp(g_auth[i].nonce, nonce)) slot = &g_auth[i];
+    if (!slot || now - slot->at > AUTH_PENDING_TTL) {
+        send_login(fd, "Запрос входа устарел — попробуй ещё раз");
+        return;
+    }
+    ndm_pending_t p = slot->p;
+    memset(slot, 0, sizeof(*slot));   /* одноразовый */
 
     /* Спрашивать роутер надо с адреса сети, а не с петли: на 127.0.0.1
        он отвечает «insufficient security level» и заголовков схемы не
        присылает вовсе. */
     char host[64] = "";
-    if (cfg->router_host[0])
-        str_copy(host, sizeof(host), cfg->router_host);
-    else if (!iface_ipv4(cfg->capture_iface, host, sizeof(host))) {
+    if (!router_host(cfg, host, sizeof(host))) {
         send_login(fd, "не узнать адрес роутера, задай routerHost");
         return;
     }
 
     char         err[160] = "";
-    ndm_result_t r = ndm_check_password(host, cfg->router_port,
-                                        login, password, err, sizeof(err));
-
-    /* Пароль в памяти не задерживаем дольше нужного. */
-    memset(password, 0, sizeof(password));
+    ndm_result_t r = ndm_finish(host, cfg->router_port, &p, login, answer,
+                                err, sizeof(err));
 
     if (r != NDM_OK) {
         if (r == NDM_DENIED) g_bad_total++;
@@ -1384,6 +1496,13 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         return;
     }
 
+    /* Без проверки входа: скрипт нужен самой форме входа. */
+    if (!strcmp(req->path, "/login.js")) {
+        http_send_gzip(fd, "application/javascript; charset=utf-8",
+                       web_loginjs, web_loginjs_len);
+        return;
+    }
+
     if (!strcmp(req->path, "/logo.png")) {
         /* Без проверки входа: картинка нужна самой форме входа, а тайны
            в ней нет. */
@@ -1395,6 +1514,11 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         log_warn("веб: POST %s с чужого источника %s, отказ", req->path, req->origin);
         http_send_text(fd, 403, "text/plain; charset=utf-8",
                        "запрос с чужой страницы\n");
+        return;
+    }
+
+    if (!strcmp(req->path, "/auth") && !strcmp(req->method, "GET")) {
+        auth_begin(req, fd, c->cfg);
         return;
     }
 

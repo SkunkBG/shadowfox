@@ -131,15 +131,12 @@ static int exchange(const char *host, int port, const char *request,
     return atoi(out + 9);
 }
 
-ndm_result_t ndm_check_password(const char *host, int port,
-                                const char *login, const char *password,
-                                char *err, unsigned err_size)
+ndm_result_t ndm_begin(const char *host, int port, ndm_pending_t *out,
+                       char *err, unsigned err_size)
 {
-    if (!host || !login || !password) return NDM_UNAVAILABLE;
+    if (!host || !out) return NDM_UNAVAILABLE;
+    memset(out, 0, sizeof(*out));
 
-    /* С запасом: сюда складываются логин, ответ на запрос и кука
-       сессии. Обрезанный запрос роутер отверг бы, а понять почему было
-       бы неоткуда. */
     char req[1024];
     /* User-Agent и Accept шлём намеренно: встроенные веб-серверы иногда
        отвечают 400 на запрос без них, а curl их подставляет сам — из-за
@@ -189,11 +186,32 @@ ndm_result_t ndm_check_password(const char *host, int port,
         return NDM_UNAVAILABLE;
     }
 
-    char realm[128] = "", challenge[128] = "";
-    if (!ndm_header(resp, "X-NDM-Realm", realm, sizeof(realm)) ||
-        !ndm_header(resp, "X-NDM-Challenge", challenge, sizeof(challenge))) {
+    if (!ndm_header(resp, "X-NDM-Realm", out->realm, sizeof(out->realm)) ||
+        !ndm_header(resp, "X-NDM-Challenge", out->challenge, sizeof(out->challenge))) {
         if (err) str_copy(err, err_size, "роутер ответил не по своей схеме входа");
         return NDM_UNAVAILABLE;
+    }
+
+    /* Сессионная кука обязательна: challenge выдан именно ей. */
+    ndm_header(resp, "Set-Cookie", out->cookie, sizeof(out->cookie));
+    char *semi = strchr(out->cookie, ';');
+    if (semi) *semi = '\0';
+
+    return NDM_OK;
+}
+
+ndm_result_t ndm_finish(const char *host, int port, const ndm_pending_t *p,
+                        const char *login, const char *answer,
+                        char *err, unsigned err_size)
+{
+    if (!host || !p || !login || !answer) return NDM_UNAVAILABLE;
+
+    /* Ответ — 64 шестнадцатеричных знака и ничего больше: он идёт в JSON
+       и в заголовок, и это единственное, что приходит со страницы без
+       нашего участия. */
+    if (strlen(answer) != 64 || strspn(answer, "0123456789abcdef") != 64) {
+        if (err) str_copy(err, err_size, "ответ на запрос не той формы");
+        return NDM_DENIED;
     }
 
     /* Логин попадает в JSON, поэтому кавычки и обратные косые в нём
@@ -205,32 +223,20 @@ ndm_result_t ndm_check_password(const char *host, int port,
         return NDM_UNAVAILABLE;
     }
 
-    char answer[65];
-    ndm_answer(realm, challenge, login, password, answer);
-    if (!answer[0]) {
-        if (err) str_copy(err, err_size, "слишком длинный логин или пароль");
-        return NDM_UNAVAILABLE;
-    }
-
-    /* Сессионная кука обязательна: challenge выдан именно ей. */
-    char cookie[256] = "";
-    ndm_header(resp, "Set-Cookie", cookie, sizeof(cookie));
-    char *semi = strchr(cookie, ';');
-    if (semi) *semi = '\0';
-
     /* Логин с ответом идут телом JSON: прошивка 5.x отвечает на пустой
        POST «no data», а на форму — «bad content type». Заголовки
        X-NDM-* шлём вдобавок: на прошивках постарше работают только они,
        а новой они не мешают. */
     char body[512];
-    n = snprintf(body, sizeof(body),
-                 "{\"login\":\"%s\",\"password\":\"%s\"}", jlogin, answer);
+    int  n = snprintf(body, sizeof(body),
+                      "{\"login\":\"%s\",\"password\":\"%s\"}", jlogin, answer);
     if (n < 0 || (size_t)n >= sizeof(body)) {
         if (err) str_copy(err, err_size, "слишком длинный логин");
         return NDM_UNAVAILABLE;
     }
     size_t blen = (size_t)n;
 
+    char req[1024];
     n = snprintf(req, sizeof(req),
                  "POST /auth HTTP/1.1\r\nHost: %s\r\n"
                  "User-Agent: ShadowFox\r\nAccept: */*\r\n"
@@ -239,14 +245,15 @@ ndm_result_t ndm_check_password(const char *host, int port,
                  "Content-Type: application/json\r\n"
                  "Content-Length: %zu\r\nConnection: close\r\n\r\n%s",
                  host, login, answer,
-                 cookie[0] ? "Cookie: " : "", cookie, cookie[0] ? "\r\n" : "",
+                 p->cookie[0] ? "Cookie: " : "", p->cookie, p->cookie[0] ? "\r\n" : "",
                  blen, body);
     if (n < 0 || (size_t)n >= sizeof(req)) {
         if (err) str_copy(err, err_size, "слишком длинный логин");
         return NDM_UNAVAILABLE;
     }
 
-    code = exchange(host, port, req, resp, sizeof(resp));
+    static char resp[8192];
+    int code = exchange(host, port, req, resp, sizeof(resp));
 
     if (code == 200) return NDM_OK;
     if (code == 401 || code == 403) {
@@ -264,4 +271,24 @@ ndm_result_t ndm_check_password(const char *host, int port,
         else           snprintf(err, err_size, "роутер ответил кодом %d", code);
     }
     return NDM_UNAVAILABLE;
+}
+
+ndm_result_t ndm_check_password(const char *host, int port,
+                                const char *login, const char *password,
+                                char *err, unsigned err_size)
+{
+    if (!host || !login || !password) return NDM_UNAVAILABLE;
+
+    ndm_pending_t p;
+    ndm_result_t  r = ndm_begin(host, port, &p, err, err_size);
+    if (r != NDM_OK) return r;
+
+    char answer[65];
+    ndm_answer(p.realm, p.challenge, login, password, answer);
+    if (!answer[0]) {
+        if (err) str_copy(err, err_size, "слишком длинный логин или пароль");
+        return NDM_UNAVAILABLE;
+    }
+
+    return ndm_finish(host, port, &p, login, answer, err, err_size);
 }

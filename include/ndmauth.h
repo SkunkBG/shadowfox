@@ -18,6 +18,25 @@ typedef enum {
     NDM_UNAVAILABLE   /* роутер не ответил или ответил непонятно */
 } ndm_result_t;
 
+/* Проверка в два шага, чтобы ответ можно было посчитать на странице:
+   ndm_begin берёт у роутера realm, challenge и его сессионную куку,
+   ndm_finish отправляет готовый ответ. Пароль тогда не покидает
+   браузер — как и у самого роутера. */
+typedef struct {
+    char realm[128];
+    char challenge[128];
+    char cookie[256];     /* сессия роутера: challenge выдан именно ей */
+} ndm_pending_t;
+
+ndm_result_t ndm_begin(const char *host, int port, ndm_pending_t *out,
+                       char *err, unsigned err_size);
+
+ndm_result_t ndm_finish(const char *host, int port, const ndm_pending_t *p,
+                        const char *login, const char *answer,
+                        char *err, unsigned err_size);
+
+/* Оба шага разом, с вычислением ответа у нас. Остаётся для проверок и
+   как запасной путь. */
 ndm_result_t ndm_check_password(const char *host, int port,
                                 const char *login, const char *password,
                                 char *err, unsigned err_size);
