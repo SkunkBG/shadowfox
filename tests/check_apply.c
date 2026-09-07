@@ -185,6 +185,29 @@ static void test_temp_keeps_extension(void)
           "и не оканчивается на .new: %s", got);
 }
 
+/* proc_run_capture обязан сообщать, что вывод не поместился: раньше
+   лишнее ронялось молча, и разбор получал обрезок как целое. */
+static void test_capture_truncation(void)
+{
+    char sh[] = "/bin/sh", c[] = "-c";
+    char big[] = "i=0; while [ $i -lt 400 ]; do echo 0123456789abcdef; i=$((i+1)); done";
+    char *argv[] = { sh, c, big, NULL };
+
+    char out[1024];
+    int  trunc = -1;
+    int  rc = proc_run_capture(argv, out, sizeof(out), 10, &trunc);
+    CHECK(rc == 0, "команда завершилась: %d", rc);
+    CHECK(trunc == 1, "обрезка должна быть замечена: %d", trunc);
+    CHECK(strlen(out) < sizeof(out), "буфер завершён нулём");
+
+    char small[] = "echo привет";
+    char *argv2[] = { sh, c, small, NULL };
+    trunc = -1;
+    rc = proc_run_capture(argv2, out, sizeof(out), 10, &trunc);
+    CHECK(rc == 0 && trunc == 0, "короткий вывод: rc %d, trunc %d", rc, trunc);
+    CHECK(strstr(out, "привет") != NULL, "вывод на месте");
+}
+
 int main(void)
 {
     printf("check_apply " VERSION "\n");
@@ -198,6 +221,7 @@ int main(void)
     test_bad_config_keeps_old();
     test_missing_xray();
     test_temp_keeps_extension();
+    test_capture_truncation();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);

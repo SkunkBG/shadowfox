@@ -9,13 +9,29 @@
 #include <time.h>
 #include <unistd.h>
 
+static int run(char *const argv[], const char *input,
+               char *out, size_t out_size, int timeout_sec, int *truncated);
+
 int proc_run(char *const argv[], char *out, size_t out_size, int timeout_sec)
 {
-    return proc_run_input(argv, NULL, out, out_size, timeout_sec);
+    return run(argv, NULL, out, out_size, timeout_sec, NULL);
 }
 
 int proc_run_input(char *const argv[], const char *input,
                    char *out, size_t out_size, int timeout_sec)
+{
+    return run(argv, input, out, out_size, timeout_sec, NULL);
+}
+
+int proc_run_capture(char *const argv[], char *out, size_t out_size,
+                     int timeout_sec, int *truncated)
+{
+    if (truncated) *truncated = 0;
+    return run(argv, NULL, out, out_size, timeout_sec, truncated);
+}
+
+static int run(char *const argv[], const char *input,
+               char *out, size_t out_size, int timeout_sec, int *truncated)
 {
     if (!argv || !argv[0]) return -1;
     if (out && out_size) out[0] = '\0';
@@ -99,6 +115,11 @@ int proc_run_input(char *const argv[], const char *input,
                 memcpy(out + len, buf, (size_t)n);
                 len += (size_t)n;
                 out[len] = '\0';
+            } else if (truncated) {
+                /* Раньше кусок ронялся молча, причём поштучно: следующий
+                   короткий мог ещё влезть, и текст склеивался из
+                   обрывков. Теперь хотя бы известно, что так было. */
+                *truncated = 1;
             }
             continue;
         }

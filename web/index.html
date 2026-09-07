@@ -1253,12 +1253,18 @@ function flipTheme(){
 }
 
 /* ---- события ---- */
+/* Набранное в полях группы живёт только в DOM, пока его не заберёт
+   collect(). Любая перерисовка без этого шага теряла текст, а плашка
+   «Сохранить» оставалась — и сохраняла старое. Поэтому перед каждой
+   перерисовкой из раздела правил забираем правки. */
+function syncEdits(){ if(tab==='rules' && D) D.domains=buildDomains(collect()); }
+
 document.addEventListener('input',ev=>{
   if(ev.target.id==='q'){ query=ev.target.value;
-    const el=$('#view'); const pos=ev.target.selectionStart;
-    draw(); const q=$('#q'); if(q){ q.focus(); q.setSelectionRange(pos,pos); }
+    const pos=ev.target.selectionStart;
+    syncEdits(); draw(); const q=$('#q'); if(q){ q.focus(); q.setSelectionRange(pos,pos); }
     return; }
-  if(ev.target.closest('.g')) touch();
+  if(ev.target.closest('.g')){ syncEdits(); touch(); }
 });
 
 document.addEventListener('click',async ev=>{
@@ -1269,7 +1275,7 @@ document.addEventListener('click',async ev=>{
     $('#view').scrollIntoView({block:'start'}); return; }
 
   const nav=ev.target.closest('aside nav button');
-  if(nav){ tab=nav.dataset.tab; if(nodesMode!=='masked') nodesMode='masked';
+  if(nav){ syncEdits(); tab=nav.dataset.tab; if(nodesMode!=='masked') nodesMode='masked';
            if(tab!=='conn'){ dnsLoaded=0; dnsInfo=null; }
            draw(); return; }
 
@@ -1308,6 +1314,13 @@ document.addEventListener('click',async ev=>{
     picker(-1,t.trim()); return; }
 
   if(ev.target.id==='apply'){
+    /* Пустые группы при сохранении отбрасываются — но не молча: создал
+       группу, не успел вписать строки, нажал «Сохранить» — и она
+       исчезала с ответом «сохранено». */
+    const empty=[];
+    for(const r of collect()) for(const g of r.groups) if(!g.lines.length) empty.push(g.name);
+    if(empty.length && !confirm('Пустые группы будут удалены: '+empty.join(', ')+
+                                '.\nСохранить без них?')) return;
     const btn=ev.target; btn.disabled=true;
     D.domains=buildDomains(collect(true));
     const ok=await save('domains',D.domains,'m-rules');

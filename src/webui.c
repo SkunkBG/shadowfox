@@ -373,11 +373,15 @@ static void send_dns(int fd, const config_t *cfg)
     /* Без ndmc спрашивать нечего, и это надо сказать прямо: «не удалось
        прочитать» одинаково звучит и когда программы нет, и когда она
        ответила ошибкой — а чинится это по-разному. */
-    int rc = bin[0] ? proc_run(argv, out, sizeof(out), 10) : -1;
+    int trunc = 0;
+    int rc = bin[0] ? proc_run_capture(argv, out, sizeof(out), 10, &trunc) : -1;
+    if (rc == 0 && trunc) rc = -2;
 
     json_kv_bool(&j, "ok", rc == 0);
-    json_kv_str(&j, "why", bin[0] ? (rc == 0 ? "" : "ndmc ответил ошибкой")
-                                  : "ndmc не найден");
+    json_kv_str(&j, "why", !bin[0]   ? "ndmc не найден"
+                         : rc == 0   ? ""
+                         : rc == -2  ? "конфигурация роутера не поместилась в буфер"
+                                     : "ndmc ответил ошибкой");
     json_kv_str(&j, "bin", bin);
 
     /* Спрашиваем до разбора остального: соседи режут текст на месте. */
@@ -545,7 +549,13 @@ static void apply_dns(const http_req_t *req, int fd)
         char *sargv[] = { bin, arg, show, NULL };
         static char cfgtext[64 * 1024];
 
-        if (proc_run(sargv, cfgtext, sizeof(cfgtext), 10) == 0) {
+        int trunc = 0;
+        if (proc_run_capture(sargv, cfgtext, sizeof(cfgtext), 10, &trunc) != 0 || trunc) {
+            http_send_text(fd, 500, "text/plain; charset=utf-8",
+                           "не удалось прочитать конфигурацию роутера, DNS не тронут\n");
+            return;
+        }
+        {
             const char *ifs[DNS_LINES_MAX];
             int n = dns_isp_interfaces(cfgtext, ifs, DNS_LINES_MAX);
 
@@ -691,8 +701,19 @@ static void apply_policy(const http_req_t *req, int fd, const config_t *cfg)
     const char *globals[DNS_LINES_MAX];
     int         gn = 0;
 
-    if (proc_run(sargv, cfgtext, sizeof(cfgtext), 10) == 0)
-        gn = policy_globals(cfgtext, globals, DNS_LINES_MAX);
+    /* Без полного списка подключений план — половина дела: политика
+       создастся и разрешит своё подключение, а запреты остальных
+       выпадут, и трафик пойдёт через провайдера при зелёном «настроена».
+       Ровно так и было: сбой чтения молча давал gn = 0. */
+    int trunc = 0;
+    if (proc_run_capture(sargv, cfgtext, sizeof(cfgtext), 10, &trunc) != 0 || trunc) {
+        log_warn("веб: конфигурация роутера не прочитана%s, политика не тронута",
+                 trunc ? " целиком" : "");
+        http_send_text(fd, 500, "text/plain; charset=utf-8",
+                       "не удалось прочитать конфигурацию роутера, политика не тронута\n");
+        return;
+    }
+    gn = policy_globals(cfgtext, globals, DNS_LINES_MAX);
 
     static char cmds[DNS_LINES_MAX + 4][160];
     int         n = 0;

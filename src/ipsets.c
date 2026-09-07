@@ -279,7 +279,13 @@ int ips_timeout_differs(ips_t *s, const wl_t *w, int timeout)
     char *argv[] = { binbuf, list, terse, NULL };
 
     static char out[32768];
-    if (proc_run(argv, out, sizeof(out), 10) != 0) return 1;
+    int trunc = 0;
+    if (proc_run_capture(argv, out, sizeof(out), 10, &trunc) != 0) return 1;
+
+    /* Обрезанный вывод — неясность, а при неясности пересоздаём: наши
+       наборы могли остаться за срезом, и «расхождения нет» было бы
+       ответом по тексту, которого мы не видели. */
+    if (trunc) return 1;
 
     return ips_headers_differ(out, w, timeout);
 }
