@@ -830,7 +830,11 @@ static int spawn_detached(const char *command)
         open("/dev/null", O_RDWR);
         if (dup(0) < 0 || dup(0) < 0) _exit(1);
 
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
+        char sh[] = "/bin/sh", n0[] = "sh", c[] = "-c";
+        char cmdbuf[1024];
+        str_copy(cmdbuf, sizeof(cmdbuf), command);
+        char *sargv[] = { n0, c, cmdbuf, NULL };
+        execve(sh, sargv, child_env);
         _exit(127);
     }
 

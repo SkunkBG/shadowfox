@@ -25,4 +25,8 @@ int proc_run_input(char *const argv[], const char *input,
 int proc_run_capture(char *const argv[], char *out, size_t out_size,
                      int timeout_sec, int *truncated);
 
+/* Окружение для потомков: только PATH. Общее и для тех, кто запускает
+   шелл сам, — чтобы никто не унаследовал окружение root целиком. */
+extern char *const child_env[];
+
 #endif /* SHADOWFOX_PROC_H */

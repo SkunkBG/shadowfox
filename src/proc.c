@@ -12,6 +12,12 @@
 static int run(char *const argv[], const char *input,
                char *out, size_t out_size, int timeout_sec, int *truncated);
 
+/* Единственное, что нужно потомкам, — где искать программы. */
+char *const child_env[] = {
+    "PATH=/opt/sbin:/opt/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    NULL
+};
+
 int proc_run(char *const argv[], char *out, size_t out_size, int timeout_sec)
 {
     return run(argv, NULL, out, out_size, timeout_sec, NULL);
@@ -74,8 +80,12 @@ static int run(char *const argv[], const char *input,
             }
         }
 
-        execv(argv[0], argv);
-        _exit(127);                 /* execv вернулся — значит не запустился */
+        /* Окружение потомку — своё, минимальное, а не унаследованное от
+           процесса root целиком. ipset, iptables, conntrack и xray сами
+           могут порождать процессы и читать LD_* и IFS; демону от root
+           передавать им чужие переменные незачем. */
+        execve(argv[0], argv, child_env);
+        _exit(127);                 /* execve вернулся — значит не запустился */
     }
 
     close(pipefd[1]);

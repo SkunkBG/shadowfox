@@ -53,6 +53,35 @@ static void usage(FILE *out)
         "  SIGUSR1               восстановить правила (шлют ndm-хуки роутера)\n");
 }
 
+/* Настройки генератора для --link и --sub: те же, что у работающего
+   демона. Раньше ручная генерация брала умолчания библиотеки, и
+   печатала не то, что получает роутер: другой адрес, порт и отпечаток.
+   Из-за этого сквозная проверка через настоящее ядро никогда не гоняла
+   реальную форму конфига. Флаги в командной строке — поверх конфига. */
+static void gen_opts_from_conf(xraycfg_opts_t *o, config_t *cfg,
+                               const char *conf_path, int argc, char **argv)
+{
+    config_defaults(cfg);
+    str_copy(cfg->conf_file, sizeof(cfg->conf_file), conf_path);
+    config_load_file(cfg, cfg->conf_file);
+
+    o->socks_port  = cfg->socks_port;
+    o->fragment    = cfg->fragment;
+    o->fingerprint = cfg->fingerprint;
+
+    for (int k = 1; k < argc; k++) {
+        if (!strcmp(argv[k], "--fragment")) {
+            o->fragment = 1;
+        } else if (!strcmp(argv[k], "--no-fragment")) {
+            o->fragment = 0;
+        } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
+            o->socks_port = atoi(argv[++k]);
+        } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {
+            o->listen = argv[++k];
+        }
+    }
+}
+
 /* Уводит процесс в фон. Возвращает 0 в потомке, не возвращается в родителе. */
 static int daemonize(void)
 {
@@ -122,19 +151,10 @@ int main(int argc, char **argv)
             const char *link = argv[++i];
 
             xraycfg_opts_t opts;
+            config_t       gen_cfg;
             xraycfg_defaults(&opts);
 
-            for (int k = 1; k < argc; k++) {
-                if (!strcmp(argv[k], "--fragment")) {
-                    opts.fragment = 1;
-                } else if (!strcmp(argv[k], "--no-fragment")) {
-                    opts.fragment = 0;
-                } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
-                    opts.socks_port = atoi(argv[++k]);
-                } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {
-                    opts.listen = argv[++k];
-                }
-            }
+            gen_opts_from_conf(&opts, &gen_cfg, conf_path, argc, argv);
 
             node_t node;
             char   err[128] = "";
@@ -187,18 +207,9 @@ int main(int argc, char **argv)
                 fprintf(stderr, "пропущено неразобранных строк: %d\n", list.skipped);
 
             xraycfg_opts_t opts;
+            config_t       gen_cfg;
             xraycfg_defaults(&opts);
-            for (int k = 1; k < argc; k++) {
-                if (!strcmp(argv[k], "--fragment")) {
-                    opts.fragment = 1;
-                } else if (!strcmp(argv[k], "--no-fragment")) {
-                    opts.fragment = 0;
-                } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
-                    opts.socks_port = atoi(argv[++k]);
-                } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {
-                    opts.listen = argv[++k];
-                }
-            }
+            gen_opts_from_conf(&opts, &gen_cfg, conf_path, argc, argv);
 
             static char out[262144];
             if (xraycfg_build_list(&list, &opts, out, sizeof(out)) != 0) {

@@ -16,7 +16,11 @@ CC_MIPSEL  = $(call pick_cc,mipsel-unknown-linux-muslsf-gcc mipsel-linux-muslsf-
 CC_MIPS    = $(call pick_cc,mips-unknown-linux-muslsf-gcc mips-linux-muslsf-gcc)
 CC_NATIVE  = cc
 
+# -fstack-protector-strong: демон от root разбирает пакеты из сети;
+# разборщики проверены, но защита в глубину стоит десятков байт на
+# функцию. _FORTIFY_SOURCE не включаем: у musl его нет.
 COMMON_CFLAGS = -Os -Wall -Wextra -Wno-unused-parameter \
+			-fstack-protector-strong \
 			-ffunction-sections -fdata-sections \
 			-fno-unwind-tables -fno-asynchronous-unwind-tables \
 			-fomit-frame-pointer -fno-strict-aliasing \
