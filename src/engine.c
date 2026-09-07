@@ -29,6 +29,12 @@
 #define ENGINE_RESTORE_DELAY 2
 #define ENGINE_BREAK_BUDGET  20   /* обрывов соединений в секунду */
 
+/* Расписание проверки туннеля. Живой проверяем раз в минуту, упавший —
+   чаще, чтобы восстановление заметить без долгой ложной тревоги. */
+#define ENGINE_PROBE_FIRST 5
+#define ENGINE_PROBE_OK    60
+#define ENGINE_PROBE_FAIL  20
+
 void engine_init(engine_t *e)
 {
     memset(e, 0, sizeof(*e));
@@ -39,6 +45,7 @@ void engine_init(engine_t *e)
     scap_init(&e->sni);
     rci_init(&e->rci);
     sv_init(&e->xray, "", "");
+    probe_init(&e->probe);
 }
 
 int engine_fds(const engine_t *e, int *out, int max)
@@ -48,6 +55,8 @@ int engine_fds(const engine_t *e, int *out, int max)
     int n = 0;
     if (e->capturing && n < max) out[n++] = e->cap.fd;
     if (e->sniffing  && n < max) out[n++] = e->sni.fd;
+    int pfd = probe_fd(&e->probe);
+    if (pfd >= 0 && n < max) out[n++] = pfd;
     return n;
 }
 
@@ -594,7 +603,58 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
              list.count, lan, cfg->socks_port);
 
     sv_init(&e->xray, ao.xray_bin, cfg->xray_config);
-    if (sv_start(&e->xray) == 0) e->xray_managed = 1;
+    if (sv_start(&e->xray) == 0) {
+        e->xray_managed = 1;
+        str_copy(e->xray_listen, sizeof(e->xray_listen), lan);
+        /* Первую проверку — через несколько секунд: ядру надо успеть
+           открыть порт. */
+        e->probe_next = time(NULL) + ENGINE_PROBE_FIRST;
+    }
+}
+
+/* Проверка туннеля: запуск по расписанию, продвижение по шагам, итог.
+   Об изменении состояния пишем в журнал и сразу выкладываем статус,
+   чтобы страница и --status не ждали минутного круга. */
+static void tunnel_probe(engine_t *e, time_t now)
+{
+    if (e->probe.state != PROBE_IDLE && e->probe.state != PROBE_DONE) {
+        if (!probe_poll(&e->probe, (long)now)) return;
+
+        e->tunnel_at = now;
+        int st = e->probe.ok ? 1 : -1;
+        if (e->probe.ok) e->tunnel_ms = e->probe.ms;
+        str_copy(e->tunnel_why, sizeof(e->tunnel_why), e->probe.why);
+
+        if (st != e->tunnel_state) {
+            e->tunnel_since = now;
+            if (st > 0) log_info("туннель отвечает, %d мс", e->tunnel_ms);
+            else        log_warn("туннель не отвечает: %s", e->tunnel_why);
+            e->tunnel_state = st;
+            status_write(e, e->cfg);
+        }
+        e->probe_next = now + (st > 0 ? ENGINE_PROBE_OK : ENGINE_PROBE_FAIL);
+        probe_abort(&e->probe);
+        return;
+    }
+
+    if (!e->xray_managed || e->xray.pid <= 0) return;
+    if (!e->cfg || !e->cfg->probe_url[0] || !e->xray_listen[0]) return;
+    if (now < e->probe_next) return;
+
+    if (probe_start(&e->probe, e->xray_listen, e->cfg->socks_port,
+                    e->cfg->probe_url, (long)now) != 0) {
+        /* Не смогли даже начать: это тоже ответ. */
+        e->tunnel_at = now;
+        str_copy(e->tunnel_why, sizeof(e->tunnel_why), e->probe.why);
+        if (e->tunnel_state != -1) {
+            e->tunnel_state = -1;
+            e->tunnel_since = now;
+            log_warn("туннель не отвечает: %s", e->tunnel_why);
+            status_write(e, e->cfg);
+        }
+        e->probe_next = now + ENGINE_PROBE_FAIL;
+        probe_abort(&e->probe);
+    }
 }
 
 /* Всё, что движок берёт из конфига, — в одном месте. Раньше это делал
@@ -644,6 +704,7 @@ void engine_stop(engine_t *e)
 {
     if (!e) return;
 
+    probe_abort(&e->probe);
     if (e->xray_managed) {
         sv_stop(&e->xray);
         e->xray_managed = 0;
@@ -695,6 +756,7 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
 
     /* Ссылки могли смениться вместе со списками, поэтому ядро
        перезапускаем: иначе трафик пошёл бы через прежний сервер. */
+    probe_abort(&e->probe);
     if (e->xray_managed) {
         sv_stop(&e->xray);
         e->xray_managed = 0;
@@ -753,6 +815,7 @@ void engine_tick(engine_t *e, time_t now)
 
     /* Подхватываем падение своего ядра и перезапускаем с паузой. */
     if (e->xray_managed) sv_tick(&e->xray, now);
+    tunnel_probe(e, now);
 
     if (e->restore_due && now >= e->restore_due) {
         e->restore_due = 0;

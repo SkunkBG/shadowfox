@@ -185,6 +185,12 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_str(&j, "uptime", uptime);
 
     json_kv_int(&j, "xray_pid", e->xray.pid);
+    json_kv_int(&j, "tunnel", e->tunnel_state);
+    json_kv_int(&j, "tunnel_since", (long)e->tunnel_since);
+    json_kv_int(&j, "tunnel_at", (long)e->tunnel_at);
+    json_kv_int(&j, "tunnel_ms", e->tunnel_ms);
+    json_kv_str(&j, "tunnel_why", e->tunnel_why);
+    json_kv_bool(&j, "tunnel_probe", cfg->probe_url[0] != '\0');
     json_kv_bool(&j, "capture", e->capturing);
     json_kv_str(&j, "iface", cfg->capture_iface);
     json_kv_int(&j, "seen", (long)e->cap.seen);

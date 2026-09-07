@@ -76,6 +76,15 @@ static void test_config_set(void)
     CHECK(config_set(&cfg, "pidFile", "/tmp/x.pid") == 0, "ключ pidFile принят");
     CHECK(!strcmp(cfg.pid_file, "/tmp/x.pid"), "pidFile применился");
 
+    CHECK(!strcmp(cfg.probe_url, "http://www.gstatic.com/generate_204"),
+          "проверка туннеля по умолчанию включена");
+    CHECK(config_set(&cfg, "tunnelProbe", "no") == 0, "ключ tunnelProbe принят");
+    CHECK(cfg.probe_url[0] == '\0', "tunnelProbe=no выключает проверку");
+    CHECK(config_set(&cfg, "tunnelProbe", "http://cp.cloudflare.com/") == 0, "свой адрес");
+    CHECK(!strcmp(cfg.probe_url, "http://cp.cloudflare.com/"), "адрес применился");
+    CHECK(config_set(&cfg, "tunnelProbe", "") == 0 && cfg.probe_url[0] == '\0',
+          "пустое значение выключает");
+
     CHECK(config_set(&cfg, "ерунда", "1") != 0, "неизвестный ключ отвергнут");
 }
 

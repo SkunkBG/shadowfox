@@ -33,6 +33,7 @@ void config_defaults(config_t *cfg)
        снаружи выглядят как «правило настроено, а сайт идёт мимо».
        Выключатель оставлен на случай, когда захват на 443 мешает. */
     cfg->sni_capture   = 1;
+    str_copy(cfg->probe_url, sizeof(cfg->probe_url), "http://www.gstatic.com/generate_204");
 
     /* Фрагментация включена (действует только на обычный TLS, см.
        xraycfg.c). Отпечаток по умолчанию не перекрываем — берётся из
@@ -180,6 +181,15 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "sniCapture")) {
         cfg->sni_capture = parse_bool(value, cfg->sni_capture);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "tunnelProbe")) {
+        /* «no» и пустое — не проверять. */
+        if (!value[0] || !parse_bool(value, 1))
+            cfg->probe_url[0] = '\0';
+        else
+            str_copy(cfg->probe_url, sizeof(cfg->probe_url), value);
         return 0;
     }
 
@@ -363,6 +373,11 @@ int config_write_default(const char *path)
         "# оборвать соединение, успевшее уйти мимо туннеля.\n"
         "sniCapture=%s\n"
         "\n"
+        "# Проверка живого туннеля: раз в минуту запрос через свой SOCKS\n"
+        "# на этот адрес. Только http://, без TLS — нужен факт ответа, сам\n"
+        "# туннель зашифрован как всегда. «no» — не проверять.\n"
+        "tunnelProbe=%s\n"
+        "\n"
         "# Устойчивость к DPI. fragment режет TLS ClientHello у обычного TLS;\n"
         "# для Reality не применяется — там имя сервера открытое по замыслу.\n"
         "# fingerprint перекрывает отпечаток uTLS из ссылки; пусто — брать\n"
@@ -371,7 +386,7 @@ int config_write_default(const char *path)
         "fingerprint=%s\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.nodes_file, cfg.xray_config, cfg.socks_port,
-        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no",
+        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no", cfg.probe_url,
         cfg.fragment ? "yes" : "no", cfg.fingerprint);
 
     fclose(f);

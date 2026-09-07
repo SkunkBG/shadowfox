@@ -4,6 +4,7 @@
 #include "config.h"
 #include "dnscap.h"
 #include "ipsets.h"
+#include "probe.h"
 #include "rci.h"
 #include "snicap.h"
 #include "supervise.h"
@@ -34,6 +35,18 @@ typedef struct engine {
     int    xray_managed;   /* мы его подняли и следим за ним */
     char   xray_version[32];   /* спрошенная у бинарника, пусто — не знаем */
     time_t xray_ver_try;       /* когда пробовали спросить */
+    char   xray_listen[64];    /* где слушает наш SOCKS */
+
+    /* Живой ли туннель. Процесс ядра — ещё не туннель: сервер может
+       лежать при живом процессе, и об этом узнавали бы по нерабочему
+       YouTube. Проверка идёт насквозь, через свой SOCKS. */
+    probe_t probe;
+    time_t  probe_next;        /* когда проверять в следующий раз */
+    int     tunnel_state;      /* 0 — не проверяли, 1 — отвечает, -1 — нет */
+    time_t  tunnel_since;      /* с какого момента в этом состоянии */
+    time_t  tunnel_at;         /* когда проверяли последний раз */
+    int     tunnel_ms;         /* задержка последнего удачного ответа */
+    char    tunnel_why[PROBE_WHY_MAX];
 
     int    rules_applied;
     int    capturing;

@@ -75,7 +75,12 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "sni_throttled=%lu\n"
         "sni_kept=%lu\n"
         "sni_reasm=%lu\n"
-        "sni_partlost=%lu\n",
+        "sni_partlost=%lu\n"
+        "tunnel=%d\n"
+        "tunnel_since=%ld\n"
+        "tunnel_at=%ld\n"
+        "tunnel_ms=%d\n"
+        "tunnel_why=%s\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
@@ -85,7 +90,9 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->sniffing, e->sni.seen, e->sni.parsed,
         e->sni_names, e->sni_new, e->sni_broken, e->sni.drop_bad,
         e->cap.drop_foreign, e->sni.drop_foreign, e->sni_throttled,
-        e->sni.partial_kept, e->sni.reassembled, e->sni.partial_lost);
+        e->sni.partial_kept, e->sni.reassembled, e->sni.partial_lost,
+        e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_at,
+        e->tunnel_ms, e->tunnel_why);
 
     fclose(f);
     rename(tmp, path);
@@ -288,13 +295,33 @@ int status_print(const config_t *cfg)
         long r = status_num(spath, "xray_restarts");
         if (r > 0) printf("              перезапусков: %ld\n", r);
 
+        long tunnel = status_num(spath, "tunnel");
+        long at     = status_num(spath, "tunnel_at");
+        long since  = status_num(spath, "tunnel_since");
+        long tnow   = (long)time(NULL);
+        char why[128] = "";
+        status_get(spath, "tunnel_why", why, sizeof(why));
+        if (tunnel > 0) {
+            printf("  туннель:    отвечает, %ld мс, проверен %ld с назад\n",
+                   status_num(spath, "tunnel_ms"), at > 0 ? tnow - at : 0);
+        } else if (tunnel < 0) {
+            char when[32] = "";
+            if (since > 0) {
+                time_t t = (time_t)since;
+                strftime(when, sizeof(when), "%H:%M", localtime(&t));
+            }
+            printf("  туннель:    НЕ ОТВЕЧАЕТ с %s: %s\n", when, why);
+        } else {
+            printf("  туннель:    ещё не проверялся\n");
+        }
+
         char last[200];
         long lines = 0;
         if (file_tail(XRAY_ERROR_LOG, last, sizeof(last), &lines) && lines > 0) {
-            printf("              ошибок в журнале: %ld (%s)\n", lines, XRAY_ERROR_LOG);
+            printf("              записей в журнале ядра: %ld (%s)\n", lines, XRAY_ERROR_LOG);
             printf("              последняя: %s\n", last);
         } else {
-            printf("              ошибок в журнале: нет\n");
+            printf("              записей в журнале ядра: нет\n");
         }
     } else {
         printf("  своё ядро:  не запущено (нет %s?)\n", cfg->nodes_file);

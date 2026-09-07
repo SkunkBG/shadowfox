@@ -889,7 +889,8 @@ function viewInfo(){
       <p style="margin:0">Отдельный процесс Shadow Fox на порту ${D.socks_port}</p>
       ${D.xray_version?`<div class="kv" style="margin-top:10px"><span>Версия ядра</span>
         <span><b>${esc(D.xray_version)}</b></span></div>`:''}
-      ${core?`<div class="kv"><span>Ошибок в журнале</span>
+      ${core?`<div class="kv"><span>Туннель</span><span>${tunnelText()}</span></div>`:''}
+      ${core?`<div class="kv"><span>Записей в журнале</span>
         <span><b>${D.xray_errors||0}</b></span></div>`:''}
       ${D.xray_last_error?`<div class="note" style="margin-top:8px;word-break:break-all">${UI.i}
         Последняя: <code>${esc(D.xray_last_error)}</code><br>
@@ -1018,11 +1019,19 @@ function chrome(){
   $('#donate').innerHTML=UI.heart+'Поддержать<span class="sp"></span>'+UI.out;
 
   const core=D.xray_pid>0;
-  $('#corestate').innerHTML=`<i class="dot ${core?'ok':'bad'}"></i>${
-    core?'Ядро работает':'Ядро не запущено'}`;
+  const tun=core?D.tunnel:0;
+  $('#corestate').innerHTML=`<i class="dot ${!core||tun<0?'bad':'ok'}"></i>${
+    !core?'Ядро не запущено':tun>0?'Туннель работает':tun<0?'Туннель не отвечает':'Ядро работает'}`;
   $('#exit').innerHTML=UI.power+'Выход';
 }
 
+function hhmm(t){ const d=new Date(t*1000); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }
+function tunnelText(){
+  if(!D.tunnel_probe) return 'проверка выключена';
+  if(D.tunnel>0) return `<b style="color:var(--ok)">отвечает</b>, ${D.tunnel_ms} мс`;
+  if(D.tunnel<0) return `<b style="color:var(--bad)">не отвечает</b> с ${hhmm(D.tunnel_since)}: ${esc(D.tunnel_why||'')}`;
+  return 'ещё не проверялся';
+}
 function draw(){
   chrome();
   $('#view').innerHTML = tab==='rules'?viewRules() : tab==='conn'?viewConn() : viewInfo();
