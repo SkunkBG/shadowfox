@@ -1085,7 +1085,10 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
     long now = (long)time(NULL);
 
     if (g_bad_until > now) {
-        char msg[128];
+        /* 256, а не 128: текст кириллический, в UTF-8 он занимает вдвое
+           больше байт, чем символов, и в 128 не помещался — строка
+           резалась посреди многобайтового символа. */
+        char msg[256];
         snprintf(msg, sizeof(msg),
                  "Слишком много неудачных попыток. Подожди %ld секунд — "
                  "иначе роутер заблокирует адрес сам",

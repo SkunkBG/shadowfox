@@ -89,7 +89,13 @@ $(BUILD)/$(PROJECT): src/webpage.c $(SRCS) $(wildcard include/*.h) Makefile
 
 # Юнит-тесты. Работают на macOS и Linux — единственная цель, которую
 # можно гонять локально без кросс-тулчейна.
-check:
+#
+# Зависимость от native не для запуска, а ради сборки: тесты собирают
+# файлы по одному и не трогают main.c, engine.c, webui.c, signals.c,
+# status.c и сгенерированные. Целиком двоичный файл с -Werror собирает
+# только native, и пока его не гоняли на Linux, ошибка gcc в webui.c
+# лежала незамеченной — clang её не выдаёт.
+check: native
 	@mkdir -p $(BUILD)
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_config.c \
 		src/config.c src/util.c src/log.c -o $(BUILD)/check_config
