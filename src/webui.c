@@ -807,7 +807,9 @@ static time_t g_update_launched;
 
 static void launch_update_check(const char *bin)
 {
-    char cmd[512];
+    /* 768: путь к opkg подставляется дважды, по 192 байта каждый, плюс
+       три пути к файлу — по расчёту компилятора 512 не хватает. */
+    char cmd[768];
     snprintf(cmd, sizeof(cmd),
              "{ %s update >/dev/null 2>&1; %s list-upgradable 2>&1; "
              "echo '## done'; } > %s.tmp && mv %s.tmp %s",
