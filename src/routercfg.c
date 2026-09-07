@@ -1,6 +1,7 @@
 #include "routercfg.h"
 #include "util.h"
 
+#include <stdio.h>
 #include <string.h>
 
 /* Идём по секциям: заголовок стоит в первой колонке, содержимое с
@@ -111,3 +112,28 @@ int policy_globals(char *text, const char **out, int max)
     return n;
 }
 
+
+int http_proxy_present(const char *text, const char *name)
+{
+    if (!text || !name || !name[0]) return 0;
+
+    char head[96];
+    int  n = snprintf(head, sizeof(head), "ip http proxy %s", name);
+    if (n <= 0 || (size_t)n >= sizeof(head)) return 0;
+
+    const char *line = text;
+    for (;;) {
+        /* Только заголовок секции, с начала строки: те же слова
+           встречаются и во вложенных строках соседних секций. */
+        if (!strncmp(line, head, (size_t)n)) {
+            char after = line[n];
+            if (after == '\0' || after == '\n' || after == '\r') return 1;
+        }
+
+        const char *nl = strchr(line, '\n');
+        if (!nl) break;
+        line = nl + 1;
+    }
+
+    return 0;
+}

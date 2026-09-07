@@ -422,7 +422,7 @@ static int ndmc_path(char *dst, unsigned size)
     return 0;
 }
 
-static void send_dns(int fd)
+static void send_dns(int fd, const config_t *cfg)
 {
     char bin[192] = "";
     char arg[] = "-c";
@@ -447,6 +447,10 @@ static void send_dns(int fd)
     json_kv_str(&j, "why", bin[0] ? (rc == 0 ? "" : "ndmc ответил ошибкой")
                                   : "ndmc не найден");
     json_kv_str(&j, "bin", bin);
+
+    /* Спрашиваем до разбора остального: соседи режут текст на месте. */
+    json_kv_bool(&j, "web", rc == 0 && http_proxy_present(out, cfg->web_proxy));
+    json_kv_str(&j, "web_name", cfg->web_proxy);
     json_key(&j, "servers");
     json_arr_open(&j);
 
@@ -628,6 +632,55 @@ static void apply_dns(const http_req_t *req, int fd)
     plan[count++] = "system configuration save";
 
     ndmc_run_plan(bin, plan, count, "серверы DNS установлены", req->peer, fd);
+}
+
+/* Публикация интерфейса на поддомене доменного имени Keenetic.
+
+   HTTPS и проверку пароля делает сам роутер: свой вход у нас есть, но
+   выставлять его наружу незачем, когда рядом есть штатный. Форма команд
+   взята из running-config рабочей настройки. */
+static void apply_web(const http_req_t *req, int fd, const config_t *cfg)
+{
+    char bin[192] = "";
+    if (!ndmc_path(bin, sizeof(bin))) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8",
+                       "ndmc не найден, настройки роутера не тронуты\n");
+        return;
+    }
+
+    char lan[64] = "";
+    if (cfg->web_bind[0]) {
+        str_copy(lan, sizeof(lan), cfg->web_bind);
+    } else if (!iface_ipv4(cfg->capture_iface, lan, sizeof(lan))) {
+        char msg[192];
+        snprintf(msg, sizeof(msg),
+                 "не узнать адрес роутера на %s — публикация не сделана\n",
+                 cfg->capture_iface);
+        http_send_text(fd, 500, "text/plain; charset=utf-8", msg);
+        return;
+    }
+
+    static char cmds[7][160];
+    const char *plan[7];
+    int n = 0;
+
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip http proxy %s", cfg->web_proxy);
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip http proxy %s upstream http %s %d",
+             cfg->web_proxy, lan, cfg->web_port);
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip http proxy %s domain ndns",
+             cfg->web_proxy);
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip http proxy %s ssl redirect",
+             cfg->web_proxy);
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip http proxy %s security-level public",
+             cfg->web_proxy);
+    snprintf(cmds[n++], sizeof(cmds[0]), "ip http proxy %s auth", cfg->web_proxy);
+    snprintf(cmds[n++], sizeof(cmds[0]), "system configuration save");
+
+    for (int i = 0; i < n; i++) plan[i] = cmds[i];
+
+    char what[160];
+    snprintf(what, sizeof(what), "интерфейс опубликован как %s", cfg->web_proxy);
+    ndmc_run_plan(bin, plan, n, what, req->peer, fd);
 }
 
 /* Своё подключение на роутере: прокси-клиент SOCKS5, смотрящий в наше
@@ -1285,9 +1338,14 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         return;
     }
 
+    if (!strcmp(req->path, "/web") && !strcmp(req->method, "POST")) {
+        apply_web(req, fd, c->cfg);
+        return;
+    }
+
     if (!strcmp(req->path, "/dns")) {
         if (!strcmp(req->method, "POST")) apply_dns(req, fd);
-        else                              send_dns(fd);
+        else                              send_dns(fd, c->cfg);
         return;
     }
 

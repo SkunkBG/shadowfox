@@ -27,4 +27,9 @@ int dns_isp_interfaces(char *text, const char **out, int max);
    выбирает. Без повторов; text изменяется. */
 int policy_globals(char *text, const char **out, int max);
 
+/* Опубликован ли веб-интерфейс наружу: есть ли в конфиге секция
+   «ip http proxy <имя>». В отличие от соседей текст не портит — её
+   спрашивают до разбора остального. */
+int http_proxy_present(const char *text, const char *name);
+
 #endif /* SHADOWFOX_ROUTERCFG_H */

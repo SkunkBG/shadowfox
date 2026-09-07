@@ -190,6 +190,31 @@ int main(void)
             CHECK(strcmp(g[i], "xkeen") != 0, "описание попало в список");
     }
 
+
+    /* Публикация интерфейса наружу. Проверять надо именно заголовок
+       секции: те же слова встречаются во вложенных строках соседних
+       секций, и поиск подстрокой дал бы ложное «уже настроено». */
+    {
+        const char *cfg =
+            "ip http security-level private\n"
+            "ip http proxy shadowfox\n"
+            "    upstream http 192.168.1.1 8090\n"
+            "    domain ndns\n"
+            "    auth\n"
+            "ip name-server 1.1.1.1\n";
+
+        CHECK(http_proxy_present(cfg, "shadowfox") == 1, "секция найдена");
+        CHECK(http_proxy_present(cfg, "shadow") == 0, "неполное имя");
+        CHECK(http_proxy_present(cfg, "other") == 0, "чужое имя");
+        CHECK(http_proxy_present("", "shadowfox") == 0, "пустой конфиг");
+        CHECK(http_proxy_present(NULL, "shadowfox") == 0, "NULL");
+        CHECK(http_proxy_present(cfg, "") == 0, "пустое имя");
+
+        /* Те же слова с отступом — содержимое чужой секции, не заголовок. */
+        CHECK(http_proxy_present("something\n    ip http proxy shadowfox\n",
+                                 "shadowfox") == 0, "отступ не заголовок");
+    }
+
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);
         return 1;
