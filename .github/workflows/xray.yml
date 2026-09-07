@@ -97,8 +97,9 @@ jobs:
           SF_REQUIRE_XRAY: "1"
         run: |
           set -o pipefail
-          make native
-          sh tools/check-configs.sh 2>&1 | tee -a /tmp/xray.log
+          # Сборка тоже в лог: gcc ругается не на то, на что clang, а
+          # без записи её ошибка в сводку не попадает.
+          { make native && sh tools/check-configs.sh; } 2>&1 | tee -a /tmp/xray.log
 
       - name: Показать, на чём упало
         if: failure()
