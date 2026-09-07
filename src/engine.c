@@ -502,6 +502,10 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
        Но молчать о том, что ссылка его просила, нельзя: человек будет
        искать, почему «не работает как в приложении». */
     for (int i = 0; i < list.count; i++)
+        if (list.items[i].flow_dropped)
+            log_warn("ссылка «%s»: flow снят — Vision работает только поверх tcp",
+                     list.items[i].tag[0] ? list.items[i].tag : "без имени");
+    for (int i = 0; i < list.count; i++)
         if (list.items[i].allow_insecure)
             log_warn("ссылка «%s» просит allowInsecure — не переношу: без "
                      "проверки сертификата TLS ничего не защищает",

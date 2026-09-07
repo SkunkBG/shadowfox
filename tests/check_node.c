@@ -234,6 +234,90 @@ static void test_allow_insecure_dropped(void)
     CHECK(strstr(cfg, "allowInsecure") == NULL, "allowInsecure в конфиге: есть");
 }
 
+/* Формы ссылок, которые раньше молча теряли нужное или врали. */
+static void test_link_forms(void)
+{
+    node_t n;
+    char   err[128];
+    char   cfg[16384];
+    xraycfg_opts_t o;
+    xraycfg_defaults(&o);
+
+    /* raw — новое имя tcp у ядра. */
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+                         "?type=raw&security=tls&sni=h#r", &n, err, sizeof(err)) == 0,
+          "raw разобран: %s", err);
+    CHECK(strcmp(n.network, "tcp") == 0, "raw стал tcp: %s", n.network);
+
+    /* flow поверх ws: -test проходит, соединение падает. Снимаем и помечаем. */
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+                         "?type=ws&security=tls&sni=h&flow=xtls-rprx-vision#w",
+                         &n, err, sizeof(err)) == 0, "ws разобран");
+    CHECK(n.flow[0] == '\0' && n.flow_dropped == 1, "flow снят и помечен");
+
+    /* Reality без sni не сойдётся — отказ, а не тихий конфиг. */
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+                         "?type=tcp&security=reality&pbk=PUBKEY#x",
+                         &n, err, sizeof(err)) != 0, "reality без sni отвергнут");
+    CHECK(strstr(err, "sni") != NULL, "причина названа: %s", err);
+
+    /* Незнакомый транспорт — честный отказ. */
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+                         "?type=kcp&security=none#k", &n, err, sizeof(err)) != 0,
+          "kcp отвергнут");
+
+    /* xhttp mode и grpc authority/multi доезжают до конфига. */
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+                         "?type=xhttp&security=tls&sni=h&path=%2Fx&mode=stream-one#x",
+                         &n, err, sizeof(err)) == 0, "xhttp разобран");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "xhttp собран");
+    CHECK(strstr(cfg, "\"mode\":\"stream-one\"") != NULL, "mode в конфиге");
+
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+                         "?type=grpc&security=tls&sni=h&serviceName=s&authority=a.h&mode=multi#g",
+                         &n, err, sizeof(err)) == 0, "grpc разобран");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "grpc собран");
+    CHECK(strstr(cfg, "\"authority\":\"a.h\"") != NULL, "authority");
+    CHECK(strstr(cfg, "\"multiMode\":true") != NULL, "multiMode");
+
+    /* HTTP-заголовок с Host и путём. */
+    CHECK(node_from_link("vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:80"
+                         "?type=tcp&headerType=http&host=cdn.example&path=%2Fp#h",
+                         &n, err, sizeof(err)) == 0, "http-header разобран");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "http-header собран");
+    CHECK(strstr(cfg, "\"Host\":[\"cdn.example\"]") != NULL, "Host в заголовке");
+    CHECK(strstr(cfg, "\"path\":[\"/p\"]") != NULL, "путь в заголовке");
+}
+
+/* Длинная ссылка: у VLESS Encryption строка около 1,6 КБ. Раньше падала
+   с «не похоже на ссылку», а усечение поля было молчаливым. */
+static void test_long_query(void)
+{
+    node_t n;
+    char   err[128];
+    char   link[4096];
+    char   enc[1700];
+
+    memset(enc, 'A', sizeof(enc) - 1);
+    memcpy(enc, "mlkem768x25519plus.native.600s.", 31);
+    enc[sizeof(enc) - 1] = '\0';
+
+    snprintf(link, sizeof(link),
+             "vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443"
+             "?type=tcp&security=tls&sni=h&encryption=%s#e", enc);
+    CHECK(node_from_link(link, &n, err, sizeof(err)) == 0, "длинная ссылка: %s", err);
+    CHECK(strlen(n.encryption) == sizeof(enc) - 1, "encryption целиком: %zu",
+          strlen(n.encryption));
+
+    /* А то, что не влезает в поле, — отказ с именем параметра. */
+    char big[3000];
+    memset(big, 'x', sizeof(big) - 1); big[sizeof(big) - 1] = '\0';
+    snprintf(link, sizeof(link),
+             "vless://d342d11e-d424-4583-b36e-524ab1f0afa4@h:443?type=tcp&sni=%s#e", big);
+    CHECK(node_from_link(link, &n, err, sizeof(err)) != 0, "усечение — отказ");
+    CHECK(strstr(err, "sni") != NULL, "назван параметр: %s", err);
+}
+
 int main(void)
 {
     printf("check_node " VERSION "\n");
@@ -243,6 +327,8 @@ int main(void)
     test_generated_config();
     test_fingerprint();
     test_allow_insecure_dropped();
+    test_link_forms();
+    test_long_query();
     test_alpn_from_link();
     test_transports();
     test_small_buffer_fails();

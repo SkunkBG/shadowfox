@@ -6,12 +6,18 @@
 #include <string.h>
 
 /* Читает параметр запроса в поле фиксированного размера.
-   Отсутствие параметра — не ошибка: поле остаётся пустым. */
+   Отсутствие параметра — не ошибка: поле остаётся пустым. Усечение —
+   ошибка: молча обрезанный ключ или путь выглядит как настоящий и
+   ломается уже на сервере. Имя усечённого параметра запоминаем, чтобы
+   назвать его в отказе. */
+static const char *g_truncated;
+
 static void q(const url_t *u, const char *key, char *dst, unsigned dst_size)
 {
     char tmp[URL_QUERY_MAX];
-    if (url_query_get(u, key, tmp, sizeof(tmp)) == 1)
-        str_copy(dst, dst_size, tmp);
+    if (url_query_get(u, key, tmp, sizeof(tmp)) == 1) {
+        if (str_copy(dst, dst_size, tmp) != 0 && !g_truncated) g_truncated = key;
+    }
 }
 
 static void fail(char *err, unsigned err_size, const char *msg)
@@ -57,6 +63,8 @@ int node_from_link(const char *link, node_t *n, char *err, unsigned err_size)
     }
     n->port = u.port;
 
+    g_truncated = NULL;
+
     q(&u, "flow",       n->flow,        sizeof(n->flow));
     q(&u, "encryption", n->encryption,  sizeof(n->encryption));
     q(&u, "type",       n->network,     sizeof(n->network));
@@ -73,7 +81,16 @@ int node_from_link(const char *link, node_t *n, char *err, unsigned err_size)
 
     q(&u, "path",        n->path,         sizeof(n->path));
     q(&u, "host",        n->host,         sizeof(n->host));
+    q(&u, "mode",        n->mode,         sizeof(n->mode));
     q(&u, "serviceName", n->service_name, sizeof(n->service_name));
+    q(&u, "authority",   n->authority,    sizeof(n->authority));
+
+    if (g_truncated) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "параметр %s слишком длинный", g_truncated);
+        fail(err, err_size, msg);
+        return -1;
+    }
 
     char insecure[16];
     if (url_query_get(&u, "allowInsecure", insecure, sizeof(insecure)) == 1)
@@ -81,6 +98,29 @@ int node_from_link(const char *link, node_t *n, char *err, unsigned err_size)
 
     /* Значения по умолчанию — только там, где у Xray они однозначны. */
     if (!n->network[0])    str_copy(n->network, sizeof(n->network), "tcp");
+
+    /* Ядро переименовало tcp в raw; панели пишут и так, и так. */
+    if (!strcmp(n->network, "raw")) str_copy(n->network, sizeof(n->network), "tcp");
+
+    /* Что умеем собирать. Незнакомая сеть раньше уходила в конфиг как
+       есть: -test проходил, а соединение не устанавливалось — kcp без
+       seed, quic и прочее. Лучше честный отказ. */
+    if (strcmp(n->network, "tcp") && strcmp(n->network, "ws") &&
+        strcmp(n->network, "grpc") && strcmp(n->network, "xhttp") &&
+        strcmp(n->network, "splithttp") && strcmp(n->network, "httpupgrade")) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "транспорт %s не поддерживается", n->network);
+        fail(err, err_size, msg);
+        return -1;
+    }
+
+    /* Vision работает только поверх голого tcp. С ws/grpc/xhttp -test
+       проходил, а каждое соединение падало с «XTLS only supports TLS
+       and REALITY directly». Панели такое генерируют. */
+    if (n->flow[0] && strcmp(n->network, "tcp") != 0) {
+        n->flow[0]      = '\0';
+        n->flow_dropped = 1;
+    }
     if (!n->security[0])   str_copy(n->security, sizeof(n->security), "none");
     if (!n->encryption[0]) str_copy(n->encryption, sizeof(n->encryption), "none");
 
@@ -89,6 +129,12 @@ int node_from_link(const char *link, node_t *n, char *err, unsigned err_size)
 
     if (strcmp(n->security, "reality") == 0 && !n->public_key[0]) {
         fail(err, err_size, "reality без публичного ключа pbk");
+        return -1;
+    }
+    /* Без sni ядро подставит адрес сервера, и рукопожатие с Reality не
+       сойдётся — а -test этого не видит. */
+    if (strcmp(n->security, "reality") == 0 && !n->sni[0]) {
+        fail(err, err_size, "reality без sni");
         return -1;
     }
 

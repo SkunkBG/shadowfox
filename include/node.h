@@ -18,7 +18,8 @@ typedef struct {
 
     char id[NODE_ID_MAX];          /* uuid — секрет, в журнал не пишется */
     char flow[64];
-    char encryption[32];
+    char encryption[2048];         /* VLESS Encryption — строка длинная */
+    int  flow_dropped;             /* flow был, но транспорт его не умеет */
 
     char network[16];              /* tcp, ws, grpc, xhttp, httpupgrade */
     char security[16];             /* none, tls, reality */
@@ -35,7 +36,9 @@ typedef struct {
 
     char path[NODE_STR_MAX];       /* ws, xhttp, httpupgrade */
     char host[NODE_STR_MAX];       /* заголовок Host */
+    char mode[32];                 /* xhttp: auto, packet-up, stream-up, stream-one; grpc: multi */
     char service_name[NODE_STR_MAX]; /* grpc */
+    char authority[NODE_STR_MAX];    /* grpc */
 } node_t;
 
 /* Разбирает vless://... Возвращает 0 при успехе.

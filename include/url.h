@@ -7,7 +7,9 @@
 #define URL_USER_MAX   128
 #define URL_HOST_MAX   256
 #define URL_PATH_MAX   256
-#define URL_QUERY_MAX  1024
+/* 4096, а не 1024: строка encryption у VLESS Encryption около 1,6 КБ,
+   и ссылка с ней падала с «не похоже на ссылку». */
+#define URL_QUERY_MAX  4096
 #define URL_FRAG_MAX   256
 
 typedef struct {

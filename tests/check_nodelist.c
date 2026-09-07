@@ -47,7 +47,7 @@ static void test_base64(void)
           "нехватка буфера отлавливается");
 }
 
-#define L1 "vless://uuid@a.example.com:443?security=reality&pbk=K#Узел"
+#define L1 "vless://uuid@a.example.com:443?security=reality&pbk=K&sni=www.example.com#Узел"
 #define L2 "vless://uuid@b.example.com:8443?type=ws&security=tls#Узел"
 #define L3 "vless://uuid@c.example.com:443#Третий"
 
@@ -78,9 +78,9 @@ static void test_base64_subscription(void)
 
     /* base64 от "L1\nL3" */
     const char *body =
-        "dmxlc3M6Ly91dWlkQGEuZXhhbXBsZS5jb206NDQzP3NlY3VyaXR5PXJlYWxpdHkmcGJr"
-        "PUsjJUQwJUEzJUQwJUI3JUQwJUI1JUQwJUJCCnZsZXNzOi8vdXVpZEBjLmV4YW1wbGUu"
-        "Y29tOjQ0Mw==";
+        "dmxlc3M6Ly91dWlkQGEuZXhhbXBsZS5jb206NDQzP3NlY3VyaXR5PXJlYWxpdHkm"
+        "cGJrPUsmc25pPXd3dy5leGFtcGxlLmNvbSMlRDAlQTMlRDAlQjclRDAlQjUlRDAl"
+        "QkIKdmxlc3M6Ly91dWlkQGMuZXhhbXBsZS5jb206NDQz";
 
     CHECK(nodelist_from_subscription(&l, body) == 2,
           "подписка в base64 разобрана, узлов %d", l.count);

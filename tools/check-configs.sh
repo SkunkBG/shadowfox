@@ -51,6 +51,10 @@ grpc+tls|vless://$UUID@example.com:443?type=grpc&security=tls&sni=example.com&se
 xhttp+reality|vless://$UUID@example.com:443?type=xhttp&security=reality&pbk=$PBK&sni=www.google.com&path=%2Fx#xhttp
 tcp+http-header|vless://$UUID@example.com:80?type=tcp&headerType=http&host=example.com#httphdr
 plain|vless://$UUID@example.com:443#plain
+raw+tls|vless://$UUID@example.com:443?type=raw&security=tls&sni=example.com#raw
+xhttp+mode|vless://$UUID@example.com:443?type=xhttp&security=tls&sni=example.com&path=%2Fx&mode=stream-one#xm
+grpc+multi|vless://$UUID@example.com:443?type=grpc&security=tls&sni=example.com&serviceName=g&authority=a.example.com&mode=multi#gm
+http-header+host|vless://$UUID@example.com:80?type=tcp&headerType=http&host=cdn.example.com&path=%2Fp#hh
 CASES
 )
 

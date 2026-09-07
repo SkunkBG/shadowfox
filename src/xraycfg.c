@@ -146,6 +146,8 @@ static void build_stream(json_t *j, const node_t *n, const xraycfg_opts_t *o)
         json_key(j, "grpcSettings");
         json_obj_open(j);
         json_kv_str(j, "serviceName", n->service_name);
+        if (n->authority[0]) json_kv_str(j, "authority", n->authority);
+        if (!strcmp(n->mode, "multi")) json_kv_bool(j, "multiMode", 1);
         json_obj_close(j);
     } else if (strcmp(n->network, "xhttp") == 0 ||
                strcmp(n->network, "splithttp") == 0) {
@@ -153,6 +155,7 @@ static void build_stream(json_t *j, const node_t *n, const xraycfg_opts_t *o)
         json_obj_open(j);
         json_kv_str(j, "path", n->path[0] ? n->path : "/");
         if (n->host[0]) json_kv_str(j, "host", n->host);
+        if (n->mode[0]) json_kv_str(j, "mode", n->mode);
         json_obj_close(j);
     } else if (strcmp(n->network, "tcp") == 0 &&
                strcmp(n->header_type, "http") == 0) {
@@ -161,6 +164,20 @@ static void build_stream(json_t *j, const node_t *n, const xraycfg_opts_t *o)
         json_key(j, "header");
         json_obj_open(j);
         json_kv_str(j, "type", "http");
+        /* Без Host и пути заголовок бесполезен: сервер с маскировкой
+           под HTTP ждёт своего имени. Раньше писался один type. */
+        if (n->host[0] || n->path[0]) {
+            json_key(j, "request");
+            json_obj_open(j);
+            if (n->path[0]) json_kv_str_list(j, "path", n->path, ',');
+            if (n->host[0]) {
+                json_key(j, "headers");
+                json_obj_open(j);
+                json_kv_str_list(j, "Host", n->host, ',');
+                json_obj_close(j);
+            }
+            json_obj_close(j);
+        }
         json_obj_close(j);
         json_obj_close(j);
     }
