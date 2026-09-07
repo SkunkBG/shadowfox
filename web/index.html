@@ -67,8 +67,11 @@ aside nav button.on{background:var(--acc-soft);color:var(--acc);font-weight:600}
 
 /* ---- правая часть ---- */
 .side2{flex:1;min-width:0;display:flex;flex-direction:column}
+/* Перенос обязателен: на узком экране «Условия использования», плашка
+   состояния ядра и кнопка темы в строку не помещаются, а без переноса
+   они уезжают за край. */
 header{display:flex;align-items:center;justify-content:flex-end;gap:12px;
-  padding:18px 30px 0}
+  flex-wrap:wrap;padding:18px 30px 0}
 .pill{display:inline-flex;align-items:center;gap:9px;background:var(--panel);
   border:1px solid var(--line);border-radius:12px;padding:10px 16px;
   font-size:14px;color:var(--fg)}
