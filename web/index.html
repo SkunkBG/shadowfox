@@ -879,6 +879,12 @@ function live(){
 async function load(probed,quiet){
   try{
     const r=await fetch(api('/data'+(probed?'?probed=1':'')));
+
+    /* Сессия живёт в памяти службы и не переживает её перезапуск —
+       например, при обновлении. Тогда надо показать форму входа, а не
+       невнятную ошибку: страницу отдаёт сама служба. */
+    if(r.status===401){ location.reload(); return; }
+
     if(!r.ok) throw new Error('код '+r.status);
     const was = D ? sig() : null;
     D=await r.json();
@@ -893,7 +899,9 @@ async function load(probed,quiet){
     if(D.dns==='bypass' && !dnsShown && $('#gate').hidden){ dnsShown=1; dnsWarn(); }
   }catch(e){
     $('#view').innerHTML='<div class="card"><p style="color:var(--bad)">'+
-      'Нет связи со службой: '+esc(e.message)+'</p></div>';
+      'Нет связи со службой: '+esc(e.message)+'</p>'+
+      '<p>Если это сразу после обновления — она сейчас перезапускается, '+
+      'страница вернётся сама.</p></div>';
   }
 }
 
@@ -1117,6 +1125,9 @@ document.addEventListener('click',async ev=>{
         await new Promise(r=>setTimeout(r,3000));
         try{
           const rr=await fetch(api('/data'));
+          /* 401 значит, что служба уже вернулась, но сессия старая —
+             это тоже признак, что обновление прошло. */
+          if(rr.status===401){ location.reload(); return; }
           if(rr.ok){ const d=await rr.json();
             if(d.version!==was){ updInfo=null; location.reload(); return; } }
         }catch(e){}
