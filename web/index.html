@@ -1011,7 +1011,10 @@ async function save(what,text,msgId){
 }
 
 /* ---- выбор готового набора ---- */
-function picker(ruleIdx){
+/* target задаётся, когда правила ещё нет: в текстовом виде правило без
+   групп не существует — цель живёт строкой interface внутри группы.
+   Поэтому оно заводится здесь, вместе с первой группой, а не заранее. */
+function picker(ruleIdx,target){
   const el=$('#pick');
   el.className='modal'; el.hidden=false;
   el.innerHTML=`<div class="box"><h3>Новая группа</h3>
@@ -1029,6 +1032,13 @@ function picker(ruleIdx){
 
   el.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
     const n=+b.dataset.preset, rules=collect();
+    let idx=ruleIdx;
+    if(target!=null){
+      idx=rules.findIndex(r=>r.target===target);
+      if(idx<0){ rules.push({target,groups:[]}); idx=rules.length-1; }
+    }
+    if(!rules[idx]){ close(); return; }
+
     const used=new Set();
     for(const r of rules) for(const g of r.groups) used.add(g.name.toLowerCase());
 
@@ -1039,8 +1049,8 @@ function picker(ruleIdx){
           if(used.has(name.toLowerCase())){
             let i=2; while(used.has((name+' '+i).toLowerCase())) i++; name=name+' '+i; } }
 
-    rules[ruleIdx].groups.push({name,on:true,lines});
-    edit[ruleIdx+'.'+(rules[ruleIdx].groups.length-1)]=1;
+    rules[idx].groups.push({name,on:true,lines});
+    edit[idx+'.'+(rules[idx].groups.length-1)]=1;
     D.domains=buildDomains(rules);
     close(); touch(); query=''; draw();
   });
@@ -1167,9 +1177,9 @@ document.addEventListener('click',async ev=>{
     const t=prompt('Куда заворачивать? Имя политики Keenetic либо интерфейса:',
                    D.policy_name);
     if(!t) return;
-    const rules=collect();
-    rules.push({target:t.trim(),groups:[]});
-    D.domains=buildDomains(rules); touch(); draw(); picker(rules.length-1); return; }
+    /* Ничего не трогаем до выбора набора: пустое правило до текста не
+       доживёт, а отмена не должна оставлять следов. */
+    picker(-1,t.trim()); return; }
 
   if(ev.target.id==='apply'){
     const btn=ev.target; btn.disabled=true;
