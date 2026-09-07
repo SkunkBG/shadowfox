@@ -129,6 +129,32 @@ static void test_config_write_default(void)
 
     CHECK(config_write_default(path) == 0, "конфиг по умолчанию записан");
 
+    /* Файл, который создаётся при установке, — единственное место, где
+       человек видит все ключи. Ключ, известный config_set, но не
+       записанный сюда, для него не существует. */
+    static const char *keys[] = {
+        "log", "logFile", "pidFile", "autoStart", "confDir", "interface",
+        "ipv6", "createPolicy", "ipsetTimeout", "web", "webPort",
+        "routerHost", "routerPort", "webBind", "webToken", "webProxy",
+        "nodesFile", "xrayConfig", "xrayBin", "socksPort", "proxyInterface",
+        "policy", "sniCapture", "tunnelProbe", "fragment", "fingerprint", NULL
+    };
+    {
+        FILE *f = fopen(path, "r");
+        static char body[16384];
+        size_t got = f ? fread(body, 1, sizeof(body) - 1, f) : 0;
+        if (f) fclose(f);
+        body[got] = '\0';
+        for (int i = 0; keys[i]; i++) {
+            char needle[80];
+            snprintf(needle, sizeof(needle), "\n%s=", keys[i]);
+            if (!strstr(body, needle)) {
+                printf("  ПРОВАЛ %s:%d: в genconfig нет ключа %s\n", __FILE__, __LINE__, keys[i]);
+                failures++;
+            }
+        }
+    }
+
     /* Записанный файл обязан читаться обратно без единой ошибки —
        иначе --genconfig выдаёт то, что сам же не понимает. */
     config_t cfg;

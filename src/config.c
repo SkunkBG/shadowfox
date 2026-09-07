@@ -357,12 +357,19 @@ int config_write_default(const char *path)
         "# роутера спрашивает сам роутер, см. shadowfoxd --setup-web\n"
         "webToken=\n"
         "\n"
+        "# Имя записи в прокси роутера для доступа к странице снаружи\n"
+        "# через KeenDNS; заводится кнопкой на странице.\n"
+        "webProxy=%s\n"
+        "\n"
         "# Свой экземпляр Xray и своё прокси-подключение в Keenetic.\n"
         "# nodesFile — файл со ссылками vless:// либо подпиской. Пока его\n"
         "# нет, свой Xray не запускается, и маршрутизация работает через\n"
         "# то подключение, которое настроено вручную.\n"
         "nodesFile=%s\n"
         "xrayConfig=%s\n"
+        "# Путь к ядру. Пусто — искать самим: сначала свою сборку\n"
+        "# /opt/sbin/shadowfox-xray, потом штатный xray в PATH.\n"
+        "xrayBin=%s\n"
         "socksPort=%d\n"
         "proxyInterface=%s\n"
         "policy=%s\n"
@@ -385,7 +392,8 @@ int config_write_default(const char *path)
         "fragment=%s\n"
         "fingerprint=%s\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
-        cfg.nodes_file, cfg.xray_config, cfg.socks_port,
+        cfg.web_proxy,
+        cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.socks_port,
         cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no", cfg.probe_url,
         cfg.fragment ? "yes" : "no", cfg.fingerprint);
 

@@ -18,6 +18,20 @@ chmod 0755 /opt/etc/ndm/ifstatechanged.d/015-shadowfox.sh 2>/dev/null || true
 # Короткая команда управления: `shadowfox status`, `shadowfox restart` и т.д.
 ln -sf /opt/etc/init.d/S99shadowfox /opt/bin/shadowfox
 
+mkdir -p /opt/etc/shadowfox
+
+# Файл настроек не лежит в пакете, а пишется демоном при первой
+# установке — из тех же значений по умолчанию, что вшиты в него. Иначе
+# было бы два источника правды, и они уже расходились: в образце
+# из пакета не хватало ключей. И opkg при каждом обновлении ругался
+# на изменённый conffile и складывал рядом shadowfox.conf-opkg.
+if [ ! -f /opt/etc/shadowfox/shadowfox.conf ]; then
+    /opt/bin/shadowfoxd --genconfig /opt/etc/shadowfox >/dev/null 2>&1 || \
+        echo "[WARN] не удалось записать /opt/etc/shadowfox/shadowfox.conf"
+fi
+# Остаток от прежней схемы, когда образец ехал в пакете.
+rm -f /opt/etc/shadowfox/shadowfox.conf-opkg
+
 # Списки создаём только при отсутствии. Файлами пакета их держать нельзя:
 # это пользовательские данные, и при каждой правке шаблона opkg оставлял
 # бы рядом domain.conf-opkg.

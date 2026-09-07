@@ -84,7 +84,8 @@ for arch in "$@"; do
     # по другому и молча ничего не делает. Ровно так и случилось при
     # переименовании проекта: файл настроек не попал под замену, и хуки
     # бездействовали, ничем себя не выдавая.
-    conf_pid=$(sed -n 's/^pidFile=//p' "$STAGE/data/opt/etc/shadowfox/shadowfox.conf")
+    conf_pid=$(sed -n 's/^#define DEFAULT_PID_FILE *"\(.*\)"/\1/p' "$ROOT/include/shadowfox.h")
+    [ -n "$conf_pid" ] || { echo "в include/shadowfox.h нет DEFAULT_PID_FILE" >&2; exit 1; }
     init_pid=$(sed -n 's/^PIDFILE=//p' "$STAGE/data/opt/etc/init.d/S99shadowfox")
 
     for hook in "$STAGE"/data/opt/etc/ndm/*/015-shadowfox.sh; do
