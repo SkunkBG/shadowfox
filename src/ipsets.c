@@ -289,3 +289,51 @@ int ips_timeout_differs(ips_t *s, const wl_t *w, int timeout)
 
     return ips_headers_differ(out, w, timeout);
 }
+
+void ips_entry_counts(const char *text, const wl_t *w, long *c4, long *c6)
+{
+    if (!w) return;
+    for (int i = 0; i < w->group_count; i++) { c4[i] = -1; c6[i] = -1; }
+    if (!text) return;
+
+    char  name[WL_SETNAME_MAX] = "";
+    const char *line = text;
+    for (;;) {
+        const char *nl  = strchr(line, '\n');
+        size_t      len = nl ? (size_t)(nl - line) : strlen(line);
+
+        if (len > 6 && !strncmp(line, "Name: ", 6)) {
+            size_t n = len - 6;
+            if (n >= sizeof(name)) n = sizeof(name) - 1;
+            memcpy(name, line + 6, n);
+            name[n] = '\0';
+        } else if (len > 19 && !strncmp(line, "Number of entries: ", 19) && name[0]) {
+            long cnt = atol(line + 19);
+            for (int i = 0; i < w->group_count; i++) {
+                if (!strcmp(name, w->groups[i].ipset4)) c4[i] = cnt;
+                if (!strcmp(name, w->groups[i].ipset6)) c6[i] = cnt;
+            }
+            name[0] = '\0';
+        }
+
+        if (!nl) break;
+        line = nl + 1;
+    }
+}
+
+int ips_count_entries(ips_t *s, const wl_t *w, long *c4, long *c6)
+{
+    if (!s || !w || !s->bin[0]) return -1;
+
+    char binbuf[IPS_BIN_MAX];
+    str_copy(binbuf, sizeof(binbuf), s->bin);
+    char list[] = "list", terse[] = "-t";
+    char *argv[] = { binbuf, list, terse, NULL };
+
+    static char out[32768];
+    int trunc = 0;
+    if (proc_run_capture(argv, out, sizeof(out), 10, &trunc) != 0) return -1;
+
+    ips_entry_counts(out, w, c4, c6);
+    return 0;
+}

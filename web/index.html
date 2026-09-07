@@ -528,7 +528,7 @@ function viewRules(){
             <div style="flex:1;min-width:0">
               ${ed?`<input class="nm" value="${esc(g.name)}" data-name>`
                   :`<div class="nm">${esc(g.name)}</div>`}
-              <div class="cnt">${plural(g.lines.length,'запись','записи','записей')}</div>
+              <div class="cnt">${plural(g.lines.length,'запись','записи','записей')}${addrText(g.name)}</div>
             </div>
             <button class="sw ${g.on===false?'':'on'}" data-toggle
               title="${g.on===false?'Включить':'Выключить'}"></button>
@@ -546,6 +546,16 @@ function viewRules(){
     </div>`;}).join('');
 
   return head + (body || `<div class="card"><p>Ничего не найдено.</p></div>`);
+}
+
+/* Сколько адресов набрала группа — из наборов ipset, снимок раз в
+   минуту. До сих пор здесь был ноль, и всё смотрели через консоль. */
+function addrText(name){
+  const g=(D.groups||[]).find(x=>x.name===name);
+  if(!g || g.addrs4==null) return '';
+  const n=Math.max(0,g.addrs4)+Math.max(0,g.addrs6);
+  if(g.addrs4<0 && g.addrs6<0) return '';
+  return ' · '+plural(n,'адрес','адреса','адресов');
 }
 
 /* ---- раздел «Подключения» ---- */
@@ -663,7 +673,7 @@ function viewConn(){
       ${D.have_link?'<span class="badge ok">Настроен</span>'
                    :'<span class="badge">Не настроен</span>'}
       ${tag?`<span class="badge tag">${esc(serverFlag(tag))} ${esc(tag)}</span>`:''}</div>
-    <p style="margin:0 0 4px">Ссылка VLESS или подписка</p>
+    <p style="margin:0 0 4px">Ссылка VLESS</p>
     <label>Ссылки подключения</label>
     ${nodesMode==='masked'
       ? `<div class="field"><code>${esc(first)||'пусто'}</code>
@@ -848,6 +858,18 @@ function viewInfo(){
     ${tile(UI.pkt,'Пакетов','<span data-live="seen">'+D.seen+'</span>')}
     ${tile(UI.back,'Ответов','<span data-live="parsed">'+D.parsed+'</span>')}
   </div>
+
+  ${D.sni_on?`<div class="card" style="margin-top:14px"><h3>Перехват имён TLS</h3>
+    <p style="margin:0 0 8px">Второй канал рядом с DNS: имя сервера из приветствия
+    TLS. Закрывает тёплый кеш, свой DoH у браузера и зашитые адреса.</p>
+    ${kv('Имён под правилами','<span data-live="sni_names">'+D.sni_names+'</span>')}
+    ${kv('Новых адресов','<span data-live="sni_new">'+D.sni_new+'</span>')}
+    ${kv('Оборвано соединений','<span data-live="sni_broken">'+D.sni_broken+'</span>')}
+    ${D.sni_throttled?kv('Обрывов придержано','<span data-live="sni_throttled">'+D.sni_throttled+'</span>'):''}
+    <p style="margin:10px 0 0;color:var(--dim);font-size:13.5px">Новых адресов и
+    оборванных соединений должно быть поровну: обрыв делается на каждый новый
+    адрес. Расхождение — признак, что conntrack не сработал.</p>
+  </div>`:''}
 
   <div class="two">
     <div class="card"><h3>Параметры системы</h3>
@@ -1075,6 +1097,7 @@ function sig(){
   return JSON.stringify([D.domains,D.nodes,D.nodes_shown,D.xray_bin,D.proxy_ready,
     D.fragment,D.fingerprint,
     D.policy_ready,D.have_link,D.model,D.osver,D.version,D.xray_version,D.dns,D.capture,D.iface,
+    D.sni_on,(D.groups||[]).map(g=>g.name+':'+g.addrs4+':'+g.addrs6).join(','),
     D.rules,D.socks_port,D.policy_name,D.proxy_name,D.xray_pid>0]);
 }
 

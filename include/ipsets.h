@@ -59,6 +59,15 @@ int  ips_headers_differ(const char *text, const wl_t *w, int timeout);
    чем оставить набор, который не примет записи. */
 int  ips_timeout_differs(ips_t *s, const wl_t *w, int timeout);
 
+/* Число записей в наборах групп из вывода `ipset list -t`: строка
+   «Name: …», ниже «Number of entries: N». Для страницы: до сих пор она
+   показывала для каждой группы ноль, и всё смотрели через консоль.
+   -1 — набора в выводе нет. */
+void ips_entry_counts(const char *text, const wl_t *w, long *c4, long *c6);
+
+/* То же, спросив у ipset. Возвращает 0, если удалось. */
+int  ips_count_entries(ips_t *s, const wl_t *w, long *c4, long *c6);
+
 /* Ставит в очередь добавление адреса в набор группы.
    family — 4 или 6, text — адрес в обычной записи. */
 void ips_queue_add(ips_t *s, const wl_t *w, int group, int family,

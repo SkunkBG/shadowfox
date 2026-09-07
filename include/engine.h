@@ -56,6 +56,8 @@ typedef struct engine {
        пустоту, хуже отсутствующего. */
     unsigned long marked_conns;
     unsigned long restored_pkts;
+    long          addr4[WL_GROUPS_MAX];   /* записей в наборах, -1 — нет набора */
+    long          addr6[WL_GROUPS_MAX];
 
     /* Перехват SNI. Считаем врозь имена, новые адреса и оборванные
        соединения: по одному числу не отличить «имён не видим» от
@@ -83,7 +85,6 @@ typedef struct engine {
         time_t        at;
     } known[ENG_KNOWN_MAX];
     int           known_count;
-    int           policies_pending;   /* политик без метки */
     int           may_create_policy;
     int           ipset_timeout;
 } engine_t;

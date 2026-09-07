@@ -253,6 +253,30 @@ static void test_headers(void)
     CHECK(ips_headers_differ(NULL, &w, 86400) == 1, "NULL — пересоздать");
 }
 
+/* Число записей по наборам из `ipset list -t` — для страницы. */
+static void test_entry_counts(void)
+{
+    wl_t w;
+    load_lists(&w);
+
+    char text[1024];
+    snprintf(text, sizeof(text),
+             "Name: чужой\nHeader: family inet\nNumber of entries: 999\n"
+             "Name: %s\nType: hash:net\nHeader: family inet timeout 86400\n"
+             "Size in memory: 1\nReferences: 2\nNumber of entries: 78\n"
+             "Name: %s\nHeader: family inet6\nNumber of entries: 3\n",
+             w.groups[0].ipset4, w.groups[0].ipset6);
+
+    long c4[WL_GROUPS_MAX], c6[WL_GROUPS_MAX];
+    ips_entry_counts(text, &w, c4, c6);
+    CHECK(c4[0] == 78, "v4 первой группы: %ld", c4[0]);
+    CHECK(c6[0] == 3,  "v6 первой группы: %ld", c6[0]);
+    CHECK(c4[1] == -1 && c6[1] == -1, "у второй наборов нет: %ld %ld", c4[1], c6[1]);
+
+    ips_entry_counts(NULL, &w, c4, c6);
+    CHECK(c4[0] == -1, "NULL — нет данных");
+}
+
 int main(void)
 {
     printf("check_ipsets " VERSION "\n");
@@ -268,6 +292,7 @@ int main(void)
     test_flush_reports_failure();
     test_overflow_keeps_whole_lines();
     test_headers();
+    test_entry_counts();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);

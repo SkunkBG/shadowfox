@@ -378,7 +378,6 @@ static void sync_capture(engine_t *e, const config_t *cfg)
    никуда, поэтому такие группы просто пропускаются до следующей попытки. */
 static void fetch_policy_marks(engine_t *e)
 {
-    e->policies_pending = 0;
 
     for (int i = 0; i < e->wl.group_count; i++) {
         wl_group_t *g = &e->wl.groups[i];
@@ -408,7 +407,6 @@ static void fetch_policy_marks(engine_t *e)
             log_info("политика %s: метка 0x%x", g->iface, mark);
         } else {
             g->policy_mark = 0;
-            e->policies_pending++;
             log_warn("у политики %s пока нет метки, её трафик не метится",
                      g->iface);
         }
@@ -725,6 +723,7 @@ void engine_tick(engine_t *e, time_t now)
     if (now - e->last_stats >= 60) {
         e->last_stats = now;
         rt_counters(&e->rt, &e->marked_conns, &e->restored_pkts);
+        ips_count_entries(&e->ips, &e->wl, e->addr4, e->addr6);
         status_write(e, e->cfg);
     }
 

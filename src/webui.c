@@ -184,6 +184,11 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_bool(&j, "rules", e->rules_applied);
     json_kv_int(&j, "marked", (long)e->marked_conns);
     json_kv_int(&j, "restored", (long)e->restored_pkts);
+    json_kv_bool(&j, "sni_on", e->sniffing);
+    json_kv_int(&j, "sni_names", (long)e->sni_names);
+    json_kv_int(&j, "sni_new", (long)e->sni_new);
+    json_kv_int(&j, "sni_broken", (long)e->sni_broken);
+    json_kv_int(&j, "sni_throttled", (long)e->sni_throttled);
 
     /* Что уже сделано, а что нет: без этого со страницы непонятно,
        какой шаг настройки следующий. */
@@ -285,7 +290,8 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
         json_kv_str(&j, "kind",
                     g->target == WL_TARGET_IFACE  ? "устройство" :
                     g->target == WL_TARGET_POLICY ? "политика"   : "неизвестно");
-        json_kv_int(&j, "addrs", 0);
+        json_kv_int(&j, "addrs4", (long)e->addr4[i]);
+        json_kv_int(&j, "addrs6", (long)e->addr6[i]);
         json_obj_close(&j);
     }
     json_arr_close(&j);
