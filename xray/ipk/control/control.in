@@ -6,4 +6,4 @@ Installed-Size: @INSTALLED_SIZE@
 Maintainer: @MAINTAINER@
 Section: net
 Priority: optional
-Description: Xray core, trimmed build for Shadow Fox (@VARIANT@)
+Description: Xray core, build for Shadow Fox

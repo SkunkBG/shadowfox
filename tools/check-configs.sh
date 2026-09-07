@@ -21,7 +21,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SFD="$ROOT/build/shadowfoxd"
 
 XRAY=""
-for cand in "$ROOT"/build/xray/xray-check-* "$ROOT"/build/xray/out/xray-*; do
+for cand in "$ROOT"/build/xray/xray-check "$ROOT"/build/xray/out/xray-*; do
     [ -x "$cand" ] || continue
     # Бинарники под роутер здесь не запустить — нужен собранный под хост.
     if "$cand" version >/dev/null 2>&1; then XRAY="$cand"; break; fi

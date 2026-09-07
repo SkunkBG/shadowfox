@@ -5,11 +5,10 @@
 # конфликтует со штатным xray-core из Entware, и обе сборки могут стоять
 # рядом, пока идёт сравнение.
 #
-#   xray/build-ipk.sh --variant minimal --version 26.2.6
+#   xray/build-ipk.sh --version 26.7.28
 set -eu
 
-VARIANT=minimal
-XVERSION=26.2.6
+XVERSION=26.7.28
 REVISION=1
 ARCHES="aarch64 mipsel mips"
 MAINTAINER=${MAINTAINER:-Shadow Fox}
@@ -20,7 +19,6 @@ OUT="$ROOT/build/ipk"
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --variant)  VARIANT=$2;  shift 2 ;;
         --version)  XVERSION=$2; shift 2 ;;
         --revision) REVISION=$2; shift 2 ;;
         --arch)     ARCHES=$2;   shift 2 ;;
@@ -47,7 +45,7 @@ for arch in $ARCHES; do
     ARCH=$(opkg_arch "$arch")
     [ -n "$ARCH" ] || { echo "неизвестная архитектура: $arch" >&2; exit 1; }
 
-    BIN="$BIN_DIR/xray-$VARIANT-$arch"
+    BIN="$BIN_DIR/xray-$arch"
     [ -f "$BIN" ] || { echo "нет $BIN — сначала xray/build.sh" >&2; exit 1; }
 
     STAGE="$ROOT/build/xray-stage-$arch"
@@ -59,11 +57,10 @@ for arch in $ARCHES; do
 
     SIZE=$(wc -c < "$BIN" | tr -d ' ')
 
-    sed -e "s|@VERSION@|$XVERSION-$VARIANT$REVISION|g" \
+    sed -e "s|@VERSION@|$XVERSION-$REVISION|g" \
         -e "s|@ARCH@|$ARCH|g" \
         -e "s|@INSTALLED_SIZE@|$SIZE|g" \
         -e "s|@MAINTAINER@|$MAINTAINER|g" \
-        -e "s|@VARIANT@|$VARIANT|g" \
         "$ROOT/xray/ipk/control/control.in" > "$STAGE/control/control"
 
     echo '2.0' > "$STAGE/debian-binary"
@@ -71,7 +68,7 @@ for arch in $ARCHES; do
     ( cd "$STAGE/control" && tar $TAR_OPTS -czf ../control.tar.gz . )
     ( cd "$STAGE/data"    && tar $TAR_OPTS -czf ../data.tar.gz    . )
 
-    IPK="$OUT/shadowfox-xray_${XVERSION}-${VARIANT}${REVISION}_${ARCH}.ipk"
+    IPK="$OUT/shadowfox-xray_${XVERSION}-${REVISION}_${ARCH}.ipk"
     ( cd "$STAGE" && tar $TAR_OPTS -czf "$IPK" ./debian-binary ./control.tar.gz ./data.tar.gz )
 
     rm -rf "$STAGE"

@@ -54,7 +54,7 @@ SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/
 BUILD = build
 
 .PHONY: all aarch64 mipsel mips native check check-configs ipk-all feed clean distclean help docker-all \
-        xray xray-sizes xray-ipk xray-check
+        xray xray-ipk xray-check
 
 all: aarch64 mipsel mips
 
@@ -170,25 +170,22 @@ check-configs: native
 
 # Ядро Xray собирается отдельно: это Go, он кросс-компилируется сам,
 # без musl-тулчейнов. Нужен только `brew install go`.
-xray-sizes:
+xray:
 	sh xray/build.sh
 
-xray:
-	sh xray/build.sh --variant $(or $(VARIANT),full)
-
-# Функциональная проверка: собранный вариант обязан принять эталонный
-# конфиг. Только размеры мерить мало — можно молча потерять загрузчик.
+# Функциональная проверка: сборка обязана принять эталонный конфиг.
+# Только размеры мерить мало — можно молча потерять загрузчик.
 xray-check:
-	sh xray/check.sh $(or $(VARIANT),full)
+	sh xray/check.sh
 
 xray-ipk: xray xray-check
-	sh xray/build-ipk.sh --variant $(or $(VARIANT),full)
+	sh xray/build-ipk.sh
 
 # Исходники Xray не трогаем: это клон апстрима на сотни мегабайт, и
 # сносить его ради пересборки демона — значит качать заново.
 clean:
 	find $(BUILD) -mindepth 1 -maxdepth 1 ! -name xray -exec rm -rf {} + 2>/dev/null || true
-	rm -rf $(BUILD)/xray/out $(BUILD)/xray/xray-check-* 2>/dev/null || true
+	rm -rf $(BUILD)/xray/out $(BUILD)/xray/xray-check 2>/dev/null || true
 
 # Полная очистка, включая клон Xray. chmod нужен потому, что git и Go
 # оставляют файлы без права записи, и rm -rf на них спотыкается.
@@ -204,8 +201,7 @@ help:
 	@echo "  make ipk-all     собрать .ipk под все три архитектуры"
 	@echo "  make feed        собрать opkg-фид в build/feed"
 	@echo "  make docker-all  всё то же в контейнере, если нет тулчейнов"
-	@echo "  make xray-sizes  собрать все варианты xray и сравнить размеры"
-	@echo "  make xray        собрать xray (VARIANT=full|lean-plus|lean)"
+	@echo "  make xray        собрать ядро xray под три архитектуры"
 	@echo "  make xray-check  проверить, что сборка принимает эталонный конфиг"
 	@echo "  make xray-ipk    упаковать xray в .ipk"
 	@echo "  make clean       удалить сборки, сохранив клон Xray"

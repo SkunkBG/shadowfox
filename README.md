@@ -58,9 +58,9 @@ Xray написан на Go и кросс-компилируется без ст
 чужой апстрим с закреплённой версией:
 
 ```bash
-make xray-sizes                # три варианта × три архитектуры, таблица размеров
-make xray VARIANT=minimal      # только нужный вариант
-make xray-ipk VARIANT=minimal  # упаковать в .ipk
+make xray       # три архитектуры, таблица размеров
+make xray-check # проверить, что ядро принимает эталонный конфиг
+make xray-ipk   # упаковать в .ipk
 ```
 
 Пакет ставится в `/opt/sbin/shadowfox-xray`, а не в `/opt/sbin/xray`, чтобы

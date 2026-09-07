@@ -10,11 +10,6 @@ on:
         default: v26.7.28
   push:
     tags: ['v*']
-  schedule:
-    # Раз в неделю: обрезка правит структуру infra/conf апстрима, и если
-    # она сломается при обновлении Xray, узнать об этом лучше заранее,
-    # а не в тот момент, когда сборка внезапно понадобится.
-    - cron: '0 6 * * 1'
 
 jobs:
   build:
@@ -33,11 +28,11 @@ jobs:
       # Логи шагов через API без прав администратора не читаются, поэтому
       # при падении показываем хвост прямо в сводке запуска: она видна
       # всем и не требует лазить по шагам.
-      - name: Собрать ядро, которое публикуем
+      - name: Собрать ядро
         shell: bash
         run: |
           set -o pipefail
-          sh xray/build.sh --variant lean \
+          sh xray/build.sh \
              --version "${{ github.event.inputs.xray_version || 'v26.7.28' }}" \
              2>&1 | tee -a /tmp/xray.log
 
@@ -45,14 +40,14 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          sh xray/check.sh lean 2>&1 | tee -a /tmp/xray.log
+          sh xray/check.sh 2>&1 | tee -a /tmp/xray.log
 
       - name: Собрать пакеты ядра
         shell: bash
         run: |
           set -o pipefail
           VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
-          sh xray/build-ipk.sh --variant lean --version "${VER#v}" 2>&1 | tee -a /tmp/xray.log
+          sh xray/build-ipk.sh --version "${VER#v}" 2>&1 | tee -a /tmp/xray.log
           ls -la build/ipk/
 
       - name: Выложить в выпуск
@@ -64,10 +59,10 @@ jobs:
           set -o pipefail
           VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
           cat > /tmp/notes.md <<NOTES
-          Урезанная сборка Xray-core $VER для Shadow Fox: только VLESS-клиент.
+          Сборка Xray-core $VER для Shadow Fox, апстрим без изменений.
 
           Ставится в /opt/sbin/shadowfox-xray и не конфликтует со штатным
-          пакетом. Обрезка описана в xray/trim.py.
+          пакетом Entware.
 
           Пакеты отсюда подкладываются в фид основным процессом сборки.
           NOTES
@@ -76,18 +71,6 @@ jobs:
             gh release create xray build/ipk/shadowfox-xray_*.ipk \
               --title "Ядро Xray $VER" --notes-file /tmp/notes.md
           } 2>&1 | tee -a /tmp/xray.log
-
-      # Сравнение вариантов идёт после публикации: оно нужно, чтобы
-      # видеть, во что обходится обрезка, но ронять из-за него выкладку
-      # рабочего ядра неправильно.
-      - name: Сравнить размеры вариантов
-        shell: bash
-        run: |
-          set -o pipefail
-          sh xray/build.sh \
-             --version "${{ github.event.inputs.xray_version || 'v26.7.28' }}" \
-             2>&1 | tee -a /tmp/xray.log
-          for v in full lean-plus; do sh xray/check.sh "$v" 2>&1 | tee -a /tmp/xray.log; done
 
       # Сквозная проверка: конфиги нашего генератора скармливаются
       # настоящему ядру. Держим её здесь, потому что только тут оно есть.
