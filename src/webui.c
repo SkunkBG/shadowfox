@@ -3,6 +3,7 @@
 #include "digest.h"
 #include "ndmauth.h"
 #include "proc.h"
+#include "mask.h"
 #include "routercfg.h"
 
 #define DNS_LINES_MAX 32
@@ -132,75 +133,6 @@ static int file_for(const config_t *cfg, const char *what,
     if (!strcmp(what, "cidrs"))   { path_in_conf(cfg, "ip.list",     dst, size); return 1; }
     if (!strcmp(what, "nodes"))   { str_copy(dst, size, cfg->nodes_file);        return 1; }
     return 0;
-}
-
-/* Маскировка ссылок. Ключ — учётные данные, и отдавать его странице на
-   каждом обновлении незачем: достаточно показать, куда ведёт ссылка.
-   Прятать в разметке было бы обманом — текст всё равно уехал бы в
-   браузер и осел в кеше. */
-#define MASK_MARK "\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2"   /* •••• */
-
-static void mask_link(const char *in, char *out, size_t size)
-{
-    const char *scheme = strstr(in, "://");
-    if (!scheme) { str_copy(out, size, in); return; }
-
-    const char *rest = scheme + 3;
-    const char *at   = strchr(rest, '@');
-    const char *hash = strchr(rest, '#');
-
-    /* Подписка целиком секрет: у неё вся ссылка — это доступ. */
-    if (!at || (hash && at > hash)) {
-        size_t head = (size_t)(rest - in);
-        const char *slash = strchr(rest, '/');
-        size_t host = slash ? (size_t)(slash - rest) : strlen(rest);
-        snprintf(out, size, "%.*s%.*s/" MASK_MARK,
-                 (int)head, in, (int)host, rest);
-        return;
-    }
-
-    /* Ссылка на узел: прячем uuid и sid, остальное полезно видеть. */
-    size_t head = (size_t)(rest - in);
-    char   tail[512];
-    str_copy(tail, sizeof(tail), at + 1);
-
-    char *sid = strstr(tail, "sid=");
-    if (sid) {
-        char *end = sid + 4;
-        while (*end && *end != '&' && *end != '#') end++;
-        memmove(sid + 4 + 4, end, strlen(end) + 1);
-        memcpy(sid + 4, "****", 4);
-    }
-
-    snprintf(out, size, "%.*s" MASK_MARK "@%s", (int)head, in, tail);
-}
-
-static void mask_nodes(const char *in, char *out, size_t size)
-{
-    size_t used = 0;
-    out[0] = '\0';
-
-    const char *p = in;
-    while (*p) {
-        const char *nl  = strchr(p, '\n');
-        size_t      len = nl ? (size_t)(nl - p) : strlen(p);
-
-        char line[1024];
-        if (len >= sizeof(line)) len = sizeof(line) - 1;
-        memcpy(line, p, len);
-        line[len] = '\0';
-
-        char shown[1024];
-        if (line[0]) mask_link(str_trim(line), shown, sizeof(shown));
-        else         shown[0] = '\0';
-
-        int n = snprintf(out + used, size - used, "%s\n", shown);
-        if (n < 0 || (size_t)n >= size - used) break;
-        used += (size_t)n;
-
-        if (!nl) break;
-        p = nl + 1;
-    }
 }
 
 /* Строковое поле верхнего уровня из ответа RCI. Разбор нарочно грубый:

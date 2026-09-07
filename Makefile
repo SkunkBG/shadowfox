@@ -49,7 +49,7 @@ src/webpage.c: web/index.html tools/embed.sh tools/build-page.sh $(wildcard web/
 	sh tools/build-page.sh web/index.html web/logo.png > $(BUILD)/page.html
 	sh tools/embed.sh $(BUILD)/page.html web_page > $@
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/snicap.c src/engine.c src/rci.c src/status.c src/http.c src/webui.c src/digest.c src/ndmauth.c src/routercfg.c src/logopng.c src/fontwoff.c src/webpage.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/snicap.c src/engine.c src/rci.c src/status.c src/http.c src/mask.c src/webui.c src/digest.c src/ndmauth.c src/routercfg.c src/logopng.c src/fontwoff.c src/webpage.c
 
 BUILD = build
 
@@ -139,6 +139,9 @@ check: native
 		src/dnscap.c src/dnsmsg.c src/util.c src/log.c \
 		-o $(BUILD)/check_dnscap
 	./$(BUILD)/check_dnscap
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_mask.c \
+		src/mask.c src/util.c -o $(BUILD)/check_mask
+	./$(BUILD)/check_mask
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_snicap.c \
 		src/snicap.c src/util.c src/log.c \
 		-o $(BUILD)/check_snicap
