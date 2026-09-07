@@ -1016,7 +1016,8 @@ function draw(){
 /* Проверка обновлений: opkg update занимает секунды, поэтому только по
    нажатию, а результат хранится — иначе перерисовка его потеряет. */
 function updBox(){
-  if(!updInfo) return UI.i+'Нажми «Проверить», чтобы спросить у opkg';
+  if(!updInfo) return UI.i+'Спрашиваю у opkg…';
+  if(updInfo.pending) return UI.i+'Проверка идёт, это до минуты';
   if(!updInfo.ok) return UI.i+'Не проверить: '+esc(updInfo.why||'opkg молчит');
   if(!updInfo.available) return UI.ok+'Установлена последняя версия';
   return UI.i+'Доступна версия <b>'+esc(updInfo.available)+'</b>';
@@ -1075,7 +1076,7 @@ async function loadDns(){
 function sig(){
   return JSON.stringify([D.domains,D.nodes,D.nodes_shown,D.xray_bin,D.proxy_ready,
     D.fragment,D.noise,D.fingerprint,
-    D.policy_ready,D.have_link,D.model,D.osver,D.version,D.dns,D.capture,D.iface,
+    D.policy_ready,D.have_link,D.model,D.osver,D.version,D.xray_version,D.dns,D.capture,D.iface,
     D.rules,D.socks_port,D.policy_name,D.proxy_name,D.xray_pid>0]);
 }
 
@@ -1343,12 +1344,8 @@ document.addEventListener('click',async ev=>{
   if(ev.target.id==='upd-check'){
     const btn=ev.target, m=$('#m-upd');
     btn.disabled=true; m.className='msg'; m.textContent='спрашиваю opkg…';
-    try{
-      const r=await fetch(api('/update'));
-      updInfo=await r.json();
-      m.textContent='';
-    }catch(e){ updInfo={ok:false,why:e.message}; }
-    btn.disabled=false; draw(); return; }
+    await checkUpdate(1);   /* перерисует страницу сама */
+    return; }
 
   if(ev.target.id==='upd-go'){
     if(!confirm('Обновить Shadow Fox до '+updInfo.available+'?\n'+
@@ -1392,6 +1389,9 @@ document.addEventListener('click',async ev=>{
         await new Promise(r=>setTimeout(r,4000));
         try{
           const rr=await fetch(api('/data'));
+          /* 401 — сессия истекла или служба перезапустилась; ядро при
+             этом могло встать. Та же починка, что у обновления демона. */
+          if(rr.status===401){ location.reload(); return; }
           if(rr.ok){ const d=await rr.json();
             if(d.xray_bin){ await load(); return; } }
         }catch(e){}
@@ -1496,15 +1496,20 @@ addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValu
 if(!seen()) gate();
 load();
 
-/* Один раз за открытие страницы: opkg update ходит в сеть и занимает
-   секунды, поэтому в опрос каждые десять секунд его класть нельзя. */
-(async()=>{
-  try{
-    const r=await fetch(api('/update'));
-    updInfo=await r.json();
-  }catch(e){ updInfo={ok:false,why:e.message}; }
+/* Проверка обновлений идёт у службы отвязанно; пока результата нет,
+   она отвечает pending — переспрашиваем, но недолго. */
+async function checkUpdate(force){
+  for(let i=0;i<14;i++){
+    try{
+      const r=await fetch(api('/update'+(force&&i===0?'?force=1':'')));
+      updInfo=await r.json();
+    }catch(e){ updInfo={ok:false,why:e.message}; break; }
+    if(!updInfo.pending) break;
+    await new Promise(r=>setTimeout(r,5000));
+  }
   if(D && !dirty) draw();
-})();
+}
+checkUpdate(0);
 setInterval(()=>{
   if(dirty || document.querySelector('textarea:focus,input:focus')) return;
   if(document.querySelector('.modal')) return;   /* поверх открытого окна незачем */

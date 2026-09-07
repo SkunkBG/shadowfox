@@ -795,7 +795,29 @@ static int spawn_detached(const char *command)
 
 #define UPDATE_LOG "/opt/var/log/shadowfox-update.log"
 
-static void check_update(int fd)
+/* Проверка обновлений. opkg update ходит в сеть и занимает до минуты,
+   а демон однопоточный: пока он ждал, стояли и перехват, и страница.
+   Поэтому opkg запускается отвязанно и пишет результат в файл, а
+   обработчик только читает файл. Свежий — отдаём, старый или нет —
+   запускаем и отвечаем «идёт проверка», страница переспросит. */
+#define UPDATE_FILE   "/opt/var/run/shadowfox.update"
+#define UPDATE_FRESH  (6 * 3600)   /* сколько верим результату */
+#define UPDATE_GUARD  60           /* не чаще запускаем повторно */
+
+static time_t g_update_launched;
+
+static void launch_update_check(const char *bin)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd),
+             "{ %s update >/dev/null 2>&1; %s list-upgradable 2>&1; "
+             "echo '## done'; } > %s.tmp && mv %s.tmp %s",
+             bin, bin, UPDATE_FILE, UPDATE_FILE, UPDATE_FILE);
+    spawn_detached(cmd);
+    g_update_launched = time(NULL);
+}
+
+static void check_update(const http_req_t *req, int fd)
 {
     char bin[192] = "";
     char buf[2048];
@@ -807,6 +829,7 @@ static void check_update(int fd)
 
     if (!opkg_path(bin, sizeof(bin))) {
         json_kv_bool(&j, "ok", 0);
+        json_kv_bool(&j, "pending", 0);
         json_kv_str(&j, "why", "opkg не найден");
         json_kv_str(&j, "available", "");
         json_obj_close(&j);
@@ -815,17 +838,28 @@ static void check_update(int fd)
         return;
     }
 
+    char force[4] = "";
+    http_query_get(req, "force", force, sizeof(force));
+
+    time_t      now = time(NULL);
+    struct stat st;
+    int         have  = stat(UPDATE_FILE, &st) == 0;
+    int         fresh = have && now - st.st_mtime < UPDATE_FRESH;
+
+    /* Кнопка «Проверить» спрашивает заново, страница при открытии
+       довольствуется свежим результатом. */
+    int want_launch = (force[0] == '1') || !fresh;
+    if (want_launch && now - g_update_launched >= UPDATE_GUARD) {
+        launch_update_check(bin);
+        have = 0;   /* прежний ответ больше не показываем */
+    }
+
     static char out[16 * 1024];
-    char upd[] = "update";
-    char *uargv[] = { bin, upd, NULL };
-    proc_run(uargv, out, sizeof(out), 60);
-
-    char lst[] = "list-upgradable";
-    char *largv[] = { bin, lst, NULL };
-    int rc = proc_run(largv, out, sizeof(out), 30);
-
+    int  ok = 0;
     char available[64] = "";
-    if (rc == 0) {
+
+    if (have && slurp(UPDATE_FILE, out, sizeof(out)) > 0 && strstr(out, "## done")) {
+        ok = 1;
         for (char *line = strtok(out, "\n"); line; line = strtok(NULL, "\n")) {
             char *t = str_trim(line);
             if (strncmp(t, "shadowfox ", 10) != 0) continue;
@@ -837,8 +871,9 @@ static void check_update(int fd)
         }
     }
 
-    json_kv_bool(&j, "ok", rc == 0);
-    json_kv_str(&j, "why", rc == 0 ? "" : "opkg ответил ошибкой");
+    json_kv_bool(&j, "ok", ok);
+    json_kv_bool(&j, "pending", !ok && now - g_update_launched < 120);
+    json_kv_str(&j, "why", ok ? "" : "проверка ещё идёт");
     json_kv_str(&j, "available", available);
     json_obj_close(&j);
 
@@ -1288,7 +1323,7 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/update")) {
         if (!strcmp(req->method, "POST")) do_update(req, fd);
-        else                              check_update(fd);
+        else                              check_update(req, fd);
         return;
     }
 
