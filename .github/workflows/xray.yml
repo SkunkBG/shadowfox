@@ -26,39 +26,29 @@ jobs:
         with:
           go-version: stable
 
-      - name: Собрать все варианты и сравнить размеры
-        run: sh xray/build.sh --version "${{ github.event.inputs.xray_version || 'v26.7.28' }}"
-
-      # Размеров недостаточно: можно потерять загрузчик конфига и не заметить
-      # этого — бинарник станет меньше и молча перестанет читать файл.
-      - name: Проверить, что сборки принимают эталонный конфиг
+      # Логи шагов через API без прав администратора не читаются, поэтому
+      # при падении показываем хвост прямо в сводке запуска: она видна
+      # всем и не требует лазить по шагам.
+      - name: Собрать ядро, которое публикуем
+        shell: bash
         run: |
-          for v in full lean lean-plus; do
-            sh xray/check.sh "$v"
-          done
+          set -o pipefail
+          sh xray/build.sh --variant lean \
+             --version "${{ github.event.inputs.xray_version || 'v26.7.28' }}" \
+             2>&1 | tee -a /tmp/xray.log
 
-      # Сквозная проверка: конфиги нашего генератора скармливаются
-      # настоящему Xray. Держим её здесь, а не в основном workflow,
-      # потому что только тут есть собранное ядро.
-      - name: Собрать демона и прогнать через него конфиги
-        env:
-          SF_REQUIRE_XRAY: "1"
+      - name: Проверить, что сборка принимает эталонный конфиг
+        shell: bash
         run: |
-          make native
-          sh tools/check-configs.sh
+          set -o pipefail
+          sh xray/check.sh lean 2>&1 | tee -a /tmp/xray.log
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: xray-binaries
-          path: build/xray/out/*
-
-      # Пакеты кладём в выпуск с постоянным тегом: основной процесс
-      # забирает их оттуда и подкладывает в фид. Постоянный тег нужен,
-      # чтобы адрес не менялся от версии к версии.
       - name: Собрать пакеты ядра
+        shell: bash
         run: |
+          set -o pipefail
           VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
-          sh xray/build-ipk.sh --variant lean --version "${VER#v}"
+          sh xray/build-ipk.sh --variant lean --version "${VER#v}" 2>&1 | tee -a /tmp/xray.log
           ls -la build/ipk/
 
       - name: Выложить в выпуск
@@ -67,7 +57,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
-          gh release delete xray --yes --cleanup-tag 2>/dev/null || true
           cat > /tmp/notes.md <<NOTES
           Урезанная сборка Xray-core $VER для Shadow Fox: только VLESS-клиент.
 
@@ -76,5 +65,44 @@ jobs:
 
           Пакеты отсюда подкладываются в фид основным процессом сборки.
           NOTES
+          gh release delete xray --yes --cleanup-tag 2>/dev/null || true
           gh release create xray build/ipk/shadowfox-xray_*.ipk \
             --title "Ядро Xray $VER" --notes-file /tmp/notes.md
+
+      # Сравнение вариантов идёт после публикации: оно нужно, чтобы
+      # видеть, во что обходится обрезка, но ронять из-за него выкладку
+      # рабочего ядра неправильно.
+      - name: Сравнить размеры вариантов
+        shell: bash
+        run: |
+          set -o pipefail
+          sh xray/build.sh \
+             --version "${{ github.event.inputs.xray_version || 'v26.7.28' }}" \
+             2>&1 | tee -a /tmp/xray.log
+          for v in full lean-plus; do sh xray/check.sh "$v" 2>&1 | tee -a /tmp/xray.log; done
+
+      # Сквозная проверка: конфиги нашего генератора скармливаются
+      # настоящему ядру. Держим её здесь, потому что только тут оно есть.
+      - name: Прогнать через ядро конфиги генератора
+        shell: bash
+        env:
+          SF_REQUIRE_XRAY: "1"
+        run: |
+          set -o pipefail
+          make native
+          sh tools/check-configs.sh 2>&1 | tee -a /tmp/xray.log
+
+      - name: Показать, на чём упало
+        if: failure()
+        run: |
+          {
+            echo '### Хвост сборки'
+            echo '```'
+            tail -80 /tmp/xray.log 2>/dev/null || echo 'лог не создан — упало до первого шага'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xray-binaries
+          path: build/xray/out/*
