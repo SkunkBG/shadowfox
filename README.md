@@ -74,10 +74,12 @@ make xray-ipk VARIANT=minimal  # упаковать в .ipk
 
 Сначала научить `opkg` ходить по https. Он качает через `wget`, а
 встроенный в BusyBox не умеет TLS и обрывается на
-`wget: not an http or ftp url`:
+`wget: not an http or ftp url`. Корневые сертификаты нужны отдельно: в
+зависимостях `wget-ssl` их нет, и без них он возвращает код 5 —
+«не проверить сертификат»:
 
 ```bash
-opkg update && opkg install wget-ssl
+opkg update && opkg install wget-ssl ca-bundle
 ```
 
 Дальше подключить фид и поставить пакет. Каталог фида у Entware

@@ -39,13 +39,20 @@ if command -v curl >/dev/null 2>&1; then
 fi
 
 # opkg качает через wget, а встроенный в BusyBox не умеет TLS: фид по
-# https он не возьмёт и оборвётся на «not an http or ftp url». Ставим
-# нормальный wget заранее, иначе следующий шаг падает непонятно почему.
-if ! /opt/bin/wget --version 2>/dev/null | grep -qi 'GNU Wget'; then
-    echo "ставлю wget-ssl: без него opkg не умеет https" >&2
-    opkg update  >/dev/null 2>&1 || true
-    opkg install wget-ssl >/dev/null 2>&1 || \
-        echo "не поставить wget-ssl — сделай это вручную" >&2
+# https он не возьмёт и оборвётся на «not an http or ftp url». Корневые
+# сертификаты нужны отдельно — в зависимостях wget-ssl их нет, и без них
+# он возвращает код 5. Ставим оба заранее, иначе следующий шаг падает
+# так, что причину не угадать.
+need=""
+/opt/bin/wget --version 2>/dev/null | grep -qi 'GNU Wget' || need="wget-ssl"
+[ -d /opt/etc/ssl/certs ] || need="$need ca-bundle"
+
+if [ -n "$need" ]; then
+    echo "ставлю$need: без них opkg не умеет https" >&2
+    opkg update >/dev/null 2>&1 || true
+    # shellcheck disable=SC2086
+    opkg install $need >/dev/null 2>&1 || \
+        echo "не поставить$need — сделай это вручную" >&2
 fi
 
 mkdir -p /opt/etc/opkg
