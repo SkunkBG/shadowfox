@@ -630,8 +630,12 @@ static void tunnel_probe(engine_t *e, time_t now)
             if (st > 0) log_info("туннель отвечает, %d мс", e->tunnel_ms);
             else        log_warn("туннель не отвечает: %s", e->tunnel_why);
             e->tunnel_state = st;
-            status_write(e, e->cfg);
         }
+        /* Файл состояния — после каждой проверки, а не раз в минуту:
+           иначе --status показывал «проверен 107 с назад» при интервале
+           в 60, потому что удачная повторная проверка ничего не меняла
+           и записи не вызывала. */
+        status_write(e, e->cfg);
         e->probe_next = now + (st > 0 ? ENGINE_PROBE_OK : ENGINE_PROBE_FAIL);
         probe_abort(&e->probe);
         return;
