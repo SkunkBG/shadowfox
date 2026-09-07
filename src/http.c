@@ -226,6 +226,14 @@ int http_open(http_t *h, const char *addr, int port, char *err, unsigned err_siz
         return -1;
     }
 
+    /* Закрывать при exec обязательно: иначе слушающий сокет достаётся
+       по наследству всякому запущенному нами процессу. Однажды так
+       вышло, что обновление породило цепочку sh -> opkg -> postinst ->
+       новая служба, и та унаследовала сокет прежней: порт занят, свой
+       bind падает с «Address in use», а соединения копятся в очереди
+       сокета, с которого никто не принимает. */
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
@@ -362,6 +370,8 @@ void http_poll(http_t *h,
            нечего» ещё до того, как запрос доедет: соединение закрывалось
            без ответа. В Linux наследования нет, поэтому на роутере это
            не проявилось бы вовсе. Ждать даём таймауту ниже. */
+        fcntl(c, F_SETFD, FD_CLOEXEC);
+
         int cf = fcntl(c, F_GETFL, 0);
         if (cf != -1) fcntl(c, F_SETFL, cf & ~O_NONBLOCK);
 

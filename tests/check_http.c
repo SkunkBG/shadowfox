@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <time.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 static int failures = 0;
@@ -104,6 +105,60 @@ static void test_long_cookie(void)
     CHECK(found != NULL, "метка сессии видна целиком");
     CHECK(found && !strncmp(found, "deadbeef0123456789", 18),
           "и значение не обрезано");
+}
+
+/* Обработчик для проверки: смотрит флаги дескриптора соединения. */
+static int g_accepted_cloexec;
+
+static void reply_cloexec(const http_req_t *r, int fd, void *ctx)
+{
+    (void)r; (void)ctx;
+    int f = fcntl(fd, F_GETFD, 0);
+    g_accepted_cloexec = (f != -1 && (f & FD_CLOEXEC)) ? 1 : 0;
+    http_send_text(fd, 200, "text/plain", "ok\n");
+}
+
+/* Слушающий сокет не должен доставаться запущенным нами процессам.
+   Один раз так и вышло: обновление породило цепочку sh -> opkg ->
+   postinst -> новая служба, и та унаследовала сокет прежней. Порт занят,
+   свой bind падает с «Address in use», а соединения копятся в очереди
+   сокета, с которого никто не принимает. */
+static void test_listener_not_inherited(void)
+{
+    http_t h;
+    char   err[128];
+
+    http_init(&h);
+    CHECK(http_open(&h, "127.0.0.1", 0, err, sizeof(err)) == 0,
+          "сервер поднят: %s", err);
+
+    int flags = fcntl(http_fd(&h), F_GETFD, 0);
+    CHECK(flags != -1 && (flags & FD_CLOEXEC),
+          "на слушающем сокете стоит FD_CLOEXEC");
+
+    /* И на принятом тоже: он живёт недолго, но утечь успевает. */
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    getsockname(http_fd(&h), (struct sockaddr *)&sa, &sl);
+
+    int c = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in to;
+    memset(&to, 0, sizeof(to));
+    to.sin_family = AF_INET;
+    to.sin_port   = sa.sin_port;
+    inet_pton(AF_INET, "127.0.0.1", &to.sin_addr);
+
+    if (connect(c, (struct sockaddr *)&to, sizeof(to)) == 0) {
+        const char *req = "GET /x HTTP/1.1\r\nHost: t\r\n\r\n";
+        if (write(c, req, strlen(req)) > 0) {
+            /* Обработчик увидит дескриптор принятого соединения. */
+            http_poll(&h, reply_cloexec, NULL);
+            CHECK(g_accepted_cloexec == 1, "на принятом сокете тоже FD_CLOEXEC");
+        }
+    }
+    close(c);
+
+    http_close(&h);
 }
 
 static void test_token(void)
@@ -373,6 +428,7 @@ int main(void)
     test_query();
     test_body();
     test_long_cookie();
+    test_listener_not_inherited();
     test_token();
     test_garbage();
     test_refuses_all_interfaces();

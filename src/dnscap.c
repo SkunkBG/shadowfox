@@ -242,6 +242,9 @@ int dcap_open(dcap_t *c, const char *iface, char *err, unsigned err_size)
         str_copy(c->iface, sizeof(c->iface), iface);
     }
 
+    /* Тот же случай, что и с веб-сокетом: чужим процессам он не нужен. */
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 

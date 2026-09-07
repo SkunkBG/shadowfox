@@ -89,6 +89,9 @@ int webui_open(http_t *h, const config_t *cfg, char *err, unsigned err_size)
     char addr[64];
     if (webui_addr(cfg, addr, sizeof(addr), err, err_size) != 0) return -1;
 
+    /* Закрываем прежний сокет до http_init: тот обнуляет структуру, и
+       живой дескриптор потерялся бы, оставшись открытым в ядре. */
+    http_close(h);
     http_init(h);
 
     /* Токен слою HTTP не отдаём: он требовал бы заголовок на каждый
@@ -712,6 +715,12 @@ static int spawn_detached(const char *command)
         pid_t second = fork();
         if (second < 0) _exit(1);
         if (second > 0) _exit(0);       /* родителя ждёт наш вызывающий */
+
+        /* Закрываем всё, что досталось по наследству: сокеты службы
+           чужому процессу не нужны, а удержанный им порт потом не даёт
+           подняться заново. CLOEXEC уже стоит, но здесь между fork и
+           exec есть окно, да и sh может наплодить своих детей. */
+        for (int fdn = 3; fdn < 256; fdn++) close(fdn);
 
         for (int fdn = 0; fdn < 3; fdn++) close(fdn);
         open("/dev/null", O_RDWR);
