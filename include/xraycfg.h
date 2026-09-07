@@ -9,8 +9,7 @@
 typedef struct {
     const char *listen;   /* адрес входа; см. комментарий в xraycfg.c */
     int  socks_port;      /* локальный вход, к которому цепляется Proxy0 */
-    int  fragment;        /* резать TLS ClientHello */
-    int  noise;           /* добавлять шум в UDP */
+    int  fragment;        /* резать TLS ClientHello — только для tls, не reality */
     const char *fingerprint;  /* перекрыть отпечаток uTLS, "" — из ссылки */
     int  sniffing;        /* определять домен для маршрутизации */
     const char *log_level;

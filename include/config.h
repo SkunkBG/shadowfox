@@ -22,8 +22,7 @@ typedef struct {
 
     /* Устойчивость к DPI. Ровно те ручки, отсутствие которых, судя по
        всему, и хоронило neofit со временем. */
-    int         fragment;        /* резать TLS ClientHello */
-    int         noise;           /* шум в UDP */
+    int         fragment;        /* резать TLS ClientHello (только tls) */
     char        fingerprint[16]; /* перекрыть отпечаток uTLS, пусто — из ссылки */
 
     /* Свой экземпляр Xray и своё прокси-подключение в Keenetic. */

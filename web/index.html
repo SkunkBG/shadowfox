@@ -681,25 +681,23 @@ function viewConn(){
 
   <div class="card"><h3>Устойчивость к DPI</h3>
     <p>Ручки Xray, которые решают, доживёт ли туннель до следующего месяца.
-    Менеджер без них перестаёт работать со временем, хотя настройки при этом
-    выглядят исправными. Включены всегда — выбирать тут нечего.</p>
+    Выбирать тут нечего — включено то, что имеет смысл, и только там, где
+    имеет.</p>
 
     <div class="dpi">
       <div class="row"><i class="dot ok"></i>
         <div><b>Фрагментация ClientHello</b>
-          <i>Приветствие TLS режется на части, и целевое имя не собирается
-          в один пакет.</i></div>
+          <i>Для обычного TLS: приветствие режется на части, и имя сервера не
+          собирается в один пакет. Для Reality не применяется — там имя
+          открытое по замыслу, а резать его значило бы только тормозить каждое
+          соединение.</i></div>
       </div>
       <div class="row"><i class="dot ok"></i>
-        <div><b>Шум в UDP</b>
-          <i>Мусорные пакеты перед основными, чтобы начало потока не
-          опознавалось по образцу.</i></div>
-      </div>
-      <div class="row"><i class="dot ok"></i>
-        <div><b>Отпечаток uTLS: ${esc(D.fingerprint||'firefox')}</b>
-          <i>Соединение представляется этим браузером. Не chrome намеренно:
-          он самый частый, и его подпись распознают в первую очередь —
-          даже если панель проставила chrome в саму ссылку.</i></div>
+        <div><b>Отпечаток uTLS: ${esc(D.fingerprint||'из ссылки')}</b>
+          <i>Каким браузером представляется соединение. Берётся из ссылки —
+          так, как выдала панель; если там пусто, chrome. Одинаковый редкий
+          отпечаток у всех был бы приметой, а самый частый — лучшее
+          прикрытие.</i></div>
       </div>
     </div>
   </div>
@@ -1075,7 +1073,7 @@ async function loadDns(){
    только числа. */
 function sig(){
   return JSON.stringify([D.domains,D.nodes,D.nodes_shown,D.xray_bin,D.proxy_ready,
-    D.fragment,D.noise,D.fingerprint,
+    D.fragment,D.fingerprint,
     D.policy_ready,D.have_link,D.model,D.osver,D.version,D.xray_version,D.dns,D.capture,D.iface,
     D.rules,D.socks_port,D.policy_name,D.proxy_name,D.xray_pid>0]);
 }

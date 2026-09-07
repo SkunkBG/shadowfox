@@ -194,7 +194,6 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_str(&j, "xray_version", e->xray_version);
 
     json_kv_bool(&j, "fragment", cfg->fragment);
-    json_kv_bool(&j, "noise", cfg->noise);
     json_kv_str(&j, "fingerprint", cfg->fingerprint);
 
     json_kv_str(&j, "policy_name", cfg->policy);

@@ -34,14 +34,13 @@ void config_defaults(config_t *cfg)
        Выключатель оставлен на случай, когда захват на 443 мешает. */
     cfg->sni_capture   = 1;
 
-    /* Включены по умолчанию и наружу не выведены: см. комментарий в
-       xraycfg_defaults. Отпечаток задан явно, а не взят из ссылки, —
-       панели проставляют туда chrome, а его подпись распознают в первую
-       очередь. Ключи в конфиге остались: выключить при разборе полёта
-       можно, но выбирать это пользователю не предлагаем. */
+    /* Фрагментация включена (действует только на обычный TLS, см.
+       xraycfg.c). Отпечаток по умолчанию не перекрываем — берётся из
+       ссылки, запасной chrome; перекрытие остаётся ручкой для разбора
+       полётов. Ключ noise принимается и игнорируется: шум убран, а
+       старые конфиги ругаться не должны. */
     cfg->fragment      = 1;
-    cfg->noise         = 1;
-    str_copy(cfg->fingerprint, sizeof(cfg->fingerprint), "firefox");
+    cfg->fingerprint[0] = '\0';
 
     cfg->web_enabled = 1;
     /* 2000 занят hrweb, 8080 у MagiTrickle, 92 был у neofit. */
@@ -171,8 +170,7 @@ int config_set(config_t *cfg, const char *key, const char *value)
     }
 
     if (!strcasecmp(key, "noise")) {
-        cfg->noise = parse_bool(value, cfg->noise);
-        return 0;
+        return 0;   /* устаревший ключ, см. config_defaults */
     }
 
     if (!strcasecmp(key, "fingerprint")) {
@@ -365,18 +363,16 @@ int config_write_default(const char *path)
         "# оборвать соединение, успевшее уйти мимо туннеля.\n"
         "sniCapture=%s\n"
         "\n"
-        "# Устойчивость к DPI. fragment режет TLS ClientHello, noise\n"
-        "# добавляет шум в UDP. fingerprint перекрывает отпечаток uTLS из\n"
-        "# ссылки: панели обычно проставляют chrome, а его подпись\n"
-        "# распознают в первую очередь. Пусто — брать из ссылки.\n"
+        "# Устойчивость к DPI. fragment режет TLS ClientHello у обычного TLS;\n"
+        "# для Reality не применяется — там имя сервера открытое по замыслу.\n"
+        "# fingerprint перекрывает отпечаток uTLS из ссылки; пусто — брать\n"
+        "# из ссылки, а если и там нет — chrome, как у самого ядра.\n"
         "fragment=%s\n"
-        "noise=%s\n"
         "fingerprint=%s\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.nodes_file, cfg.xray_config, cfg.socks_port,
         cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no",
-        cfg.fragment ? "yes" : "no", cfg.noise ? "yes" : "no",
-        cfg.fingerprint);
+        cfg.fragment ? "yes" : "no", cfg.fingerprint);
 
     fclose(f);
     return 0;

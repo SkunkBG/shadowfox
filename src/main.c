@@ -40,8 +40,8 @@ static void usage(FILE *out)
         "      --dry-run         показать план правил и выйти, ничего не меняя\n"
         "      --setup-proxy     напечатать команды для своего прокси в Keenetic\n"
         "      --setup-web       напечатать команды для доступа по доменному имени\n"
-        "      --fragment        включить фрагментацию TLS и шум UDP\n"
-        "      --no-fragment     выключить их явно (и так выключены)\n"
+        "      --fragment        резать TLS ClientHello (по умолчанию да, только tls)\n"
+        "      --no-fragment     не резать\n"
         "      --log УРОВЕНЬ     off | error | warn | info | debug\n"
         "      --КЛЮЧ ЗНАЧЕНИЕ   любой параметр из shadowfox.conf\n"
         "  -v, --version         версия\n"
@@ -127,10 +127,8 @@ int main(int argc, char **argv)
             for (int k = 1; k < argc; k++) {
                 if (!strcmp(argv[k], "--fragment")) {
                     opts.fragment = 1;
-                    opts.noise    = 1;
                 } else if (!strcmp(argv[k], "--no-fragment")) {
                     opts.fragment = 0;
-                    opts.noise    = 0;
                 } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
                     opts.socks_port = atoi(argv[++k]);
                 } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {
@@ -193,10 +191,8 @@ int main(int argc, char **argv)
             for (int k = 1; k < argc; k++) {
                 if (!strcmp(argv[k], "--fragment")) {
                     opts.fragment = 1;
-                    opts.noise    = 1;
                 } else if (!strcmp(argv[k], "--no-fragment")) {
                     opts.fragment = 0;
-                    opts.noise    = 0;
                 } else if (!strcmp(argv[k], "--socks-port") && k + 1 < argc) {
                     opts.socks_port = atoi(argv[++k]);
                 } else if (!strcmp(argv[k], "--listen") && k + 1 < argc) {

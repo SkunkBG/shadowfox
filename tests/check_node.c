@@ -93,15 +93,15 @@ static void test_fingerprint(void)
     CHECK(strstr(cfg, "\"fingerprint\":\"firefox\"") == NULL,
           "старого отпечатка в конфиге не остаётся");
 
-    /* Ссылки без fp: запасной — firefox, а не chrome. */
+    /* Ссылки без fp: запасной — chrome, умолчание самого ядра. */
     xraycfg_defaults(&o);
     CHECK(node_from_link(
               "vless://d342d11e-d424-4583-b36e-524ab1f0afa4@example.com:443"
               "?type=tcp&security=tls&sni=example.com#нет-fp",
               &n, err, sizeof(err)) == 0, "разбор без fp");
     CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "сборка без fp");
-    CHECK(strstr(cfg, "\"fingerprint\":\"firefox\"") != NULL,
-          "запасной отпечаток firefox");
+    CHECK(strstr(cfg, "\"fingerprint\":\"chrome\"") != NULL,
+          "запасной отпечаток chrome");
 }
 
 static void test_generated_config(void)
@@ -113,33 +113,17 @@ static void test_generated_config(void)
     xraycfg_opts_t o;
     xraycfg_defaults(&o);
 
-    /* По умолчанию включены. Раньше было наоборот; решение поменялось
-       после сравнения с neofit, который умирал со временем ровно без
-       этих ручек. */
-    CHECK(o.fragment == 1 && o.noise == 1, "по умолчанию включены");
+    CHECK(o.fragment == 1, "фрагментация по умолчанию включена");
 
+    /* Reality: имя сервера открытое по замыслу, резать нечего, а
+       dialerProxy лишил бы Vision splice. Фрагментации у такого узла
+       быть не должно даже при включённой ручке. */
     CHECK(node_from_link(REALITY_LINK, &n, err, sizeof(err)) == 0, "разбор");
-
-    /* Выключенное состояние тоже обязано собираться: им меряют, во
-       сколько обходится фрагментация по скорости. */
-    o.fragment = 0;
-    o.noise    = 0;
-    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг без фрагментации");
-    CHECK(strstr(cfg, "dialerProxy") == NULL, "нет ссылки на фрагментацию");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг reality");
+    CHECK(strstr(cfg, "dialerProxy") == NULL, "reality без фрагментации");
     CHECK(strstr(cfg, "\"tag\":\"fragment\"") == NULL, "нет лишнего исходящего");
-
-    /* Шум без фрагментации: исходящий нужен, но резать ClientHello в нём
-       нечего. Одно от другого не должно зависеть. */
-    o.noise = 1;
-    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг только с шумом");
-    CHECK(strstr(cfg, "\"tag\":\"fragment\"") != NULL, "исходящий для шума есть");
-    CHECK(strstr(cfg, "\"noises\"") != NULL, "шум записан");
-    CHECK(strstr(cfg, "\"packets\":\"tlshello\"") == NULL,
-          "фрагментации быть не должно");
-
-    o.fragment = 1;
-    o.noise    = 1;
-    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг с фрагментацией");
+    CHECK(strstr(cfg, "\"noises\"") == NULL, "шума больше нет");
+    CHECK(strstr(cfg, "\"access\":\"none\"") != NULL, "журнал доступа ядра выключен");
 
     /* Вход обязан слушать только петлю. У Xray listen по умолчанию
        0.0.0.0, и neofit его не задавал — получался открытый SOCKS5
@@ -149,10 +133,24 @@ static void test_generated_config(void)
 
     CHECK(strstr(cfg, "\"fingerprint\":\"firefox\"") != NULL,
           "отпечаток взят из ссылки, а не подставлен свой");
+    /* Обычный TLS: SNI открытый, тут фрагментация и нужна. */
+    node_t t;
+    CHECK(node_from_link(
+              "vless://d342d11e-d424-4583-b36e-524ab1f0afa4@example.com:443"
+              "?type=tcp&security=tls&sni=example.com&fp=firefox#tls",
+              &t, err, sizeof(err)) == 0, "разбор tls");
+    CHECK(xraycfg_build(&t, &o, cfg, sizeof(cfg)) == 0, "конфиг tls");
     CHECK(strstr(cfg, "\"dialerProxy\":\"fragment\"") != NULL,
-          "трафик узла идёт через фрагментирующий исходящий");
+          "tls идёт через фрагментирующий исходящий");
     CHECK(strstr(cfg, "\"packets\":\"tlshello\"") != NULL, "фрагментация");
-    CHECK(strstr(cfg, "\"noises\"") != NULL, "шум");
+    CHECK(strstr(cfg, "\"length\":\"300-500\"") != NULL, "куски покрупнее");
+
+    /* И выключенное состояние обязано собираться: им меряют цену. */
+    o.fragment = 0;
+    CHECK(xraycfg_build(&t, &o, cfg, sizeof(cfg)) == 0, "tls без фрагментации");
+    CHECK(strstr(cfg, "dialerProxy") == NULL, "выключено — нет ссылки");
+    o.fragment = 1;
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "reality снова");
 
     /* alpn в ссылке не было — значит его не должно быть и в конфиге. */
     CHECK(strstr(cfg, "\"alpn\"") == NULL,
