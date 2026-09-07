@@ -72,16 +72,24 @@ make xray-ipk VARIANT=minimal  # упаковать в .ipk
 > отвечает на сигналы. Он **не управляет xray и не трогает маршрутизацию**.
 > Установка сейчас проверяет упаковку и автозапуск, не более.
 
-Подключить фид и поставить пакет — одной командой, без загрузок со
-стороны. Каталог фида у Entware называется не так, как архитектура,
-поэтому он определяется по `entware_release`:
+Сначала научить `opkg` ходить по https. Он качает через `wget`, а
+встроенный в BusyBox не умеет TLS и обрывается на
+`wget: not an http or ftp url`:
+
+```bash
+opkg update && opkg install wget-ssl
+```
+
+Дальше подключить фид и поставить пакет. Каталог фида у Entware
+называется не так, как архитектура, поэтому он определяется по
+`entware_release`:
 
 ```bash
 ARCH=$(grep '^arch=' /opt/etc/entware_release | cut -d= -f2); case "$ARCH" in aarch64) DIR=aarch64-k3.10 ;; mipsel) DIR=mipselsf-k3.4 ;; mips) DIR=mipssf-k3.4 ;; *) echo "неизвестная архитектура: $ARCH" >&2; false ;; esac && mkdir -p /opt/etc/opkg && echo "src/gz shadowfox https://skunkbg.github.io/shadowfox/keenetic/$DIR" > /opt/etc/opkg/shadowfox.conf && opkg update && opkg install shadowfox
 ```
 
-На свежем Entware нет `curl`, поэтому команда обходится одним `opkg` —
-он умеет ходить по https сам. Если `curl` уже стоит, то же самое делает
+На свежем Entware нет ни `curl`, ни `wget` с TLS, поэтому команда
+обходится одним `opkg`. Если `curl` уже стоит, то же самое делает
 скрипт, который вдобавок проверяет, что фид вообще опубликован:
 
 ```bash

@@ -38,6 +38,16 @@ if command -v curl >/dev/null 2>&1; then
     fi
 fi
 
+# opkg качает через wget, а встроенный в BusyBox не умеет TLS: фид по
+# https он не возьмёт и оборвётся на «not an http or ftp url». Ставим
+# нормальный wget заранее, иначе следующий шаг падает непонятно почему.
+if ! /opt/bin/wget --version 2>/dev/null | grep -qi 'GNU Wget'; then
+    echo "ставлю wget-ssl: без него opkg не умеет https" >&2
+    opkg update  >/dev/null 2>&1 || true
+    opkg install wget-ssl >/dev/null 2>&1 || \
+        echo "не поставить wget-ssl — сделай это вручную" >&2
+fi
+
 mkdir -p /opt/etc/opkg
 printf 'src/gz shadowfox %s/%s\n' "$FEED_BASE" "$DIR" > "$CONF"
 
