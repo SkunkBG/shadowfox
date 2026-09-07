@@ -217,6 +217,57 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
     }
 }
 
+/* Порт ядра SOCKS5 — без пароля, на LAN-адресе роутера, с UDP: так
+   его ждёт прокси-клиент Keenetic. Но тогда любое устройство сегмента
+   могло слать через туннель что угодно, минуя политику и наборы, — с
+   выходом с адреса VPS. Снято на живом роутере: единственный клиент
+   порта — сам роутер, а соединение с самого себя идёт через lo, не
+   через br0. Поэтому закрываем порт для всего, что пришло не с петли,
+   и прокси-клиент под правило не попадает. Своя цепочка в filter, с
+   врезкой в начало INPUT: правило точечное, чужому не мешает. */
+static void plan_guard(rt_plan_t *p, const char *tables, int port, int remove)
+{
+    if (port <= 0) return;
+
+    char dport[16];   /* %d по максимуму типа — десять знаков */
+    snprintf(dport, sizeof(dport), "%d", port);
+
+    const char *unhook[] = {
+        tables, "-t", "filter", "-D", "INPUT", "-j", RT_GUARD, NULL
+    };
+
+    if (remove) {
+        add(p, 1, unhook);
+        const char *fl[] = { tables, "-t", "filter", "-F", RT_GUARD, NULL };
+        add(p, 1, fl);
+        const char *rm[] = { tables, "-t", "filter", "-X", RT_GUARD, NULL };
+        add(p, 1, rm);
+        return;
+    }
+
+    const char *mk[] = { tables, "-t", "filter", "-N", RT_GUARD, NULL };
+    add(p, 1, mk);
+    const char *fl[] = { tables, "-t", "filter", "-F", RT_GUARD, NULL };
+    add(p, 0, fl);
+
+    const char *tcp[] = {
+        tables, "-t", "filter", "-A", RT_GUARD, "!", "-i", "lo",
+        "-p", "tcp", "--dport", dport, "-j", "DROP", NULL
+    };
+    add(p, 0, tcp);
+    const char *udp[] = {
+        tables, "-t", "filter", "-A", RT_GUARD, "!", "-i", "lo",
+        "-p", "udp", "--dport", dport, "-j", "DROP", NULL
+    };
+    add(p, 0, udp);
+
+    add(p, 1, unhook);
+    const char *hook[] = {
+        tables, "-t", "filter", "-I", "INPUT", "1", "-j", RT_GUARD, NULL
+    };
+    add(p, 0, hook);
+}
+
 static void plan_both(rt_plan_t *p, const rt_t *r, const wl_t *w, int remove)
 {
     if (!p || !r || !w) return;
@@ -230,6 +281,9 @@ static void plan_both(rt_plan_t *p, const rt_t *r, const wl_t *w, int remove)
     plan_family(p, ipt, ipb, "-4", w, 0, remove);
     if (r->ipv6 && r->ip6tables[0])
         plan_family(p, r->ip6tables, ipb, "-6", w, 1, remove);
+
+    /* Ядро слушает на адресе IPv4, поэтому и закрываем только его. */
+    plan_guard(p, ipt, r->guard_port, remove);
 }
 
 void rt_plan_apply(rt_plan_t *p, const rt_t *r, const wl_t *w)

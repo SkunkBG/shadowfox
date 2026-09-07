@@ -342,6 +342,41 @@ static void test_full_house_fits(void)
     CHECK(p.overflow == 0, "план снятия не поместился: %d", p.count);
 }
 
+/* Порт ядра закрыт от сети: правило в своей цепочке filter, только для
+   пришедшего не с петли — прокси-клиент роутера ходит через lo и под
+   него не попадает. Ставится и снимается общим планом. */
+static void test_guard_port(void)
+{
+    wl_t w;  load_lists(&w);
+    rt_t r;  setup(&r, 0);
+    r.guard_port = 1301;
+
+    rt_plan_t p;
+    rt_plan_apply(&p, &r, &w);
+
+    char text[16384];
+    plan_text(&p, text, sizeof(text));
+
+    CHECK(strstr(text, "-t filter -N SHADOWFOX_IN") != NULL, "цепочка создаётся");
+    CHECK(strstr(text, "SHADOWFOX_IN ! -i lo -p tcp --dport 1301 -j DROP") != NULL,
+          "tcp закрыт для всего, кроме петли");
+    CHECK(strstr(text, "SHADOWFOX_IN ! -i lo -p udp --dport 1301 -j DROP") != NULL,
+          "udp тоже");
+    CHECK(strstr(text, "-I INPUT 1 -j SHADOWFOX_IN") != NULL, "врезка в начало INPUT");
+    CHECK(p.overflow == 0, "план помещается");
+
+    rt_plan_remove(&p, &r, &w);
+    plan_text(&p, text, sizeof(text));
+    CHECK(strstr(text, "-X SHADOWFOX_IN") != NULL, "снятие убирает цепочку");
+    CHECK(strstr(text, "-D INPUT -j SHADOWFOX_IN") != NULL, "и врезку");
+
+    /* Без порта — ни одной команды про filter. */
+    r.guard_port = 0;
+    rt_plan_apply(&p, &r, &w);
+    plan_text(&p, text, sizeof(text));
+    CHECK(strstr(text, "SHADOWFOX_IN") == NULL, "без порта цепочки нет");
+}
+
 int main(void)
 {
     printf("check_routing " VERSION "\n");
@@ -358,6 +393,7 @@ int main(void)
     test_policy_target();
     test_policy_without_mark();
     test_full_house_fits();
+    test_guard_port();
     test_counters();
 
     char cmd[160];

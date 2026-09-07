@@ -603,6 +603,7 @@ static void adopt_config(engine_t *e, const config_t *cfg)
 {
     e->cfg               = cfg;
     e->rt.ipv6           = cfg->ipv6 && e->rt.ip6tables[0];
+    e->rt.guard_port     = cfg->socks_port;
     e->may_create_policy = cfg->create_policy;
     e->ipset_timeout     = cfg->ipset_timeout;
 }
