@@ -54,7 +54,7 @@ SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/
 BUILD = build
 
 .PHONY: all aarch64 mipsel mips native check check-configs ipk-all feed clean distclean help docker-all \
-        xray xray-ipk xray-check
+        xray xray-ipk xray-check check-gcc
 
 all: aarch64 mipsel mips
 
@@ -159,6 +159,20 @@ check: native
 		src/routercfg.c src/util.c -o $(BUILD)/check_routercfg
 	./$(BUILD)/check_routercfg
 
+# Те же проверки, но компилятором из сборочного процесса. У clang и gcc
+# разные наборы предупреждений, а с -Werror чужое предупреждение — это
+# отказ сборки. За один день так упало четыре сборки подряд: усечение
+# строки при UTF-8, буфер под %u и забытый заголовок. Все три — настоящие
+# ошибки, но узнавать о них через трёхминутную сборку дорого.
+#
+# gcc берётся из Homebrew: системный cc на macOS — это clang.
+check-gcc:
+	@g=$$(ls /opt/homebrew/bin/gcc-[0-9]* /usr/local/bin/gcc-[0-9]* 2>/dev/null \
+	      | sort -V | tail -1); \
+	 [ -n "$$g" ] || { echo "нет gcc — поставь: brew install gcc" >&2; exit 1; }; \
+	 echo "проверяю через $$g"; \
+	 $(MAKE) check CC_NATIVE=$$g
+
 ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \
 		sh tools/build-ipk.sh aarch64 mipsel mips
@@ -206,6 +220,7 @@ distclean:
 help:
 	@echo "Цели:"
 	@echo "  make check       юнит-тесты (работает на macOS)"
+	@echo "  make check-gcc   то же компилятором из сборки, а не clang"
 	@echo "  make check-configs  прогнать сгенерированные конфиги через Xray"
 	@echo "  make all         бинарники под aarch64, mipsel, mips"
 	@echo "  make ipk-all     собрать .ipk под все три архитектуры"
