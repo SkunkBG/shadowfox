@@ -685,8 +685,7 @@ function viewConn(){
            D.xray_bin?'<span></span>':`<button class="b sm" id="getxray">Установить</button>`)}
     <div class="msg" id="m-xray" style="margin:-6px 0 14px 60px"></div>
     ${D.xray_bin?'':`<div class="note" style="margin:-8px 0 14px 60px">${UI.i}
-      В Entware ядра нет: понадобится фид, где оно есть. Команда для этого —
-      в разделе ниже.</div>`}
+      Своя сборка, только VLESS-клиент, около 8 МБ</div>`}
     ${stat(UI.router,'Подключение роутера',D.proxy_ready,
            D.proxy_ready?P+' создано':P+' не создано')}
     ${stat(UI.shield,'Политика доступа',D.policy_ready,
@@ -729,12 +728,12 @@ function viewConn(){
     <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
 
     <h4>Ядро Xray</h4>
-    <p>В фидах Entware ядра нет. Подключить фид, где оно есть, и поставить:</p>
-    <pre>echo "src/gz ground-zerro https://git.zerrolabs.org/Ground-Zerro/release/pages/keenetic/$(ARCH)" > /opt/etc/opkg/ground-zerro.conf
-opkg update && opkg install xray</pre>
-    <p>Каталог <code>$(ARCH)</code> тот же, что у нашего фида — посмотреть можно
-    в <code>/opt/etc/opkg/shadowfox.conf</code>. После этого кнопка
-    «Установить» на карточке ядра сделает остальное.</p>
+    <p>В фидах Entware ядра нет, поэтому мы собираем своё: только
+    VLESS-клиент, около 8 мегабайт после сжатия. Оно лежит в нашем же
+    фиде и ставится кнопкой на карточке ядра.</p>
+    <p>Ставится оно в <code>/opt/sbin/shadowfox-xray</code> и не конфликтует
+    со штатным пакетом, если тот когда-нибудь появится: обе сборки могут
+    стоять рядом.</p>
 
     <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
 

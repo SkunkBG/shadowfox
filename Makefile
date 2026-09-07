@@ -153,6 +153,8 @@ ipk-all: all
 	VERSION=$(VERSION) REVISION=$(REVISION) PKG=$(PKG) PROJECT=$(PROJECT) \
 		sh tools/build-ipk.sh aarch64 mipsel mips
 
+# Ядро в фид не собирается: оно приезжает выпуском, см. .github/workflows.
+# Если рядом уже лежат его пакеты, make-feed.sh подхватит их сам.
 feed: ipk-all
 	sh tools/make-feed.sh
 

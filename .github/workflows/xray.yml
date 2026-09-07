@@ -27,7 +27,7 @@ jobs:
           go-version: stable
 
       - name: Собрать все варианты и сравнить размеры
-        run: sh xray/build.sh --version "${{ github.event.inputs.xray_version || 'v26.2.6' }}"
+        run: sh xray/build.sh --version "${{ github.event.inputs.xray_version || 'v26.7.28' }}"
 
       # Размеров недостаточно: можно потерять загрузчик конфига и не заметить
       # этого — бинарник станет меньше и молча перестанет читать файл.
@@ -51,3 +51,30 @@ jobs:
         with:
           name: xray-binaries
           path: build/xray/out/*
+
+      # Пакеты кладём в выпуск с постоянным тегом: основной процесс
+      # забирает их оттуда и подкладывает в фид. Постоянный тег нужен,
+      # чтобы адрес не менялся от версии к версии.
+      - name: Собрать пакеты ядра
+        run: |
+          VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
+          sh xray/build-ipk.sh --variant lean --version "${VER#v}"
+          ls -la build/ipk/
+
+      - name: Выложить в выпуск
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
+          gh release delete xray --yes --cleanup-tag 2>/dev/null || true
+          cat > /tmp/notes.md <<NOTES
+          Урезанная сборка Xray-core $VER для Shadow Fox: только VLESS-клиент.
+
+          Ставится в /opt/sbin/shadowfox-xray и не конфликтует со штатным
+          пакетом. Обрезка описана в xray/trim.py.
+
+          Пакеты отсюда подкладываются в фид основным процессом сборки.
+          NOTES
+          gh release create xray build/ipk/shadowfox-xray_*.ipk \
+            --title "Ядро Xray $VER" --notes-file /tmp/notes.md

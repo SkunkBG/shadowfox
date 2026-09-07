@@ -829,7 +829,7 @@ static void install_xray(const http_req_t *req, int fd)
 
     char command[512];
     snprintf(command, sizeof(command),
-             "sleep 1; { date; %s update; %s install xray; date; } > %s 2>&1",
+             "sleep 1; { date; %s update; %s install shadowfox-xray; date; } > %s 2>&1",
              bin, bin, XRAY_LOG);
 
     if (spawn_detached(command) != 0) {
