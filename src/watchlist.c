@@ -154,6 +154,7 @@ static int add_domain(wl_t *w, int group, const char *raw)
 
     wl_domain_t *d = &w->domains[w->domain_count++];
     d->offset = (unsigned)off;
+    d->len    = (unsigned char)(len < 255 ? len : 255);
     d->kind   = (unsigned char)kind;
     d->group  = (unsigned char)group;
     return 0;
@@ -338,7 +339,7 @@ int wl_match_domain(const wl_t *w, const char *host)
         if (!w->groups[w->domains[i].group].enabled) continue;
 
         const char *pat  = w->pool + w->domains[i].offset;
-        size_t      plen = strlen(pat);
+        size_t      plen = w->domains[i].len;
         int         hit  = 0;
 
         if (plen > hlen) continue;

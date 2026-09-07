@@ -435,6 +435,27 @@ static void send_dns(int fd, const config_t *cfg)
     }
     json_arr_close(&j);
 
+    /* Куда вообще можно заворачивать: политики и подключения роутера.
+       Раньше цель правила набиралась в prompt() руками, с опечатками, —
+       а роутер эти имена знает. Третья копия конфига нужна по той же
+       причине, что и вторая: разборщики режут текст на месте. */
+    json_key(&j, "targets");
+    json_arr_open(&j);
+    if (rc == 0) {
+        static char copy2[64 * 1024];
+        str_copy(copy2, sizeof(copy2), copy);
+
+        const char *pol[DNS_LINES_MAX];
+        int pn = policy_names(copy2, pol, DNS_LINES_MAX);
+        for (int i = 0; i < pn; i++) json_str(&j, pol[i]);
+
+        str_copy(copy2, sizeof(copy2), copy);
+        const char *gl[DNS_LINES_MAX];
+        int gn2 = policy_globals(copy2, gl, DNS_LINES_MAX);
+        for (int i = 0; i < gn2; i++) json_str(&j, gl[i]);
+    }
+    json_arr_close(&j);
+
     json_obj_close(&j);
 
     if (json_done(&j) != 0) {

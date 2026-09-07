@@ -1149,6 +1149,32 @@ async function save(what,text,msgId){
   }catch(e){ if(m){ m.className='msg bad'; m.textContent=e.message; } return false; }
 }
 
+/* Куда заворачивать: список от роутера плюс «своё имя». Отдельным
+   окном, а не prompt(): в prompt нельзя показать, что вообще бывает. */
+function pickTarget(list){
+  return new Promise(resolve=>{
+    const el=$('#pick');
+    el.className='modal'; el.hidden=false;
+    el.innerHTML=`<div class="box"><h3>Куда заворачивать</h3>
+      <p class="ctr">Политика доступа Keenetic либо подключение</p>
+      <div class="picks">
+        ${list.map(t=>`<button class="pick" data-target="${esc(t)}">
+          ${UI.shield}<span>${esc(t)}</span></button>`).join('')}
+        <button class="pick" data-target="">${UI.pen}<span>Своё имя</span></button>
+      </div>
+      <div class="bar"><button class="b ghost" id="pick-close">Отмена</button></div></div>`;
+
+    const done=v=>{ el.hidden=true; el.className=''; el.innerHTML=''; resolve(v); };
+    $('#pick-close').onclick=()=>done(null);
+    el.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>{
+      const v=b.dataset.target;
+      if(v) return done(v);
+      const t=prompt('Имя политики Keenetic либо интерфейса:', D.policy_name);
+      done(t && t.trim() ? t.trim() : null);
+    });
+  });
+}
+
 /* ---- выбор готового набора ---- */
 /* target задаётся, когда правила ещё нет: в текстовом виде правило без
    групп не существует — цель живёт строкой interface внутри группы.
@@ -1328,8 +1354,12 @@ document.addEventListener('click',async ev=>{
   if(addg){ D.domains=buildDomains(collect()); picker(+addg.dataset.addgrp); return; }
 
   if(ev.target.closest('#newrule')){
-    const t=prompt('Куда заворачивать? Имя политики Keenetic либо интерфейса:',
-                   D.policy_name);
+    /* Роутер знает свои политики и подключения — предлагаем их списком,
+       а не просим набрать имя руками с опечатками. Список приходит с
+       разделом подключений; если его ещё не открывали, спросим сами. */
+    if(!dnsInfo) await loadDns();
+    const known=(dnsInfo && dnsInfo.targets) ? dnsInfo.targets : [];
+    const t=await pickTarget(known);
     if(!t) return;
     /* Ничего не трогаем до выбора набора: пустое правило до текста не
        доживёт, а отмена не должна оставлять следов. */

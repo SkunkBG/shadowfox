@@ -137,3 +137,29 @@ int http_proxy_present(const char *text, const char *name)
 
     return 0;
 }
+
+int policy_names(char *text, const char **out, int max)
+{
+    if (!text || !out || max <= 0) return 0;
+
+    int n = 0;
+    char *save = NULL;
+    for (char *line = strtok_r(text, "\n", &save); line && n < max;
+         line = strtok_r(NULL, "\n", &save)) {
+
+        /* Только заголовок секции, с начала строки. */
+        if (strncmp(line, "ip policy ", 10) != 0) continue;
+
+        char *name = str_trim(line + 10);
+        if (!name[0]) continue;
+
+        /* «ip policy X permit ...» — это уже содержимое, не заголовок. */
+        if (strchr(name, ' ')) continue;
+
+        int dup = 0;
+        for (int i = 0; i < n; i++) if (!strcmp(out[i], name)) dup = 1;
+        if (!dup) out[n++] = name;
+    }
+
+    return n;
+}

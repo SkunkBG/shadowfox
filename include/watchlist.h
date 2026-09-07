@@ -35,6 +35,7 @@ typedef enum {
 
 typedef struct {
     unsigned      offset;   /* смещение имени в пуле */
+    unsigned char len;      /* длина имени: strlen на каждый поиск был дорог */
     unsigned char kind;
     unsigned char group;
 } wl_domain_t;

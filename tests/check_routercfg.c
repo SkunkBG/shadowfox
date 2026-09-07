@@ -215,6 +215,30 @@ int main(void)
                                  "shadowfox") == 0, "отступ не заголовок");
     }
 
+
+    /* Имена политик для выбора цели правила на странице. Заголовок
+       секции — только строка «ip policy X» без хвоста: «ip policy X
+       permit global Y» это уже содержимое. */
+    {
+        static char cfg[] =
+            "ip policy ShadowFox\n"
+            "    description Через туннель\n"
+            "    permit global Proxy1\n"
+            "ip policy ShadowFox permit global Proxy0\n"
+            "ip policy Резерв\n"
+            "    permit global ISP\n"
+            "ip name-server 1.1.1.1\n";
+
+        char copy[sizeof(cfg)];
+        memcpy(copy, cfg, sizeof(cfg));
+
+        const char *pols[8];
+        int pn = policy_names(copy, pols, 8);
+        CHECK(pn == 2, "политик две, получено %d", pn);
+        CHECK(pn > 0 && !strcmp(pols[0], "ShadowFox"), "первая: %s", pn ? pols[0] : "");
+        CHECK(pn > 1 && !strcmp(pols[1], "Резерв"), "вторая: %s", pn > 1 ? pols[1] : "");
+    }
+
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);
         return 1;
