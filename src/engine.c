@@ -4,6 +4,7 @@
 #include "status.h"
 #include "nodelist.h"
 #include "xraycfg.h"
+#include "proc.h"
 #include "util.h"
 
 #include <stdio.h>
@@ -33,13 +34,57 @@ void engine_init(engine_t *e)
     ips_init(&e->ips, NULL);
     rt_init(&e->rt);
     dcap_init(&e->cap);
+    scap_init(&e->sni);
     rci_init(&e->rci);
     sv_init(&e->xray, "", "");
 }
 
-int engine_fd(const engine_t *e)
+int engine_fds(const engine_t *e, int *out, int max)
 {
-    return (e && e->capturing) ? e->cap.fd : -1;
+    if (!e || !out || max <= 0) return 0;
+
+    int n = 0;
+    if (e->capturing && n < max) out[n++] = e->cap.fd;
+    if (e->sniffing  && n < max) out[n++] = e->sni.fd;
+    return n;
+}
+
+/* Помним, что адрес уже разложен по набору. Возвращает 1, если увидели
+   его впервые.
+
+   Срок жизни записи привязан к сроку жизни записи в самом наборе: как
+   только адрес оттуда состарится, помнить о нём нам тоже незачем. */
+static int note_addr(engine_t *e, int group, int family,
+                     const unsigned char *addr, time_t now)
+{
+    size_t alen = (family == 4) ? 4 : 16;
+    time_t ttl  = e->ipset_timeout > 0 ? e->ipset_timeout : 86400;
+
+    int oldest = 0;
+    for (int i = 0; i < e->known_count; i++) {
+        if (e->known[i].family == family && e->known[i].group == group &&
+            memcmp(e->known[i].addr, addr, alen) == 0) {
+            if (now - e->known[i].at <= ttl) {
+                e->known[i].at = now;
+                return 0;
+            }
+            /* Состарилась — переиспользуем как новую. */
+            e->known[i].at = now;
+            return 1;
+        }
+        if (e->known[i].at < e->known[oldest].at) oldest = i;
+    }
+
+    int slot;
+    if (e->known_count < ENG_KNOWN_MAX) slot = e->known_count++;
+    else                                slot = oldest;
+
+    memset(e->known[slot].addr, 0, sizeof(e->known[slot].addr));
+    memcpy(e->known[slot].addr, addr, alen);
+    e->known[slot].family = (unsigned char)family;
+    e->known[slot].group  = (short)group;
+    e->known[slot].at     = now;
+    return 1;
 }
 
 /* Пойманный ответ: раскладываем адреса по группам. */
@@ -62,6 +107,7 @@ static void on_reply(const dns_reply_t *r, void *ctx)
         if (!inet_ntop(af, a->addr, text, sizeof(text))) continue;
 
         ips_queue_add(&e->ips, &e->wl, group, a->family, text);
+        note_addr(e, group, a->family, a->addr, time(NULL));
         e->matched++;
         matched++;
 
@@ -75,6 +121,115 @@ static void on_reply(const dns_reply_t *r, void *ctx)
     if (!matched)
         log_debug("мимо списков: %s (%d адрес(ов))",
                   r->question, r->answer_count);
+}
+
+/* Обрыв соединения, которое уже установилось мимо туннеля.
+
+   Без него первое обращение к каждому новому адресу уходит напрямую
+   целиком: адрес мы кладём в набор, но у этого соединения метка уже не
+   поставится — она ставится только на новом. Убрав запись conntrack, мы
+   заставляем приложение переустановить соединение, и оно с самого
+   начала идёт по политике.
+
+   conntrack ставится зависимостью пакета. Если его всё же нет или ядро
+   без nf_conntrack_netlink, перехват продолжает работать: просто первое
+   соединение к новому адресу утекает, остальные идут верно. Молчать об
+   этом нельзя — предупреждаем один раз. */
+static void break_conn(engine_t *e, const sni_hit_t *h,
+                       const char *src, const char *dst)
+{
+    static const char *CT_CANDIDATES[] = {
+        "/opt/sbin/conntrack", "/opt/bin/conntrack",
+        "/usr/sbin/conntrack", "/sbin/conntrack", NULL
+    };
+
+    if (!e->ct_checked) {
+        e->ct_checked = 1;
+        for (int i = 0; CT_CANDIDATES[i]; i++) {
+            if (access(CT_CANDIDATES[i], X_OK) == 0) {
+                str_copy(e->ct_bin, sizeof(e->ct_bin), CT_CANDIDATES[i]);
+                break;
+            }
+        }
+    }
+
+    if (!e->ct_bin[0]) {
+        if (!e->ct_warned) {
+            e->ct_warned = 1;
+            log_warn("нет conntrack: первое соединение к каждому новому "
+                     "адресу пойдёт мимо туннеля. Поставь пакет conntrack");
+        }
+        return;
+    }
+
+    char sp[8], dp[8], fam[8];
+    snprintf(sp, sizeof(sp), "%u", h->sport);
+    snprintf(dp, sizeof(dp), "%u", h->dport);
+    str_copy(fam, sizeof(fam), h->family == 4 ? "ipv4" : "ipv6");
+
+    char bin[128], a_d[] = "-D", a_f[] = "-f", a_p[] = "-p", tcp[] = "tcp";
+    char a_s[] = "-s", a_dd[] = "-d", a_sp[] = "--sport", a_dp[] = "--dport";
+    char srcbuf[INET6_ADDRSTRLEN], dstbuf[INET6_ADDRSTRLEN];
+
+    str_copy(bin, sizeof(bin), e->ct_bin);
+    str_copy(srcbuf, sizeof(srcbuf), src);
+    str_copy(dstbuf, sizeof(dstbuf), dst);
+
+    char *argv[] = { bin, a_d, a_f, fam, a_p, tcp,
+                     a_s, srcbuf, a_dd, dstbuf,
+                     a_sp, sp, a_dp, dp, NULL };
+    char out[256] = "";
+
+    int rc = proc_run(argv, out, sizeof(out), 5);
+
+    /* Ненулевой код тут обычен: запись могла закрыться сама, пока мы
+       разбирали пакет. Это не сбой, поэтому не шумим. */
+    if (rc == 0) e->sni_broken++;
+
+    log_debug("conntrack -D %s %s:%s -> %s:%s = %d",
+              fam, srcbuf, sp, dstbuf, dp, rc);
+}
+
+/* Пойманное в ClientHello имя. В отличие от DNS адрес тут не
+   предполагаемый, а тот самый, к которому клиент уже пошёл. */
+static void on_sni(const sni_hit_t *h, void *ctx)
+{
+    engine_t *e = ctx;
+
+    int group = wl_match_domain(&e->wl, h->name);
+    if (group < 0) {
+        log_debug("SNI мимо списков: %s", h->name);
+        return;
+    }
+
+    e->sni_names++;
+
+    char dst[INET6_ADDRSTRLEN], src[INET6_ADDRSTRLEN];
+    int  af = (h->family == 4) ? AF_INET : AF_INET6;
+    if (!inet_ntop(af, h->dst, dst, sizeof(dst))) return;
+    if (!inet_ntop(af, h->src, src, sizeof(src))) return;
+
+    /* Адрес уже разложен — значит это соединение и так пойдёт куда
+       надо. Рвать его нельзя: так мы обрывали бы каждое соединение к
+       уже настроенному сайту, по кругу. */
+    if (!note_addr(e, group, h->family, h->dst, time(NULL))) return;
+
+    e->sni_new++;
+    ips_queue_add(&e->ips, &e->wl, group, h->family, dst);
+
+    /* Отдаём набору сразу, а не с общей пачкой: сейчас мы оборвём
+       соединение, и приложение переустановит его через доли секунды.
+       Если адрес к тому моменту ещё не в наборе, метки снова не будет,
+       и вся затея окажется впустую. */
+    char err[160] = "";
+    if (ips_flush(&e->ips, err, sizeof(err)) != 0)
+        log_warn("ipset после SNI: %s", err);
+    else
+        e->flushes++;
+
+    log_info("SNI %s -> %s в группу %s", h->name, dst, e->wl.groups[group].name);
+
+    break_conn(e, h, src, dst);
 }
 
 static int load_lists(engine_t *e, const config_t *cfg)
@@ -111,7 +266,9 @@ static void sync_capture(engine_t *e, const config_t *cfg)
     if (!want) {
         dcap_close(&e->cap);
         e->capturing = 0;
-        log_info("перехват DNS остановлен: доменов не осталось");
+        scap_close(&e->sni);
+        e->sniffing = 0;
+        log_info("перехват остановлен: доменов не осталось");
         return;
     }
 
@@ -126,6 +283,26 @@ static void sync_capture(engine_t *e, const config_t *cfg)
            ip.list работают. Останавливаться из-за этого неправильно. */
         log_warn("перехват DNS недоступен: %s. Домены наполняться не будут, "
                  "подсети из ip.list работают", cap_err);
+    }
+
+    /* Перехват SNI — второй канал, не замена первому. DNS даёт адрес
+       заранее, до первого соединения; SNI видит то, чего DNS не видит
+       вовсе: тёплый кеш устройства, свой DoH у клиента, зашитый адрес.
+       Поэтому один без другого не отключается и отказ одного не мешает
+       другому. */
+    if (!cfg->sni_capture) {
+        log_info("перехват SNI выключен в конфиге");
+        return;
+    }
+
+    char sni_err[160] = "";
+    if (scap_open(&e->sni, cfg->capture_iface, sni_err, sizeof(sni_err)) == 0) {
+        e->sniffing = 1;
+        log_info("перехват SNI на %s",
+                 cfg->capture_iface[0] ? cfg->capture_iface : "всех интерфейсах");
+    } else {
+        log_warn("перехват SNI недоступен: %s. Останутся слепые зоны: "
+                 "тёплый кеш, свой DoH у клиента, зашитые адреса", sni_err);
     }
 }
 
@@ -333,6 +510,11 @@ void engine_stop(engine_t *e)
         e->xray_managed = 0;
     }
 
+    if (e->sniffing) {
+        scap_close(&e->sni);
+        e->sniffing = 0;
+    }
+
     if (e->capturing) {
         dcap_close(&e->cap);
         e->capturing = 0;
@@ -415,6 +597,7 @@ void engine_tick(engine_t *e, time_t now)
     if (!e) return;
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
+    if (e->sniffing)  scap_poll(&e->sni, on_sni, e);
 
     /* Подхватываем падение своего ядра и перезапускаем с паузой. */
     if (e->xray_managed) sv_tick(&e->xray, now);

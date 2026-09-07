@@ -62,13 +62,22 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "rules=%d\n"
         "xray_pid=%ld\n"
         "xray_restarts=%d\n"
-        "socks=%d\n",
+        "socks=%d\n"
+        "sni_on=%d\n"
+        "sni_seen=%lu\n"
+        "sni_parsed=%lu\n"
+        "sni_names=%lu\n"
+        "sni_new=%lu\n"
+        "sni_broken=%lu\n"
+        "sni_bad=%lu\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
         e->cap.drop_notip, e->cap.drop_empty, e->cap.drop_bad,
         e->flushes, e->restores, e->rules_applied,
-        (long)e->xray.pid, e->xray.restarts, cfg->socks_port);
+        (long)e->xray.pid, e->xray.restarts, cfg->socks_port,
+        e->sniffing, e->sni.seen, e->sni.parsed,
+        e->sni_names, e->sni_new, e->sni_broken, e->sni.drop_bad);
 
     fclose(f);
     rename(tmp, path);
@@ -306,6 +315,25 @@ int status_print(const config_t *cfg)
                    "битых %ld\n", a, b, c);
     } else {
         printf("  перехват:   выключен\n");
+    }
+
+    if (status_num(spath, "sni_on") == 1) {
+        printf("  перехват SNI: пакетов %ld, имён %ld, под правилами %ld\n",
+               status_num(spath, "sni_seen"), status_num(spath, "sni_parsed"),
+               status_num(spath, "sni_names"));
+
+        /* Новых адресов мало при исправной работе: почти всё уже
+           разложено через DNS. Ноль оборванных при ненулевых новых
+           значит, что conntrack не сработал, и первые соединения
+           уходят мимо туннеля. */
+        printf("              новых адресов %ld, оборвано соединений %ld\n",
+               status_num(spath, "sni_new"), status_num(spath, "sni_broken"));
+
+        long bad = status_num(spath, "sni_bad");
+        if (bad > 0)
+            printf("              не разобрано ClientHello: %ld\n", bad);
+    } else {
+        printf("  перехват SNI: выключен\n");
     }
 
     long restores = status_num(spath, "restores");

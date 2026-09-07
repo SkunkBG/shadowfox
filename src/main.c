@@ -471,14 +471,19 @@ int main(int argc, char **argv)
         /* Ждём либо пакет, либо секунду: накопленные адреса надо отдавать
            в ipset регулярно, даже когда в сети тихо. Сигнал прерывает
            ожидание, и мы обработаем его на следующем витке. */
-        int            fd  = engine_fd(&engine);
+        int            efds[4];
+        int            en  = engine_fds(&engine, efds, 4);
         int            wfd = http_fd(&web);
-        int            max = fd > wfd ? fd : wfd;
+        int            max = wfd;
         struct timeval tv  = { 1, 0 };
         fd_set         rd;
 
         FD_ZERO(&rd);
-        if (fd  >= 0) FD_SET(fd,  &rd);
+        for (int i = 0; i < en; i++) {
+            if (efds[i] < 0) continue;
+            FD_SET(efds[i], &rd);
+            if (efds[i] > max) max = efds[i];
+        }
         if (wfd >= 0) FD_SET(wfd, &rd);
         select(max >= 0 ? max + 1 : 0, max >= 0 ? &rd : NULL, NULL, NULL, &tv);
 

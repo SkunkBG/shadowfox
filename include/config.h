@@ -18,6 +18,7 @@ typedef struct {
     int         ipv6;            /* обслуживать ли IPv6 */
     int         create_policy;   /* можно ли заводить политики на роутере */
     int         ipset_timeout;   /* секунд жизни записи в наборе, 0 — вечно */
+    int         sni_capture;     /* читать имена из TLS ClientHello */
 
     /* Свой экземпляр Xray и своё прокси-подключение в Keenetic. */
     char        policy[WL_NAME_MAX_CFG];      /* политика для своего прокси */

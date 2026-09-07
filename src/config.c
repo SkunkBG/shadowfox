@@ -29,6 +29,11 @@ void config_defaults(config_t *cfg)
        не копит адреса, давно переехавшие к другим сервисам. */
     cfg->ipset_timeout = 86400;
 
+    /* По умолчанию включён: без него остаются слепые зоны, которые
+       снаружи выглядят как «правило настроено, а сайт идёт мимо».
+       Выключатель оставлен на случай, когда захват на 443 мешает. */
+    cfg->sni_capture   = 1;
+
     cfg->web_enabled = 1;
     /* 2000 занят hrweb, 8080 у MagiTrickle, 92 был у neofit. */
     cfg->web_port    = 8090;
@@ -148,6 +153,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "ipsetTimeout")) {
         cfg->ipset_timeout = atoi(value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "sniCapture")) {
+        cfg->sni_capture = parse_bool(value, cfg->sni_capture);
         return 0;
     }
 
@@ -323,10 +333,16 @@ int config_write_default(const char *path)
         "xrayConfig=%s\n"
         "socksPort=%d\n"
         "proxyInterface=%s\n"
-        "policy=%s\n",
+        "policy=%s\n"
+        "\n"
+        "# Чтение имени сервера из TLS ClientHello. Закрывает то, чего не\n"
+        "# видит перехват DNS: тёплый кеш устройства, свой DoH у клиента,\n"
+        "# зашитый в приложении адрес. Требует пакет conntrack, чтобы\n"
+        "# оборвать соединение, успевшее уйти мимо туннеля.\n"
+        "sniCapture=%s\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.nodes_file, cfg.xray_config, cfg.socks_port,
-        cfg.proxy_iface, cfg.policy);
+        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no");
 
     fclose(f);
     return 0;

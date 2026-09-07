@@ -5,6 +5,7 @@
 #include "dnscap.h"
 #include "ipsets.h"
 #include "rci.h"
+#include "snicap.h"
 #include "supervise.h"
 #include "routing.h"
 #include "watchlist.h"
@@ -13,17 +14,23 @@
 
 /* Связывает всё вместе: списки, наборы, правила, перехват. */
 
+/* Адресов в памяти о разложенном. Один YouTube даёт под сотню, так что
+   запас нужен кратный: при переполнении вытесняем самое давнее. */
+#define ENG_KNOWN_MAX 1024
+
 typedef struct engine {
     wl_t   wl;
     ips_t  ips;
     rt_t   rt;
     dcap_t cap;
+    scap_t sni;
     rci_t  rci;
     sv_t   xray;           /* свой экземпляр ядра */
     int    xray_managed;   /* мы его подняли и следим за ним */
 
     int    rules_applied;
     int    capturing;
+    int    sniffing;
     time_t started_at;
     time_t last_flush;
     time_t last_stats;
@@ -35,6 +42,30 @@ typedef struct engine {
     unsigned long flushes;
     unsigned long restores;
     unsigned long marked_conns;
+
+    /* Перехват SNI. Считаем врозь имена, новые адреса и оборванные
+       соединения: по одному числу не отличить «имён не видим» от
+       «видим, но всё уже знаем», а лечатся они по-разному. */
+    unsigned long sni_names;     /* имён под правилами */
+    unsigned long sni_new;       /* из них дали новый адрес */
+    unsigned long sni_broken;    /* соединений оборвано */
+    char          ct_bin[128];   /* путь к conntrack, пустой — не искали */
+    int           ct_checked;
+    int           ct_warned;
+
+    /* Что уже разложено по наборам. Нужно ровно для перехвата SNI:
+       ClientHello виден и у соединений, которые и так идут по туннелю,
+       и без этой памяти мы обрывали бы каждое из них по кругу.
+
+       Пополняется обоими путями, и через DNS тоже: иначе первое
+       соединение к адресу, узнанному из DNS, обрывалось бы зря. */
+    struct {
+        unsigned char addr[16];
+        unsigned char family;
+        short         group;
+        time_t        at;
+    } known[ENG_KNOWN_MAX];
+    int           known_count;
     int           policies_pending;   /* политик без метки */
     int           may_create_policy;
     int           ipset_timeout;
@@ -64,7 +95,12 @@ void engine_request_restore(engine_t *e, time_t now);
 void engine_tick(engine_t *e, time_t now);
 
 /* Дескриптор перехвата для ожидания в главном цикле, либо -1. */
-int  engine_fd(const engine_t *e);
+/* Дескрипторы, которые главный цикл обязан держать в select.
+
+   Их два: перехват DNS и перехват SNI. Для SNI ожидание до следующего
+   тика недопустимо — за эту секунду соединение успеет пройти мимо
+   туннеля целиком. Возвращает, сколько записано. */
+int  engine_fds(const engine_t *e, int *out, int max);
 
 /* Печатает план правил, ничего не применяя. */
 void engine_print_plan(const engine_t *e);
