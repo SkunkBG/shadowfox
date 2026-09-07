@@ -3,6 +3,13 @@
 
 set -e
 
+# Первая установка или обновление. Отличаем по файлу ссылок: при
+# обновлении он уже есть, потому что создаётся здесь же и только при
+# отсутствии. Нужно, чтобы подсказку «куда идти дальше» показывать один
+# раз, а не при каждом обновлении.
+first_install=no
+[ -f /opt/etc/shadowfox/nodes.txt ] || first_install=yes
+
 chmod 0755 /opt/bin/shadowfoxd            2>/dev/null || true
 chmod 0755 /opt/etc/init.d/S99shadowfox   2>/dev/null || true
 chmod 0755 /opt/etc/ndm/netfilter.d/015-shadowfox.sh      2>/dev/null || true
@@ -82,5 +89,26 @@ fi
 /opt/etc/init.d/S99shadowfox stop  >/dev/null 2>&1 || true
 /opt/etc/init.d/S99shadowfox start >/dev/null 2>&1 || \
     echo "[WARN] не удалось запустить shaper, см. /opt/var/log/shadowfoxd.log"
+
+# Куда идти дальше. Без этого после установки терминал молчит, и человек
+# не знает ни что есть веб-интерфейс, ни его адреса. Показываем только
+# при первой установке: при обновлении настройки уже сделаны.
+if [ "$first_install" = yes ]; then
+    LAN=$(ip -4 addr show br0 2>/dev/null | sed -n 's/.*inet \([0-9.]*\).*/\1/p' | head -1)
+    [ -n "$LAN" ] || LAN=192.168.1.1
+
+    echo ""
+    echo "  Shadow Fox установлен."
+    echo ""
+    echo "  Интерфейс:  http://$LAN:8090"
+    echo "  Вход:       логин и пароль администратора роутера"
+    echo ""
+    echo "  Дальше в разделе «Подключения»: поставить ядро (opkg install xray),"
+    echo "  вставить ссылку vless://, создать подключение в роутере и"
+    echo "  настроить политику доступа. Каждый шаг там расписан."
+    echo ""
+    echo "  Состояние в любой момент:  shadowfoxd --status"
+    echo ""
+fi
 
 exit 0
