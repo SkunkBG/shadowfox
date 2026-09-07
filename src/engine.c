@@ -162,7 +162,9 @@ static void break_conn(engine_t *e, const sni_hit_t *h,
         return;
     }
 
-    char sp[8], dp[8], fam[8];
+    /* 16, хотя порт не длиннее пяти цифр: компилятор считает %u по
+       максимуму типа, и в восемь байт это по его меркам не влезает. */
+    char sp[16], dp[16], fam[8];
     snprintf(sp, sizeof(sp), "%u", h->sport);
     snprintf(dp, sizeof(dp), "%u", h->dport);
     str_copy(fam, sizeof(fam), h->family == 4 ? "ipv4" : "ipv6");
