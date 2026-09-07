@@ -216,6 +216,26 @@ static void test_small_buffer_fails(void)
           "нехватка буфера — ошибка, а не обрезка");
 }
 
+/* allowInsecure из ссылки в конфиг не переносится: один параметр в
+   подписке из чата снимал бы проверку сертификата целиком. */
+static void test_allow_insecure_dropped(void)
+{
+    node_t n;
+    char   err[128];
+    char   cfg[16384];
+
+    xraycfg_opts_t o;
+    xraycfg_defaults(&o);
+
+    CHECK(node_from_link(
+              "vless://d342d11e-d424-4583-b36e-524ab1f0afa4@example.com:443"
+              "?type=tcp&security=tls&sni=example.com&allowInsecure=1#x",
+              &n, err, sizeof(err)) == 0, "разбор");
+    CHECK(n.allow_insecure == 1, "просьба в ссылке замечена — для предупреждения");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "сборка");
+    CHECK(strstr(cfg, "allowInsecure") == NULL, "allowInsecure в конфиге: есть");
+}
+
 int main(void)
 {
     printf("check_node " VERSION "\n");
@@ -224,6 +244,7 @@ int main(void)
     test_defaults_and_errors();
     test_generated_config();
     test_fingerprint();
+    test_allow_insecure_dropped();
     test_alpn_from_link();
     test_transports();
     test_small_buffer_fails();

@@ -34,6 +34,8 @@ typedef struct {
     const char *cookie;
     size_t      cookie_len;
     char        token[HTTP_TOKEN_MAX];   /* из заголовка авторизации */
+    char        origin[128];             /* Origin — защита от чужих POST */
+    char        host[128];               /* Host — с чем сверять Origin */
 } http_req_t;
 
 typedef struct {

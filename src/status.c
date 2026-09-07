@@ -69,7 +69,10 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "sni_names=%lu\n"
         "sni_new=%lu\n"
         "sni_broken=%lu\n"
-        "sni_bad=%lu\n",
+        "sni_bad=%lu\n"
+        "dns_foreign=%lu\n"
+        "sni_foreign=%lu\n"
+        "sni_throttled=%lu\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
@@ -77,7 +80,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->flushes, e->restores, e->rules_applied,
         (long)e->xray.pid, e->xray.restarts, cfg->socks_port,
         e->sniffing, e->sni.seen, e->sni.parsed,
-        e->sni_names, e->sni_new, e->sni_broken, e->sni.drop_bad);
+        e->sni_names, e->sni_new, e->sni_broken, e->sni.drop_bad,
+        e->cap.drop_foreign, e->sni.drop_foreign, e->sni_throttled);
 
     fclose(f);
     rename(tmp, path);
@@ -319,6 +323,16 @@ int status_print(const config_t *cfg)
         long bad = status_num(spath, "sni_bad");
         if (bad > 0)
             printf("              не разобрано ClientHello: %ld\n", bad);
+
+        /* Чужое — пакеты не роутеру и не от него: мост, широковещание,
+           подделка. Придержанные обрывы при потоке — признак поддельных
+           ClientHello. */
+        long f1 = status_num(spath, "dns_foreign");
+        long f2 = status_num(spath, "sni_foreign");
+        long th = status_num(spath, "sni_throttled");
+        if (f1 > 0 || f2 > 0 || th > 0)
+            printf("              чужих пакетов: DNS %ld, SNI %ld; обрывов придержано %ld\n",
+                   f1 > 0 ? f1 : 0, f2 > 0 ? f2 : 0, th > 0 ? th : 0);
     } else {
         printf("  перехват SNI: выключен\n");
     }

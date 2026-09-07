@@ -63,6 +63,9 @@ typedef struct engine {
     unsigned long sni_names;     /* имён под правилами */
     unsigned long sni_new;       /* из них дали новый адрес */
     unsigned long sni_broken;    /* соединений оборвано */
+    unsigned long sni_throttled; /* обрывов не сделано: бюджет исчерпан */
+    time_t        break_sec;     /* секунда, за которую считаем обрывы */
+    int           break_in_sec;
     char          ct_bin[128];   /* путь к conntrack, пустой — не искали */
     int           ct_checked;
     int           ct_warned;

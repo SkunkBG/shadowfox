@@ -73,6 +73,26 @@ int http_parse_request(const char *buf, size_t len, http_req_t *out)
        сравнивать всё равно с одним заданным значением. */
     const char *hdr_end = sep ? sep : buf + len;
 
+    /* Origin и Host — для проверки, что POST пришёл с нашей страницы.
+       Ищем только в начале строки: те же слова бывают внутри значений. */
+    for (const char *h = buf; h + 5 < hdr_end; h++) {
+        if (h != buf && h[-1] != '\n') continue;
+
+        int is_origin = strncasecmp(h, "Origin:", 7) == 0;
+        int is_host   = !is_origin && strncasecmp(h, "Host:", 5) == 0;
+        if (!is_origin && !is_host) continue;
+
+        const char *v = h + (is_origin ? 7 : 5);
+        while (v < hdr_end && (*v == ' ' || *v == '\t')) v++;
+        const char *e = v;
+        while (e < hdr_end && *e != '\r' && *e != '\n') e++;
+
+        size_t vlen = (size_t)(e - v);
+        char  *dst  = is_origin ? out->origin : out->host;
+        size_t dmax = is_origin ? sizeof(out->origin) : sizeof(out->host);
+        if (vlen < dmax) { memcpy(dst, v, vlen); dst[vlen] = '\0'; }
+    }
+
     for (const char *h = buf; h + 7 < hdr_end; h++) {
         if (h != buf && h[-1] != '\n') continue;
         if (strncasecmp(h, "Cookie:", 7) != 0) continue;
@@ -359,7 +379,10 @@ void http_poll(http_t *h,
 
     /* По одному соединению за проход: демон должен вернуться в главный
        цикл к перехвату и сигналам, а не застревать на веб-интерфейсе. */
-    for (int i = 0; i < 8; i++) {
+    /* Соединений за проход немного, и тело ждём недолго: чтение
+       блокирующее, и пока оно ждёт, стоит весь демон. Раньше 8 × 5 с —
+       клиент без пароля мог держать перехват сорок секунд. */
+    for (int i = 0; i < 3; i++) {
         struct sockaddr_in from;
         socklen_t          fromlen = sizeof(from);
         int c = accept(h->fd, (struct sockaddr *)&from, &fromlen);
@@ -375,7 +398,7 @@ void http_poll(http_t *h,
         int cf = fcntl(c, F_GETFL, 0);
         if (cf != -1) fcntl(c, F_SETFL, cf & ~O_NONBLOCK);
 
-        struct timeval tv = { 5, 0 };
+        struct timeval tv = { 2, 0 };
         setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 

@@ -49,6 +49,7 @@ typedef struct {
        и на диагнозе это уже подводило. */
     unsigned long drop_nottls;     /* не TCP/443 или не ClientHello */
     unsigned long drop_bad;        /* похоже на ClientHello, но не сошлось */
+    unsigned long drop_foreign;    /* не адресован роутеру: чужой или мост */
 
     unsigned char buf[SCAP_BUF_BYTES];
 } scap_t;

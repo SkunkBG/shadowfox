@@ -149,6 +149,12 @@ int dcap_extract_why(const unsigned char *pkt, size_t len, dns_reply_t *out)
     return rc == 0 ? 0 : (rc == -2 ? -2 : -3);
 }
 
+/* Чтение пакета вместе с его направлением. Без направления перехват
+   верил любому пакету с портом источника 53: устройство в сети слало
+   поддельный «ответ» на MAC роутера, и адрес из него заворачивался в
+   туннель для всех. Ответ роутера — и только он — приходит как
+   PACKET_OUTGOING: это направление ядро ставит само, подделать его
+   с другого хоста нельзя. */
 #ifdef __linux__
 
 #include <arpa/inet.h>
@@ -194,6 +200,17 @@ static struct sock_filter DNS_FILTER[] = {
     { 0x6,  0, 0,  0x0000ffff },
     { 0x6,  0, 0,  0x00000000 },
 };
+
+static ssize_t cap_read(int fd, void *buf, size_t n, int *pkttype)
+{
+    struct sockaddr_ll from;
+    socklen_t          flen = sizeof(from);
+    memset(&from, 0, sizeof(from));
+
+    ssize_t got = recvfrom(fd, buf, n, 0, (struct sockaddr *)&from, &flen);
+    if (got > 0 && pkttype) *pkttype = from.sll_pkttype;
+    return got;
+}
 
 int dcap_open(dcap_t *c, const char *iface, char *err, unsigned err_size)
 {
@@ -255,6 +272,12 @@ int dcap_open(dcap_t *c, const char *iface, char *err, unsigned err_size)
 
 #else  /* не Linux */
 
+static ssize_t cap_read(int fd, void *buf, size_t n, int *pkttype)
+{
+    if (pkttype) *pkttype = -1;
+    return read(fd, buf, n);
+}
+
 int dcap_open(dcap_t *c, const char *iface, char *err, unsigned err_size)
 {
     (void)c; (void)iface;
@@ -282,10 +305,19 @@ int dcap_poll(dcap_t *c, void (*cb)(const dns_reply_t *, void *), void *ctx)
     /* Читаем всё, что накопилось, но не бесконечно: при шторме пакетов
        демон обязан вернуться в главный цикл и обработать сигналы. */
     for (int i = 0; i < 256; i++) {
-        ssize_t n = read(c->fd, c->buf, sizeof(c->buf));
+        int     pkttype = -1;
+        ssize_t n = cap_read(c->fd, c->buf, sizeof(c->buf), &pkttype);
         if (n <= 0) break;
 
         c->seen++;
+
+#ifdef __linux__
+        if (pkttype >= 0 && pkttype != PACKET_OUTGOING) {
+            c->ignored++;
+            c->drop_foreign++;
+            continue;
+        }
+#endif
 
         dns_reply_t reply;
         int         why = dcap_extract_why(c->buf, (size_t)n, &reply);

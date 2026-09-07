@@ -257,6 +257,22 @@ const scap_insn_t *scap_filter(unsigned *count)
 #include <net/if.h>
 #include <sys/socket.h>
 
+/* Пакет вместе с направлением. Нам нужны только те, что клиент шлёт
+   роутеру (PACKET_HOST): проходящее мостом между двумя хостами сети и
+   широковещательное — не наш трафик, а подделку с чужим адресом
+   источника это, увы, не отсекает — она тоже адресована роутеру. От
+   неё защищает бюджет обрывов в движке. */
+static ssize_t cap_read(int fd, void *buf, size_t n, int *pkttype)
+{
+    struct sockaddr_ll from;
+    socklen_t          flen = sizeof(from);
+    memset(&from, 0, sizeof(from));
+
+    ssize_t got = recvfrom(fd, buf, n, 0, (struct sockaddr *)&from, &flen);
+    if (got > 0 && pkttype) *pkttype = from.sll_pkttype;
+    return got;
+}
+
 int scap_open(scap_t *c, const char *iface, char *err, unsigned err_size)
 {
     if (!c) return -1;
@@ -324,6 +340,12 @@ int scap_open(scap_t *c, const char *iface, char *err, unsigned err_size)
 
 #else  /* не Linux */
 
+static ssize_t cap_read(int fd, void *buf, size_t n, int *pkttype)
+{
+    if (pkttype) *pkttype = -1;
+    return read(fd, buf, n);
+}
+
 int scap_open(scap_t *c, const char *iface, char *err, unsigned err_size)
 {
     (void)c; (void)iface;
@@ -351,10 +373,18 @@ int scap_poll(scap_t *c, void (*cb)(const sni_hit_t *, void *), void *ctx)
     /* Читаем всё, что накопилось, но не бесконечно: при шторме пакетов
        демон обязан вернуться в главный цикл и обработать сигналы. */
     for (int i = 0; i < 256; i++) {
-        ssize_t n = read(c->fd, c->buf, sizeof(c->buf));
+        int     pkttype = -1;
+        ssize_t n = cap_read(c->fd, c->buf, sizeof(c->buf), &pkttype);
         if (n <= 0) break;
 
         c->seen++;
+
+#ifdef __linux__
+        if (pkttype >= 0 && pkttype != PACKET_HOST) {
+            c->drop_foreign++;
+            continue;
+        }
+#endif
 
         sni_hit_t hit;
         int       why = scap_extract(c->buf, (size_t)n, &hit);

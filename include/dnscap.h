@@ -44,6 +44,7 @@ typedef struct {
     unsigned long drop_notip;      /* не IPv4/IPv6, не UDP, не порт 53 */
     unsigned long drop_empty;      /* настоящий ответ, но адресов в нём нет */
     unsigned long drop_bad;        /* пакет испорчен — вот это уже сбой */
+    unsigned long drop_foreign;    /* DNS-ответ не от роутера — чужой */
     unsigned char buf[DCAP_BUF_BYTES];
 } dcap_t;
 

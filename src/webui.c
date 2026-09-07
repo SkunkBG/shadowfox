@@ -973,8 +973,13 @@ static void save(const http_req_t *req, int fd, const config_t *cfg)
     char tmp[CFG_PATH_MAX + 40];
     snprintf(tmp, sizeof(tmp), "%s.web", path);
 
-    FILE *f = fopen(tmp, "w");
+    /* 0600 с момента создания и без хождения по ссылкам: раньше файл с
+       ключом рождался 0644 и получал права только после rename. */
+    unlink(tmp);
+    int tfd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
+    FILE *f = tfd >= 0 ? fdopen(tfd, "w") : NULL;
     if (!f) {
+        if (tfd >= 0) close(tfd);
         http_send_text(fd, 500, "text/plain; charset=utf-8", "не создать файл\n");
         return;
     }
@@ -1121,6 +1126,21 @@ static void form_field(const char *body, size_t len, const char *name,
 
 static void send_login(int fd, const char *message)
 {
+    /* Текст ошибки может нести заголовок X-Detail из ответа роутера —
+       чужие байты в нашей разметке. Пять символов экранируем. */
+    char safe[512] = "";
+    if (message) {
+        size_t o = 0;
+        for (const char *m = message; *m && o + 8 < sizeof(safe); m++) {
+            const char *rep = *m == '<' ? "&lt;" : *m == '>' ? "&gt;"
+                            : *m == '&' ? "&amp;" : *m == '"' ? "&quot;"
+                            : *m == '\'' ? "&#39;" : NULL;
+            if (rep) { size_t l = strlen(rep); memcpy(safe + o, rep, l); o += l; }
+            else safe[o++] = *m;
+        }
+        safe[o] = '\0';
+    }
+
     static char page[4096];
     snprintf(page, sizeof(page),
         "<!doctype html><meta charset=utf-8>"
@@ -1167,7 +1187,7 @@ static void send_login(int fd, const char *message)
         "<button>Войти</button>"
         "%s%s%s</form>",
         message && *message ? "<div class=bad>" : "",
-        message && *message ? message : "",
+        message && *message ? safe : "",
         message && *message ? "</div>" : "");
 
     http_send(fd, 200, "text/html; charset=utf-8", page, strlen(page));
@@ -1180,23 +1200,58 @@ static void send_login(int fd, const char *message)
    останавливаемся раньше, чем он. */
 #define LOGIN_TRIES     3
 #define LOGIN_COOLDOWN  60
+#define LOGIN_PEERS     16
 
-static int  g_bad_tries;
-static long g_bad_until;
+/* Счётчик на адрес клиента, а не один на всех: раньше три неверных
+   пароля с любого устройства сети закрывали вход всем на минуту, и
+   повторять это можно было без конца. Пауза растёт с каждой серией —
+   до получаса, — а перебирающий получает не три попытки в минуту, а
+   всё меньше. Общий порог остаётся второй линией, выше. */
+typedef struct {
+    char  peer[64];
+    int   tries;
+    int   streak;    /* сколько серий подряд */
+    long  until;
+    long  last;
+} login_peer_t;
+
+static login_peer_t g_peers[LOGIN_PEERS];
+static int          g_bad_total;      /* общий счётчик за окно */
+static long         g_bad_window;
+
+static login_peer_t *peer_slot(const char *peer, long now)
+{
+    login_peer_t *oldest = &g_peers[0];
+    for (int i = 0; i < LOGIN_PEERS; i++) {
+        if (g_peers[i].peer[0] && !strcmp(g_peers[i].peer, peer)) return &g_peers[i];
+        if (g_peers[i].last < oldest->last) oldest = &g_peers[i];
+    }
+    memset(oldest, 0, sizeof(*oldest));
+    str_copy(oldest->peer, sizeof(oldest->peer), peer);
+    oldest->last = now;
+    return oldest;
+}
 
 static void do_login(const http_req_t *req, int fd, const config_t *cfg)
 {
     long now = (long)time(NULL);
 
-    if (g_bad_until > now) {
+    login_peer_t *lp = peer_slot(req->peer, now);
+    lp->last = now;
+
+    /* Общая линия: двадцать неудач за минуту со всех адресов разом —
+       это уже не опечатки. */
+    if (now - g_bad_window > 60) { g_bad_window = now; g_bad_total = 0; }
+
+    if (lp->until > now || g_bad_total >= 20) {
+        long wait = lp->until > now ? lp->until - now : 60;
         /* 256, а не 128: текст кириллический, в UTF-8 он занимает вдвое
            больше байт, чем символов, и в 128 не помещался — строка
            резалась посреди многобайтового символа. */
         char msg[256];
         snprintf(msg, sizeof(msg),
                  "Слишком много неудачных попыток. Подожди %ld секунд — "
-                 "иначе роутер заблокирует адрес сам",
-                 g_bad_until - now);
+                 "иначе роутер заблокирует адрес сам", wait);
         send_login(fd, msg);
         return;
     }
@@ -1226,9 +1281,13 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
     memset(password, 0, sizeof(password));
 
     if (r != NDM_OK) {
-        if (r == NDM_DENIED && ++g_bad_tries >= LOGIN_TRIES) {
-            g_bad_tries = 0;
-            g_bad_until = now + LOGIN_COOLDOWN;
+        if (r == NDM_DENIED) g_bad_total++;
+        if (r == NDM_DENIED && ++lp->tries >= LOGIN_TRIES) {
+            lp->tries = 0;
+            lp->streak++;
+            long cool = LOGIN_COOLDOWN;
+            for (int i = 1; i < lp->streak && cool < 1800; i++) cool *= 2;
+            lp->until = now + cool;
         }
         log_warn("веб: вход отклонён (%s), запрос с %s",
                  err[0] ? err : "не подошло", req->peer);
@@ -1236,8 +1295,9 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
         return;
     }
 
-    g_bad_tries = 0;
-    g_bad_until = 0;
+    lp->tries  = 0;
+    lp->streak = 0;
+    lp->until  = 0;
 
     char tok[64];
     session_new(tok, sizeof(tok));
@@ -1250,6 +1310,23 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
              "Set-Cookie: sfsession=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d",
              tok, SESSION_HOURS * 3600);
     http_send_with(fd, 303, "text/plain; charset=utf-8", head, "Location: /", "", 0);
+}
+
+/* Запрос с чужой страницы. SameSite у cookie не различает порт: панель
+   роутера на :80 и любой пакет Entware со своей страницей — для
+   браузера тот же сайт. Поэтому на POST сверяем Origin с Host: браузер
+   на межсайтовый POST ставит Origin всегда, а совпасть чужой не может.
+   Без Origin (curl, старые клиенты) пропускаем — это не браузер. */
+static int foreign_origin(const http_req_t *req)
+{
+    if (strcmp(req->method, "POST") != 0) return 0;
+    if (!req->origin[0] || !req->host[0]) return 0;
+
+    const char *o = req->origin;
+    if (!strncmp(o, "http://", 7)) o += 7;
+    else if (!strncmp(o, "https://", 8)) o += 8;
+
+    return strcmp(o, req->host) != 0;
 }
 
 static void handle(const http_req_t *req, int fd, void *ctx)
@@ -1265,6 +1342,13 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         /* Без проверки входа: картинка нужна самой форме входа, а тайны
            в ней нет. */
         http_send_gzip(fd, "image/png", web_logo, web_logo_len);
+        return;
+    }
+
+    if (foreign_origin(req)) {
+        log_warn("веб: POST %s с чужого источника %s, отказ", req->path, req->origin);
+        http_send_text(fd, 403, "text/plain; charset=utf-8",
+                       "запрос с чужой страницы\n");
         return;
     }
 

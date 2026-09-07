@@ -490,6 +490,25 @@ static void test_late_request(void)
     http_close(&h);
 }
 
+/* Origin и Host нужны защите от чужого POST; искать их надо только в
+   начале строки, иначе слово внутри значения сойдёт за заголовок. */
+static void test_origin_host(void)
+{
+    http_req_t r;
+    const char *req =
+        "POST /save HTTP/1.1\r\n"
+        "Host: 192.168.1.1:8090\r\n"
+        "X-Note: Origin: http://evil.example\r\n"
+        "Origin: http://192.168.1.1:8090\r\n\r\n";
+    CHECK(parse(req, &r) == 0, "разобран");
+    CHECK(strcmp(r.host, "192.168.1.1:8090") == 0, "host: «%s»", r.host);
+    CHECK(strcmp(r.origin, "http://192.168.1.1:8090") == 0, "origin: «%s»", r.origin);
+
+    const char *bare = "GET / HTTP/1.1\r\nHost: t\r\n\r\n";
+    CHECK(parse(bare, &r) == 0, "разобран");
+    CHECK(r.origin[0] == '\0', "без Origin поле пустое");
+}
+
 int main(void)
 {
     printf("check_http " VERSION "\n");
@@ -507,6 +526,7 @@ int main(void)
     test_body_second_segment();
     test_body_truncated();
     test_oversized_body();
+    test_origin_host();
 
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);

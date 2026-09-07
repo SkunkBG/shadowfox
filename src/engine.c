@@ -26,6 +26,7 @@
    их приходило пять подряд. Пауза схлопывает всплеск в одно применение
    и разрывает цепную реакцию. */
 #define ENGINE_RESTORE_DELAY 2
+#define ENGINE_BREAK_BUDGET  20   /* обрывов соединений в секунду */
 
 void engine_init(engine_t *e)
 {
@@ -230,6 +231,22 @@ static void on_sni(const sni_hit_t *h, void *ctx)
         e->flushes++;
 
     log_info("SNI %s -> %s в группу %s", h->name, dst, e->wl.groups[group].name);
+
+    /* Бюджет обрывов. Обрыв делается по 5-tuple из пакета, а пакет в
+       сети может подделать кто угодно — это единственное место, где
+       чужое устройство командует нашим conntrack. Адрес в набор всё
+       равно кладём (следующее соединение пойдёт верно), а рвать больше
+       ENGINE_BREAK_BUDGET в секунду не станем: настоящему трафику
+       столько новых адресов в секунду не нужно. */
+    time_t now = time(NULL);
+    if (now != e->break_sec) { e->break_sec = now; e->break_in_sec = 0; }
+    if (++e->break_in_sec > ENGINE_BREAK_BUDGET) {
+        e->sni_throttled++;
+        if (e->break_in_sec == ENGINE_BREAK_BUDGET + 1)
+            log_warn("обрывов больше %d в секунду — похоже на подделку "
+                     "ClientHello, лишние не делаю", ENGINE_BREAK_BUDGET);
+        return;
+    }
 
     break_conn(e, h, src, dst);
 }
@@ -480,6 +497,15 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     static nodelist_t list;
     nodelist_init(&list);
     int added = nodelist_from_subscription(&list, body);
+
+    /* allowInsecure из ссылки в конфиг не переносится — см. xraycfg.c.
+       Но молчать о том, что ссылка его просила, нельзя: человек будет
+       искать, почему «не работает как в приложении». */
+    for (int i = 0; i < list.count; i++)
+        if (list.items[i].allow_insecure)
+            log_warn("ссылка «%s» просит allowInsecure — не переношу: без "
+                     "проверки сертификата TLS ничего не защищает",
+                     list.items[i].tag[0] ? list.items[i].tag : "без имени");
     if (added <= 0) {
         log_error("в %s нет ни одной понятной ссылки", cfg->nodes_file);
         return;

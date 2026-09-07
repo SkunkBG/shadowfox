@@ -112,7 +112,11 @@ static void build_stream(json_t *j, const node_t *n, const xraycfg_opts_t *o)
         /* alpn пишем только если он пришёл в ссылке. neofit прописывал
            ["h2","http/1.1"] всегда, рассогласуя ALPN с отпечатком uTLS. */
         if (n->alpn[0]) json_kv_str_list(j, "alpn", n->alpn, ',');
-        if (n->allow_insecure) json_kv_bool(j, "allowInsecure", 1);
+        /* allowInsecure из ссылки не переносим, даже если он там есть.
+           У VLESS с encryption none TLS — единственный слой защиты, и
+           один параметр в подписке, скопированной из чата, снимал бы
+           проверку сертификата: любой на пути читал бы трафик. Демон
+           предупреждает в журнале, что ссылка это просила. */
         json_obj_close(j);
     }
 
