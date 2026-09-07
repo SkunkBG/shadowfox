@@ -308,6 +308,76 @@ static void *split_client(void *arg)
     return strstr(buf, "200 OK") ? (void *)1 : (void *)2;
 }
 
+/* Заявленная длина больше буфера. Раньше такой запрос принимался как
+   «пришёл целиком» после первого read, и обрезок уезжал в файл. */
+static int g_over_called;
+
+static void over_reply(const http_req_t *r, int fd, void *ctx)
+{
+    (void)r; (void)ctx;
+    g_over_called++;
+    http_send_text(fd, 200, "text/plain", "ok\n");
+}
+
+static void *over_client(void *arg)
+{
+    (void)arg;
+
+    int c = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port   = htons((unsigned short)g_port);
+    inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+    if (connect(c, (struct sockaddr *)&sa, sizeof(sa)) != 0) { close(c); return NULL; }
+
+    const char *req =
+        "POST /save?what=domains HTTP/1.1\r\nHost: t\r\n"
+        "Content-Length: 9000000\r\n\r\nначало списка\n";
+    if (write(c, req, strlen(req)) < 0) { close(c); return NULL; }
+    shutdown(c, SHUT_WR);
+
+    static char buf[512];
+    ssize_t n = read(c, buf, sizeof(buf) - 1);
+    if (n > 0) buf[n] = '\0'; else buf[0] = '\0';
+    close(c);
+
+    return strstr(buf, "413") ? (void *)1 : (void *)2;
+}
+
+static void test_oversized_body(void)
+{
+    g_over_called = 0;
+
+    http_t h;
+    char   err[128];
+    http_init(&h);
+    CHECK(http_open(&h, "127.0.0.1", 0, err, sizeof(err)) == 0, "сервер: %s", err);
+
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    getsockname(http_fd(&h), (struct sockaddr *)&sa, &sl);
+    g_port = ntohs(sa.sin_port);
+
+    pthread_t th;
+    pthread_create(&th, NULL, over_client, NULL);
+
+    for (int i = 0; i < 40 && !g_over_called; i++) {
+        struct timespec ts = { 0, 50 * 1000 * 1000 };
+        nanosleep(&ts, NULL);
+        http_poll(&h, over_reply, NULL);
+    }
+
+    void *res = NULL;
+    pthread_join(th, &res);
+
+    CHECK(res == (void *)1, "ожидался ответ 413");
+    CHECK(g_over_called == 0, "обработчик не должен вызываться: %d", g_over_called);
+    CHECK(h.rejected == 1, "отказ засчитан: %lu", h.rejected);
+
+    http_close(&h);
+}
+
 static void *run_split(int hold)
 {
     g_split_hold = hold;
@@ -436,6 +506,7 @@ int main(void)
     test_content_length();
     test_body_second_segment();
     test_body_truncated();
+    test_oversized_body();
 
     if (failures) {
         printf("ПРОВАЛЕНО проверок: %d\n", failures);

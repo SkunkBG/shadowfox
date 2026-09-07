@@ -195,7 +195,11 @@ static void test_cidrs(void)
         "198.51.100.7\n"
         "2001:db8::/32\n"
         "не подсеть\n"
-        "10.0.0.0/33\n");
+        "10.0.0.0/33\n"
+        "10.0.0.0/\n"
+        "0.0.0.0/0\n"
+        "::/\n"
+        "2001:db8::/0\n");
 
     char path[160];
     snprintf(path, sizeof(path), "%s/ip.list", g_dir);
@@ -204,7 +208,10 @@ static void test_cidrs(void)
     wl_init(&w);
     CHECK(wl_load_cidrs(&w, path) == 0, "файл подсетей прочитан");
     CHECK(w.cidr_count == 3, "три записи, получено %d", w.cidr_count);
-    CHECK(w.skipped == 2, "мусор и неверная маска пропущены: %d", w.skipped);
+    /* Четыре последние — косая черта без цифр и /0 в обеих семьях.
+       Каждая из них раньше превращалась в «весь интернет». */
+    CHECK(w.skipped == 6, "мусор, неверная маска, пустой и нулевой префикс: %d",
+          w.skipped);
 
     unsigned char a[16];
     inet_pton(AF_INET, "192.0.2.5", a);
