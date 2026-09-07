@@ -27,6 +27,8 @@ typedef struct engine {
     rci_t  rci;
     sv_t   xray;           /* свой экземпляр ядра */
     int    xray_managed;   /* мы его подняли и следим за ним */
+    char   xray_version[32];   /* спрошенная у бинарника, пусто — не знаем */
+    time_t xray_ver_try;       /* когда пробовали спросить */
 
     int    rules_applied;
     int    capturing;

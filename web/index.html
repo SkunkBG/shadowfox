@@ -155,13 +155,15 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
   box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sw.on{background:var(--acc)}
 .sw.on::after{transform:translateX(20px)}
+#verupd{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;
+  background:var(--acc);color:var(--bg);font-size:11.5px;font-weight:700;
+  letter-spacing:.2px;cursor:pointer}
 .dpi{display:flex;flex-direction:column;gap:16px;margin-top:16px}
-.dpi .row{display:flex;gap:14px;align-items:flex-start}
+.dpi .row{display:flex;gap:12px;align-items:flex-start}
+.dpi .row .dot{margin-top:6px;flex:0 0 auto}
 .dpi .row b{display:block;font-weight:600}
 .dpi .row i{display:block;color:var(--dim);font-style:normal;font-size:13.5px;
   margin-top:3px;line-height:1.45}
-.dpi select.in{background:var(--soft);color:var(--fg);border:1px solid var(--line);
-  border-radius:8px;padding:7px 10px;font:inherit;font-size:14px;width:100%}
 .note{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:13.5px;
   margin-top:16px}
 .note svg{width:17px;height:17px;flex:0 0 auto}
@@ -302,7 +304,8 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
         <path fill="var(--bg)" d="M22 27c0-3 3-5 7-5h6v4h-8v3h6c3 0 5 2 5 5s-2 5-5 5h-8v-4h8v-3h-5c-4 0-6-2-6-5zm18-5h11v4h-7v3h6v4h-6v7h-4z"/>
       </svg>
       <!--/ЛОГОТИП-->
-      <span><b>Shadow&nbsp;Fox</b><i id="ver"></i></span>
+      <span><b>Shadow&nbsp;Fox</b><i id="ver"></i>
+        <span id="verupd" hidden></span></span>
     </a>
 
     <nav>
@@ -666,38 +669,26 @@ function viewConn(){
   <div class="card"><h3>Устойчивость к DPI</h3>
     <p>Ручки Xray, которые решают, доживёт ли туннель до следующего месяца.
     Менеджер без них перестаёт работать со временем, хотя настройки при этом
-    выглядят исправными.</p>
+    выглядят исправными. Включены всегда — выбирать тут нечего.</p>
 
     <div class="dpi">
-      <div class="row">
-        <button class="sw ${D.fragment?'on':''}" data-dpi="fragment"></button>
+      <div class="row"><i class="dot ok"></i>
         <div><b>Фрагментация ClientHello</b>
           <i>Приветствие TLS режется на части, и целевое имя не собирается
-          в один пакет. Стоит задержки на установке соединения.</i></div>
+          в один пакет.</i></div>
       </div>
-      <div class="row">
-        <button class="sw ${D.noise?'on':''}" data-dpi="noise"></button>
+      <div class="row"><i class="dot ok"></i>
         <div><b>Шум в UDP</b>
           <i>Мусорные пакеты перед основными, чтобы начало потока не
           опознавалось по образцу.</i></div>
       </div>
-      <div class="row">
-        <span style="width:44px"></span>
-        <div><b>Отпечаток uTLS</b>
-          <i>Каким браузером представляется соединение. Пусто — брать из
-          ссылки; панели почти всегда ставят туда chrome, а его подпись
-          распознают в первую очередь.</i>
-          <select id="dpi-fp" class="in" style="margin-top:8px;max-width:220px">
-            ${FPLIST.map(f=>`<option value="${f}"${(D.fingerprint||'')===f?' selected':''}>${f||'из ссылки'}</option>`).join('')}
-          </select></div>
+      <div class="row"><i class="dot ok"></i>
+        <div><b>Отпечаток uTLS: ${esc(D.fingerprint||'firefox')}</b>
+          <i>Соединение представляется этим браузером. Не chrome намеренно:
+          он самый частый, и его подпись распознают в первую очередь —
+          даже если панель проставила chrome в саму ссылку.</i></div>
       </div>
     </div>
-
-    <div class="bar" style="margin-top:14px">
-      <button class="b" id="dpi-save">Применить</button>
-      <span class="msg" id="m-dpi"></span></div>
-    <div class="note" style="margin-top:10px">${UI.i}Ядро перезапустится,
-      соединения оборвутся на секунду</div>
   </div>
 
   <div class="card"><h3>DNS роутера</h3>
@@ -725,7 +716,9 @@ function viewConn(){
     негодная не заменит рабочую</div>`;
 
   const right=`
-    ${stat(UI.box,'Ядро Xray',!!D.xray_bin,D.xray_bin?'Установлено':'Не установлено',
+    ${stat(UI.box,'Ядро Xray',!!D.xray_bin,
+           D.xray_bin?('Установлено'+(D.xray_version?', версия '+esc(D.xray_version):''))
+                     :'Не установлено',
            D.xray_bin?'<span></span>':`<button class="b sm" id="getxray">Установить</button>`)}
     <div class="msg" id="m-xray" style="margin:-6px 0 14px 60px"></div>
     ${D.xray_bin?'':`<div class="note" style="margin:-8px 0 14px 60px">${UI.i}
@@ -842,6 +835,8 @@ function viewInfo(){
         <i class="dot ${core?'ok':'bad'}"></i>
         <b style="color:var(--${core?'ok':'bad'})">${core?'Работает':'Не запущено'}</b></p>
       <p style="margin:0">Отдельный процесс Shadow Fox на порту ${D.socks_port}</p>
+      ${D.xray_version?`<div class="kv" style="margin-top:10px"><span>Версия ядра</span>
+        <span><b>${esc(D.xray_version)}</b></span></div>`:''}
     </div>
   </div>
 
@@ -915,6 +910,16 @@ function disclaimer(){ return `
 /* ---- обвязка ---- */
 function chrome(){
   $('#ver').textContent=D.version;
+
+  /* Про обновление надо узнавать, не заходя в раздел: иначе о нём просто
+     не догадаешься. Плашка рядом с версией — единственное место, куда
+     смотрят всегда. */
+  const up=$('#verupd');
+  if(up){
+    const has=updInfo && updInfo.ok && updInfo.available;
+    up.hidden=!has;
+    if(has) up.textContent='обновление '+updInfo.available;
+  }
 
   /* Значки разделов — смайлы: их рисует шрифт устройства, поэтому они
      цветные и одинаково узнаваемы везде. 🔀 для правил выбран за смысл:
@@ -1067,11 +1072,6 @@ async function save(what,text,msgId){
   }catch(e){ if(m){ m.className='msg bad'; m.textContent=e.message; } return false; }
 }
 
-/* Те же значения, что принимает служба: отпечаток уходит в конфиг ядра
-   как есть, поэтому список закрытый с обеих сторон. */
-const FPLIST=['','chrome','firefox','safari','edge','ios','android','random'];
-let dpi={};
-
 /* ---- выбор готового набора ---- */
 /* target задаётся, когда правила ещё нет: в текстовом виде правило без
    групп не существует — цель живёт строкой interface внутри группы.
@@ -1204,6 +1204,10 @@ document.addEventListener('input',ev=>{
 });
 
 document.addEventListener('click',async ev=>{
+  if(ev.target.closest('#verupd')){
+    ev.preventDefault(); tab='info'; draw();
+    $('#view').scrollIntoView({block:'start'}); return; }
+
   const nav=ev.target.closest('aside nav button');
   if(nav){ tab=nav.dataset.tab; if(nodesMode!=='masked') nodesMode='masked';
            if(tab!=='conn'){ dnsLoaded=0; dnsInfo=null; }
@@ -1324,27 +1328,6 @@ document.addEventListener('click',async ev=>{
     }catch(e){ m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 
-  const dpiSw=ev.target.closest('[data-dpi]');
-  if(dpiSw){ const k=dpiSw.dataset.dpi;
-    dpi[k]=!(k in dpi ? dpi[k] : D[k]);
-    dpiSw.classList.toggle('on', dpi[k]); return; }
-
-  if(ev.target.id==='dpi-save'){
-    const btn=ev.target, m=$('#m-dpi');
-    const frag=('fragment' in dpi)?dpi.fragment:!!D.fragment;
-    const noise=('noise' in dpi)?dpi.noise:!!D.noise;
-    const fp=$('#dpi-fp')?$('#dpi-fp').value:'';
-    btn.disabled=true; m.className='msg'; m.textContent='применяю…';
-    try{
-      const r=await fetch(api('/shaping?fragment='+(frag?1:0)+
-                             '&noise='+(noise?1:0)+'&fp='+encodeURIComponent(fp)),
-                          {method:'POST'});
-      const t=(await r.text()).trim();
-      m.className=r.ok?'msg ok':'msg bad'; m.textContent=t;
-      if(r.ok){ dpi={}; setTimeout(load,2500); }
-    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
-    btn.disabled=false; return; }
-
   if(ev.target.id==='mkproxy'){
     const btn=ev.target, m=$('#m-proxy');
     if(!confirm('Создать подключение '+D.proxy_name+' в роутере?\n'+
@@ -1424,6 +1407,16 @@ addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValu
 
 if(!seen()) gate();
 load();
+
+/* Один раз за открытие страницы: opkg update ходит в сеть и занимает
+   секунды, поэтому в опрос каждые десять секунд его класть нельзя. */
+(async()=>{
+  try{
+    const r=await fetch(api('/update'));
+    updInfo=await r.json();
+  }catch(e){ updInfo={ok:false,why:e.message}; }
+  if(D && !dirty) draw();
+})();
 setInterval(()=>{
   if(dirty || document.querySelector('textarea:focus,input:focus')) return;
   if(document.querySelector('.modal')) return;   /* поверх открытого окна незачем */

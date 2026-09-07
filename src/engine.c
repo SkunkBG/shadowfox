@@ -234,6 +234,42 @@ static void on_sni(const sni_hit_t *h, void *ctx)
     break_conn(e, h, src, dst);
 }
 
+/* Версия ядра — спросив у самого бинарника.
+
+   Один раз, а не на каждый запрос страницы: строка не меняется, а
+   порождать процесс каждые десять секунд ради неё незачем. Если ядра
+   ещё нет, пробуем не чаще раза в минуту. */
+static void note_xray_version(engine_t *e, time_t now)
+{
+    if (e->xray_version[0]) return;
+    if (e->xray_ver_try && now - e->xray_ver_try < 60) return;
+    e->xray_ver_try = now;
+
+    char bin[APPLY_PATH_MAX] = "";
+    if (e->cfg && e->cfg->xray_bin[0])
+        str_copy(bin, sizeof(bin), e->cfg->xray_bin);
+    else if (!apply_find_xray(bin, sizeof(bin)))
+        return;
+
+    char arg[] = "version";
+    char *argv[] = { bin, arg, NULL };
+    char  out[256] = "";
+
+    if (proc_run(argv, out, sizeof(out), 5) != 0) return;
+
+    /* «Xray 26.7.28 (Xray, Penetrates Everything.) ...» — второе слово. */
+    const char *p = strchr(out, ' ');
+    if (!p) return;
+    p++;
+
+    size_t n = strcspn(p, " \n\r");
+    if (n == 0 || n >= sizeof(e->xray_version)) return;
+
+    memcpy(e->xray_version, p, n);
+    e->xray_version[n] = '\0';
+    log_info("ядро Xray версии %s", e->xray_version);
+}
+
 static int load_lists(engine_t *e, const config_t *cfg)
 {
     char domains[CFG_PATH_MAX + 32];
@@ -608,6 +644,8 @@ int engine_restore(engine_t *e, char *err, unsigned err_size)
 void engine_tick(engine_t *e, time_t now)
 {
     if (!e) return;
+
+    note_xray_version(e, now);
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
     if (e->sniffing)  scap_poll(&e->sni, on_sni, e);
