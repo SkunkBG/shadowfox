@@ -72,7 +72,17 @@ make xray-ipk VARIANT=minimal  # упаковать в .ipk
 > отвечает на сигналы. Он **не управляет xray и не трогает маршрутизацию**.
 > Установка сейчас проверяет упаковку и автозапуск, не более.
 
-Подключить фид и поставить пакет:
+Подключить фид и поставить пакет — одной командой, без загрузок со
+стороны. Каталог фида у Entware называется не так, как архитектура,
+поэтому он определяется по `entware_release`:
+
+```bash
+ARCH=$(grep '^arch=' /opt/etc/entware_release | cut -d= -f2); case "$ARCH" in aarch64) DIR=aarch64-k3.10 ;; mipsel) DIR=mipselsf-k3.4 ;; mips) DIR=mipssf-k3.4 ;; *) echo "неизвестная архитектура: $ARCH" >&2; false ;; esac && mkdir -p /opt/etc/opkg && echo "src/gz shadowfox https://skunkbg.github.io/shadowfox/keenetic/$DIR" > /opt/etc/opkg/shadowfox.conf && opkg update && opkg install shadowfox
+```
+
+На свежем Entware нет `curl`, поэтому команда обходится одним `opkg` —
+он умеет ходить по https сам. Если `curl` уже стоит, то же самое делает
+скрипт, который вдобавок проверяет, что фид вообще опубликован:
 
 ```bash
 curl -fsSL https://skunkbg.github.io/shadowfox/add-repo.sh -o /tmp/sf.sh && sh /tmp/sf.sh && opkg update && opkg install shadowfox
