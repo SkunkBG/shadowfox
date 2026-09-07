@@ -442,8 +442,11 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
 
     xraycfg_opts_t o;
     xraycfg_defaults(&o);
-    o.listen     = lan;
-    o.socks_port = cfg->socks_port;
+    o.listen      = lan;
+    o.socks_port  = cfg->socks_port;
+    o.fragment    = cfg->fragment;
+    o.noise       = cfg->noise;
+    o.fingerprint = cfg->fingerprint;
 
     static char json[256 * 1024];
     if (xraycfg_build_list(&list, &o, json, sizeof(json)) != 0) {

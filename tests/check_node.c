@@ -67,6 +67,43 @@ static void test_defaults_and_errors(void)
     CHECK(err[0] != '\0', "причина ошибки заполнена");
 }
 
+/* Отпечаток uTLS: три источника и строгий порядок между ними. Панели
+   почти всегда проставляют fp прямо в ссылку, и без перекрытия сменить
+   его было бы негде — а chrome распознают в первую очередь. */
+static void test_fingerprint(void)
+{
+    node_t n;
+    char   err[128];
+    char   cfg[16384];
+
+    xraycfg_opts_t o;
+    xraycfg_defaults(&o);
+
+    /* Из ссылки, когда перекрытия нет. */
+    CHECK(node_from_link(REALITY_LINK, &n, err, sizeof(err)) == 0, "разбор");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "сборка");
+    CHECK(strstr(cfg, "\"fingerprint\":\"firefox\"") != NULL,
+          "отпечаток берётся из ссылки");
+
+    /* Перекрытие сильнее ссылки. */
+    o.fingerprint = "safari";
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "сборка с перекрытием");
+    CHECK(strstr(cfg, "\"fingerprint\":\"safari\"") != NULL,
+          "перекрытие сильнее ссылки");
+    CHECK(strstr(cfg, "\"fingerprint\":\"firefox\"") == NULL,
+          "старого отпечатка в конфиге не остаётся");
+
+    /* Ссылки без fp: запасной — firefox, а не chrome. */
+    xraycfg_defaults(&o);
+    CHECK(node_from_link(
+              "vless://d342d11e-d424-4583-b36e-524ab1f0afa4@example.com:443"
+              "?type=tcp&security=tls&sni=example.com#нет-fp",
+              &n, err, sizeof(err)) == 0, "разбор без fp");
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "сборка без fp");
+    CHECK(strstr(cfg, "\"fingerprint\":\"firefox\"") != NULL,
+          "запасной отпечаток firefox");
+}
+
 static void test_generated_config(void)
 {
     node_t n;
@@ -76,13 +113,29 @@ static void test_generated_config(void)
     xraycfg_opts_t o;
     xraycfg_defaults(&o);
 
-    /* По умолчанию фрагментации нет: рабочая установка обходится без неё. */
-    CHECK(o.fragment == 0 && o.noise == 0, "по умолчанию выключены");
+    /* По умолчанию включены. Раньше было наоборот; решение поменялось
+       после сравнения с neofit, который умирал со временем ровно без
+       этих ручек. */
+    CHECK(o.fragment == 1 && o.noise == 1, "по умолчанию включены");
 
     CHECK(node_from_link(REALITY_LINK, &n, err, sizeof(err)) == 0, "разбор");
+
+    /* Выключенное состояние тоже обязано собираться: им меряют, во
+       сколько обходится фрагментация по скорости. */
+    o.fragment = 0;
+    o.noise    = 0;
     CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг без фрагментации");
     CHECK(strstr(cfg, "dialerProxy") == NULL, "нет ссылки на фрагментацию");
     CHECK(strstr(cfg, "\"tag\":\"fragment\"") == NULL, "нет лишнего исходящего");
+
+    /* Шум без фрагментации: исходящий нужен, но резать ClientHello в нём
+       нечего. Одно от другого не должно зависеть. */
+    o.noise = 1;
+    CHECK(xraycfg_build(&n, &o, cfg, sizeof(cfg)) == 0, "конфиг только с шумом");
+    CHECK(strstr(cfg, "\"tag\":\"fragment\"") != NULL, "исходящий для шума есть");
+    CHECK(strstr(cfg, "\"noises\"") != NULL, "шум записан");
+    CHECK(strstr(cfg, "\"packets\":\"tlshello\"") == NULL,
+          "фрагментации быть не должно");
 
     o.fragment = 1;
     o.noise    = 1;
@@ -170,6 +223,7 @@ int main(void)
     test_reality_link();
     test_defaults_and_errors();
     test_generated_config();
+    test_fingerprint();
     test_alpn_from_link();
     test_transports();
     test_small_buffer_fails();

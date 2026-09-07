@@ -155,6 +155,13 @@ h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.01em}
   box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sw.on{background:var(--acc)}
 .sw.on::after{transform:translateX(20px)}
+.dpi{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+.dpi .row{display:flex;gap:14px;align-items:flex-start}
+.dpi .row b{display:block;font-weight:600}
+.dpi .row i{display:block;color:var(--dim);font-style:normal;font-size:13.5px;
+  margin-top:3px;line-height:1.45}
+.dpi select.in{background:var(--soft);color:var(--fg);border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;font:inherit;font-size:14px;width:100%}
 .note{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:13.5px;
   margin-top:16px}
 .note svg{width:17px;height:17px;flex:0 0 auto}
@@ -656,6 +663,43 @@ function viewConn(){
            <span class="msg" id="m-nodes"></span></div>`}
   </div>
 
+  <div class="card"><h3>Устойчивость к DPI</h3>
+    <p>Ручки Xray, которые решают, доживёт ли туннель до следующего месяца.
+    Менеджер без них перестаёт работать со временем, хотя настройки при этом
+    выглядят исправными.</p>
+
+    <div class="dpi">
+      <div class="row">
+        <button class="sw ${D.fragment?'on':''}" data-dpi="fragment"></button>
+        <div><b>Фрагментация ClientHello</b>
+          <i>Приветствие TLS режется на части, и целевое имя не собирается
+          в один пакет. Стоит задержки на установке соединения.</i></div>
+      </div>
+      <div class="row">
+        <button class="sw ${D.noise?'on':''}" data-dpi="noise"></button>
+        <div><b>Шум в UDP</b>
+          <i>Мусорные пакеты перед основными, чтобы начало потока не
+          опознавалось по образцу.</i></div>
+      </div>
+      <div class="row">
+        <span style="width:44px"></span>
+        <div><b>Отпечаток uTLS</b>
+          <i>Каким браузером представляется соединение. Пусто — брать из
+          ссылки; панели почти всегда ставят туда chrome, а его подпись
+          распознают в первую очередь.</i>
+          <select id="dpi-fp" class="in" style="margin-top:8px;max-width:220px">
+            ${FPLIST.map(f=>`<option value="${f}"${(D.fingerprint||'')===f?' selected':''}>${f||'из ссылки'}</option>`).join('')}
+          </select></div>
+      </div>
+    </div>
+
+    <div class="bar" style="margin-top:14px">
+      <button class="b" id="dpi-save">Применить</button>
+      <span class="msg" id="m-dpi"></span></div>
+    <div class="note" style="margin-top:10px">${UI.i}Ядро перезапустится,
+      соединения оборвутся на секунду</div>
+  </div>
+
   <div class="card"><h3>DNS роутера</h3>
     <p>Маршрутизация по доменам опирается на DNS-ответы, которые роутер
     отдаёт сети. Если провайдерский резолвер подменяет адреса, в наборы
@@ -970,6 +1014,7 @@ async function loadDns(){
    только числа. */
 function sig(){
   return JSON.stringify([D.domains,D.nodes,D.nodes_shown,D.xray_bin,D.proxy_ready,
+    D.fragment,D.noise,D.fingerprint,
     D.policy_ready,D.have_link,D.model,D.osver,D.version,D.dns,D.capture,D.iface,
     D.rules,D.socks_port,D.policy_name,D.proxy_name,D.xray_pid>0]);
 }
@@ -1021,6 +1066,11 @@ async function save(what,text,msgId){
     return r.ok;
   }catch(e){ if(m){ m.className='msg bad'; m.textContent=e.message; } return false; }
 }
+
+/* Те же значения, что принимает служба: отпечаток уходит в конфиг ядра
+   как есть, поэтому список закрытый с обеих сторон. */
+const FPLIST=['','chrome','firefox','safari','edge','ios','android','random'];
+let dpi={};
 
 /* ---- выбор готового набора ---- */
 /* target задаётся, когда правила ещё нет: в текстовом виде правило без
@@ -1271,6 +1321,27 @@ document.addEventListener('click',async ev=>{
       }
       m.className='msg bad';
       m.textContent='ядро не появилось — смотри /opt/var/log/shadowfox-xray-install.log';
+    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    btn.disabled=false; return; }
+
+  const dpiSw=ev.target.closest('[data-dpi]');
+  if(dpiSw){ const k=dpiSw.dataset.dpi;
+    dpi[k]=!(k in dpi ? dpi[k] : D[k]);
+    dpiSw.classList.toggle('on', dpi[k]); return; }
+
+  if(ev.target.id==='dpi-save'){
+    const btn=ev.target, m=$('#m-dpi');
+    const frag=('fragment' in dpi)?dpi.fragment:!!D.fragment;
+    const noise=('noise' in dpi)?dpi.noise:!!D.noise;
+    const fp=$('#dpi-fp')?$('#dpi-fp').value:'';
+    btn.disabled=true; m.className='msg'; m.textContent='применяю…';
+    try{
+      const r=await fetch(api('/shaping?fragment='+(frag?1:0)+
+                             '&noise='+(noise?1:0)+'&fp='+encodeURIComponent(fp)),
+                          {method:'POST'});
+      const t=(await r.text()).trim();
+      m.className=r.ok?'msg ok':'msg bad'; m.textContent=t;
+      if(r.ok){ dpi={}; setTimeout(load,2500); }
     }catch(e){ m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 

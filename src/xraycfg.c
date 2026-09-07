@@ -20,16 +20,33 @@ void xraycfg_defaults(xraycfg_opts_t *o)
     memset(o, 0, sizeof(*o));
     o->listen     = "127.0.0.1";
     o->socks_port = 2080;
-    /* Фрагментация и шум выключены по умолчанию. Рабочая установка на
-       Keenetic обходится без них, а стоят они задержки и процессора.
-       Навязывать то, чего нет в работающей конфигурации, неправильно:
-       включаются флагом --fragment, когда провайдер этого требует. */
-    o->fragment   = 0;
-    o->noise      = 0;
+    /* Фрагментация и шум включены. Раньше было наоборот, из соображения
+       «рабочая установка обходится без них, а стоят они задержки». Опыт
+       показал обратное: neofit с тем же набором умолчаний переставал
+       работать через время, а HydraRoute, где эти ручки выведены на
+       каждый интерфейс, держится месяцами. Отключается через
+       fragment=no и noise=no в конфиге либо флагом --no-fragment. */
+    o->fragment   = 1;
+    o->noise      = 1;
+    o->fingerprint = "";
     o->sniffing   = 1;
     o->log_level  = "warning";
     o->probe_url  = "https://www.gstatic.com/generate_204";
     o->probe_interval = "5m";
+}
+
+/* Какой отпечаток uTLS объявлять.
+
+   Порядок такой: принудительный из конфига, затем пришедший в ссылке,
+   затем запасной. Запасной — firefox, а не chrome: chrome самый частый,
+   и именно его подпись DPI распознаёт в первую очередь. Принудительный
+   нужен потому, что панель обычно проставляет fp прямо в ссылку, и без
+   перекрытия сменить его было бы негде. */
+static const char *pick_fingerprint(const node_t *n, const xraycfg_opts_t *o)
+{
+    if (o->fingerprint && o->fingerprint[0]) return o->fingerprint;
+    if (n->fingerprint[0])                   return n->fingerprint;
+    return "firefox";
 }
 
 static void build_inbound(json_t *j, const xraycfg_opts_t *o)
@@ -85,15 +102,13 @@ static void build_stream(json_t *j, const node_t *n, const xraycfg_opts_t *o)
         json_kv_str(j, "spiderX", n->spider_x[0] ? n->spider_x : "/");
         /* Отпечаток берём из ссылки. Подставлять свой нельзя: сервер
            ожидает конкретный, и расхождение видно снаружи. */
-        json_kv_str(j, "fingerprint",
-                    n->fingerprint[0] ? n->fingerprint : "chrome");
+        json_kv_str(j, "fingerprint", pick_fingerprint(n, o));
         json_obj_close(j);
     } else if (strcmp(n->security, "tls") == 0) {
         json_key(j, "tlsSettings");
         json_obj_open(j);
         if (n->sni[0]) json_kv_str(j, "serverName", n->sni);
-        json_kv_str(j, "fingerprint",
-                    n->fingerprint[0] ? n->fingerprint : "chrome");
+        json_kv_str(j, "fingerprint", pick_fingerprint(n, o));
         /* alpn пишем только если он пришёл в ссылке. neofit прописывал
            ["h2","http/1.1"] всегда, рассогласуя ALPN с отпечатком uTLS. */
         if (n->alpn[0]) json_kv_str_list(j, "alpn", n->alpn, ',');
@@ -134,7 +149,7 @@ static void build_stream(json_t *j, const node_t *n, const xraycfg_opts_t *o)
 
     /* Фрагментация делается отдельным исходящим, а трафик узла
        направляется через него. Своего поля fragment у vless нет. */
-    if (o->fragment) {
+    if (o->fragment || o->noise) {
         json_key(j, "sockopt");
         json_obj_open(j);
         json_kv_str(j, "dialerProxy", TAG_FRAGMENT);
@@ -183,12 +198,16 @@ static void build_fragment_outbound(json_t *j, const xraycfg_opts_t *o)
     json_key(j, "settings");
     json_obj_open(j);
 
-    json_key(j, "fragment");
-    json_obj_open(j);
-    json_kv_str(j, "packets", "tlshello");
-    json_kv_str(j, "length", "100-200");
-    json_kv_str(j, "interval", "10-20");
-    json_obj_close(j);
+    /* Одно без другого включается из конфига, поэтому каждое поле
+       пишется по своему условию, а не по факту вызова. */
+    if (o->fragment) {
+        json_key(j, "fragment");
+        json_obj_open(j);
+        json_kv_str(j, "packets", "tlshello");
+        json_kv_str(j, "length", "100-200");
+        json_kv_str(j, "interval", "10-20");
+        json_obj_close(j);
+    }
 
     if (o->noise) {
         json_key(j, "noises");
@@ -249,7 +268,7 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
         snprintf(tag, sizeof(tag), PROXY_PREFIX "%d", i);
         build_proxy_outbound(&j, &l->items[i], o, tag);
     }
-    if (o->fragment) build_fragment_outbound(&j, o);
+    if (o->fragment || o->noise) build_fragment_outbound(&j, o);
 
     json_obj_open(&j);
     json_kv_str(&j, "tag", TAG_DIRECT);

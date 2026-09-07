@@ -20,6 +20,12 @@ typedef struct {
     int         ipset_timeout;   /* секунд жизни записи в наборе, 0 — вечно */
     int         sni_capture;     /* читать имена из TLS ClientHello */
 
+    /* Устойчивость к DPI. Ровно те ручки, отсутствие которых, судя по
+       всему, и хоронило neofit со временем. */
+    int         fragment;        /* резать TLS ClientHello */
+    int         noise;           /* шум в UDP */
+    char        fingerprint[16]; /* перекрыть отпечаток uTLS, пусто — из ссылки */
+
     /* Свой экземпляр Xray и своё прокси-подключение в Keenetic. */
     char        policy[WL_NAME_MAX_CFG];      /* политика для своего прокси */
     char        proxy_iface[32];              /* Proxy1 и т.п. */

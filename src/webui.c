@@ -259,6 +259,10 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     else                  apply_find_xray(xbin, sizeof(xbin));
     json_kv_str(&j, "xray_bin", xbin);
 
+    json_kv_bool(&j, "fragment", cfg->fragment);
+    json_kv_bool(&j, "noise", cfg->noise);
+    json_kv_str(&j, "fingerprint", cfg->fingerprint);
+
     json_kv_str(&j, "policy_name", cfg->policy);
     json_kv_str(&j, "proxy_name", cfg->proxy_iface);
     json_kv_int(&j, "socks_port", cfg->socks_port);
@@ -622,6 +626,108 @@ static void apply_dns(const http_req_t *req, int fd)
     plan[count++] = "system configuration save";
 
     ndmc_run_plan(bin, plan, count, "серверы DNS установлены", req->peer, fd);
+}
+
+/* Меняет один ключ в файле конфига, сохраняя всё остальное.
+
+   Файл правится, а не переписывается целиком: в нём лежат и настройки,
+   которых страница не знает, и комментарии. Пишем во временный файл и
+   переименовываем — демон читает этот же файл по SIGHUP. */
+static int conf_set_key(const char *path, const char *key, const char *value)
+{
+    static char text[64 * 1024];
+    int         have = slurp(path, text, sizeof(text));
+    if (have < 0) have = 0;
+
+    char tmp[CFG_PATH_MAX + 40];
+    snprintf(tmp, sizeof(tmp), "%s.web", path);
+
+    FILE *f = fopen(tmp, "w");
+    if (!f) return -1;
+
+    size_t klen    = strlen(key);
+    int    written = 0;
+
+    char *save = NULL;
+    for (char *line = strtok_r(text, "\n", &save); line;
+         line = strtok_r(NULL, "\n", &save)) {
+
+        const char *t = line;
+        while (*t == ' ' || *t == '\t') t++;
+
+        if (!strncasecmp(t, key, klen) && t[klen] == '=') {
+            fprintf(f, "%s=%s\n", key, value);
+            written = 1;
+            continue;
+        }
+        fprintf(f, "%s\n", line);
+    }
+
+    if (!written) fprintf(f, "%s=%s\n", key, value);
+
+    int bad = ferror(f);
+    fclose(f);
+
+    if (bad || rename(tmp, path) != 0) {
+        unlink(tmp);
+        return -1;
+    }
+    return 0;
+}
+
+/* Ручки устойчивости к DPI. Их отсутствие, судя по сравнению с neofit,
+   и есть та разница, из-за которой один менеджер работает месяцами, а
+   другой перестаёт через время. Отпечаток перекрывается отдельно:
+   панели проставляют его прямо в ссылку, и сменить его больше негде. */
+static void apply_shaping(const http_req_t *req, int fd, const config_t *cfg)
+{
+    char frag[8] = "", noise[8] = "", fp[16] = "";
+
+    http_query_get(req, "fragment", frag,  sizeof(frag));
+    http_query_get(req, "noise",    noise, sizeof(noise));
+    http_query_get(req, "fp",       fp,    sizeof(fp));
+
+    /* Отпечаток идёт в конфиг ядра как есть, поэтому принимаем только
+       известные значения, а не любую строку из запроса. */
+    static const char *FPS[] = {
+        "", "chrome", "firefox", "safari", "edge", "ios", "android",
+        "random", "randomized", NULL
+    };
+    int fp_ok = 0;
+    for (int i = 0; FPS[i]; i++)
+        if (!strcmp(fp, FPS[i])) { fp_ok = 1; break; }
+
+    if (!fp_ok) {
+        http_send_text(fd, 400, "text/plain; charset=utf-8",
+                       "неизвестный отпечаток\n");
+        return;
+    }
+
+    int ok = 1;
+    if (frag[0])
+        ok &= conf_set_key(cfg->conf_file, "fragment",
+                           frag[0] == '1' ? "yes" : "no") == 0;
+    if (noise[0])
+        ok &= conf_set_key(cfg->conf_file, "noise",
+                           noise[0] == '1' ? "yes" : "no") == 0;
+    ok &= conf_set_key(cfg->conf_file, "fingerprint", fp) == 0;
+
+    if (!ok) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8",
+                       "не записать конфиг\n");
+        return;
+    }
+
+    log_info("веб: фрагментация %s, шум %s, отпечаток «%s», запрос с %s",
+             frag[0] == '1' ? "вкл" : "выкл", noise[0] == '1' ? "вкл" : "выкл",
+             fp, req->peer);
+
+    /* Перечитывание делает главный цикл: он же пересоберёт конфиг ядра
+       и перезапустит его с новыми настройками. */
+    kill(getpid(), SIGHUP);
+
+    http_send_text(fd, 200, "text/plain; charset=utf-8",
+                   "сохранено, ядро перезапускается\n");
 }
 
 /* Своё подключение на роутере: прокси-клиент SOCKS5, смотрящий в наше
@@ -1276,6 +1382,11 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/proxy") && !strcmp(req->method, "POST")) {
         apply_proxy(req, fd, c->cfg);
+        return;
+    }
+
+    if (!strcmp(req->path, "/shaping") && !strcmp(req->method, "POST")) {
+        apply_shaping(req, fd, c->cfg);
         return;
     }
 

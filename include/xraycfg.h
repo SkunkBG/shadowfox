@@ -11,6 +11,7 @@ typedef struct {
     int  socks_port;      /* локальный вход, к которому цепляется Proxy0 */
     int  fragment;        /* резать TLS ClientHello */
     int  noise;           /* добавлять шум в UDP */
+    const char *fingerprint;  /* перекрыть отпечаток uTLS, "" — из ссылки */
     int  sniffing;        /* определять домен для маршрутизации */
     const char *log_level;
     const char *probe_url;      /* чем балансировщик меряет задержку */

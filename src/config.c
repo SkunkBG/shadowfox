@@ -34,6 +34,10 @@ void config_defaults(config_t *cfg)
        Выключатель оставлен на случай, когда захват на 443 мешает. */
     cfg->sni_capture   = 1;
 
+    /* Включены по умолчанию: см. комментарий в xraycfg_defaults. */
+    cfg->fragment      = 1;
+    cfg->noise         = 1;
+
     cfg->web_enabled = 1;
     /* 2000 занят hrweb, 8080 у MagiTrickle, 92 был у neofit. */
     cfg->web_port    = 8090;
@@ -153,6 +157,21 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "ipsetTimeout")) {
         cfg->ipset_timeout = atoi(value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "fragment")) {
+        cfg->fragment = parse_bool(value, cfg->fragment);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "noise")) {
+        cfg->noise = parse_bool(value, cfg->noise);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "fingerprint")) {
+        str_copy(cfg->fingerprint, sizeof(cfg->fingerprint), value);
         return 0;
     }
 
@@ -339,10 +358,20 @@ int config_write_default(const char *path)
         "# видит перехват DNS: тёплый кеш устройства, свой DoH у клиента,\n"
         "# зашитый в приложении адрес. Требует пакет conntrack, чтобы\n"
         "# оборвать соединение, успевшее уйти мимо туннеля.\n"
-        "sniCapture=%s\n",
+        "sniCapture=%s\n"
+        "\n"
+        "# Устойчивость к DPI. fragment режет TLS ClientHello, noise\n"
+        "# добавляет шум в UDP. fingerprint перекрывает отпечаток uTLS из\n"
+        "# ссылки: панели обычно проставляют chrome, а его подпись\n"
+        "# распознают в первую очередь. Пусто — брать из ссылки.\n"
+        "fragment=%s\n"
+        "noise=%s\n"
+        "fingerprint=%s\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.nodes_file, cfg.xray_config, cfg.socks_port,
-        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no");
+        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no",
+        cfg.fragment ? "yes" : "no", cfg.noise ? "yes" : "no",
+        cfg.fingerprint);
 
     fclose(f);
     return 0;
