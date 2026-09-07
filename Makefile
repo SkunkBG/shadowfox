@@ -105,6 +105,7 @@ $(BUILD)/$(PROJECT): src/webpage.c $(SRCS) $(wildcard include/*.h) Makefile
 check: native
 	@mkdir -p $(BUILD)
 	sh tools/check-login-js.sh
+	sh tools/check-update-script.sh
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_config.c \
 		src/config.c src/util.c src/log.c -o $(BUILD)/check_config
 	./$(BUILD)/check_config

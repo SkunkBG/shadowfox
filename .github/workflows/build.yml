@@ -115,8 +115,22 @@ jobs:
               echo "выпуска xray пока нет — фид будет без ядра" >&2
           fi
 
+      # Закрытый ключ подписи фида живёт только в секрете репозитория.
+      # Без него фид собирается, но роутер его не примет: shadowfox-update
+      # проверяет подпись индекса. Пишем ключ во временный файл вне
+      # рабочего каталога и стираем сразу после сборки.
       - name: Собрать пакеты и фид
-        run: make feed REVISION=${{ github.run_number }}
+        env:
+          SIGN_KEY: ${{ secrets.SIGN_KEY }}
+        run: |
+          if [ -z "$SIGN_KEY" ]; then
+              echo "::error title=Нет секрета SIGN_KEY::фид останется без подписи, роутер его не примет"
+              exit 1
+          fi
+          keyfile=$(mktemp)
+          printf '%s\n' "$SIGN_KEY" > "$keyfile"
+          trap 'rm -f "$keyfile"' EXIT
+          SIGN_KEY_FILE="$keyfile" make feed REVISION=${{ github.run_number }}
 
       - uses: actions/upload-artifact@v4
         with:

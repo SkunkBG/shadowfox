@@ -103,6 +103,13 @@ static void test_balancer_appears_only_for_many(void)
     CHECK(strstr(cfg, "observatory") == NULL, "и наблюдателя тоже нет");
     CHECK(strstr(cfg, "\"outboundTag\":\"proxy-0\"") != NULL,
           "правило указывает прямо на узел");
+    CHECK(strstr(cfg, "\"error\"") == NULL, "без error_log ядро не пишет журнал");
+
+    o.error_log = "/tmp/x.log";
+    CHECK(xraycfg_build_list(&one, &o, cfg, sizeof(cfg)) == 0, "конфиг с журналом");
+    CHECK(strstr(cfg, "\"error\":\"/tmp/x.log\"") != NULL, "путь журнала ошибок");
+    CHECK(strstr(cfg, "\"maskAddress\":\"half\"") != NULL, "адреса в журнале маскируются");
+    o.error_log = NULL;
 
     nodelist_t many;
     nodelist_init(&many);

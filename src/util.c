@@ -138,3 +138,35 @@ int iface_ipv4(const char *iface, char *dst, size_t dst_size)
     freeifaddrs(list);
     return found;
 }
+
+int file_tail(const char *path, char *last, size_t size, long *lines)
+{
+    if (last && size) last[0] = '\0';
+    if (lines) *lines = 0;
+
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+
+    /* Читаем кусками: строка длиннее буфера приходит частями. Считаем
+       строку по её началу — так и длинная считается один раз, и
+       последняя без перевода строки не теряется, а пустые не в счёт.
+       Запоминаем первый кусок, чтобы в хвосте была голова строки. */
+    char chunk[512];
+    long n = 0;
+    int  at_start = 1;
+
+    while (fgets(chunk, sizeof(chunk), f)) {
+        size_t len = strlen(chunk);
+
+        if (at_start && chunk[0] != '\n') {
+            n++;
+            if (last && size) str_copy(last, size, chunk);
+        }
+        at_start = len && chunk[len - 1] == '\n';
+    }
+    fclose(f);
+
+    if (last && size) str_trim(last);
+    if (lines) *lines = n;
+    return 1;
+}

@@ -63,6 +63,7 @@ for arch in "$@"; do
     mkdir -p "$STAGE/data/opt/bin"
     cp "$BIN" "$STAGE/data/opt/bin/$PROJECT"
     chmod 0755 "$STAGE/data/opt/bin/$PROJECT"
+    chmod 0755 "$STAGE/data/opt/sbin/shadowfox-update"
 
     SIZE=$(dir_size "$STAGE/data")
 

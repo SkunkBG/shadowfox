@@ -1,3 +1,4 @@
+#include "shadowfox.h"
 #include "engine.h"
 #include "apply.h"
 #include "log.h"
@@ -569,6 +570,7 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     o.socks_port  = cfg->socks_port;
     o.fragment    = cfg->fragment;
     o.fingerprint = cfg->fingerprint;
+    o.error_log   = XRAY_ERROR_LOG;
 
     static char json[256 * 1024];
     if (xraycfg_build_list(&list, &o, json, sizeof(json)) != 0) {

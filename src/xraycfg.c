@@ -266,6 +266,12 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
     /* Без этого ядро форматирует строку с адресом назначения на каждое
        соединение — впустую, вывод всё равно уходит в /dev/null. */
     json_kv_str(&j, "access", "none");
+    if (o->error_log && o->error_log[0]) {
+        json_kv_str(&j, "error", o->error_log);
+        /* В ошибках ядро печатает адреса клиентов и назначения. Нам для
+           диагноза хватает половины: видно сеть, не видно устройство. */
+        json_kv_str(&j, "maskAddress", "half");
+    }
     json_obj_close(&j);
 
     if (balanced) {

@@ -24,6 +24,7 @@
 #include "jsonw.h"
 #include "log.h"
 #include "rci.h"
+#include "shadowfox.h"
 #include "util.h"
 #include "watchlist.h"
 
@@ -205,6 +206,17 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     else                  apply_find_xray(xbin, sizeof(xbin));
     json_kv_str(&j, "xray_bin", xbin);
     json_kv_str(&j, "xray_version", e->xray_version);
+
+    /* Журнал ошибок ядра: число и последняя строка. Адреса в ней ядро
+       уже маскирует само (maskAddress). */
+    {
+        char last[200];
+        long lines = 0;
+        file_tail(XRAY_ERROR_LOG, last, sizeof(last), &lines);
+        json_kv_int(&j, "xray_errors", (int)(lines > 1000000 ? 1000000 : lines));
+        json_kv_str(&j, "xray_last_error", last);
+        json_kv_str(&j, "xray_error_log", XRAY_ERROR_LOG);
+    }
 
     json_kv_bool(&j, "fragment", cfg->fragment);
     json_kv_str(&j, "fingerprint", cfg->fingerprint);
@@ -788,20 +800,16 @@ static void apply_policy(const http_req_t *req, int fd, const config_t *cfg)
 
 /* ---- обновление пакета ---- */
 
-static const char *OPKG_CANDIDATES[] = {
-    "/opt/bin/opkg", "/opt/sbin/opkg", "/bin/opkg", "/usr/bin/opkg", NULL
-};
+/* Всё, что ходит за пакетами, делает shadowfox-update: он проверяет
+   подпись индекса фида и SHA-256 пакета и только потом зовёт opkg.
+   Демон сам opkg не запускает — иначе получилась бы вторая дорога в
+   обход проверки. Скрипт ставится нашим же пакетом, но проверяем,
+   что он на месте: без него честнее сказать «не найден», чем молчать. */
+#define UPDATER "/opt/sbin/shadowfox-update"
 
-static int opkg_path(char *dst, unsigned size)
+static int updater_ok(void)
 {
-    for (int i = 0; OPKG_CANDIDATES[i]; i++) {
-        if (access(OPKG_CANDIDATES[i], X_OK) == 0) {
-            str_copy(dst, size, OPKG_CANDIDATES[i]);
-            return 1;
-        }
-    }
-    dst[0] = '\0';
-    return 0;
+    return access(UPDATER, X_OK) == 0;
 }
 
 /* Запуск, переживающий смерть родителя. Обновление снимает демона
@@ -856,22 +864,18 @@ static int spawn_detached(const char *command)
 
 static time_t g_update_launched;
 
-static void launch_update_check(const char *bin)
+static void launch_update_check(void)
 {
-    /* 768: путь к opkg подставляется дважды, по 192 байта каждый, плюс
-       три пути к файлу — по расчёту компилятора 512 не хватает. */
-    char cmd[768];
+    char cmd[512];
     snprintf(cmd, sizeof(cmd),
-             "{ %s update >/dev/null 2>&1; %s list-upgradable 2>&1; "
-             "echo '## done'; } > %s.tmp && mv %s.tmp %s",
-             bin, bin, UPDATE_FILE, UPDATE_FILE, UPDATE_FILE);
+             "{ " UPDATER " check 2>&1; echo '## done'; } > %s.tmp && mv %s.tmp %s",
+             UPDATE_FILE, UPDATE_FILE, UPDATE_FILE);
     spawn_detached(cmd);
     g_update_launched = time(NULL);
 }
 
 static void check_update(const http_req_t *req, int fd)
 {
-    char bin[192] = "";
     char buf[2048];
     json_t j;
 
@@ -879,10 +883,10 @@ static void check_update(const http_req_t *req, int fd)
     json_obj_open(&j);
     json_kv_str(&j, "current", VERSION);
 
-    if (!opkg_path(bin, sizeof(bin))) {
+    if (!updater_ok()) {
         json_kv_bool(&j, "ok", 0);
         json_kv_bool(&j, "pending", 0);
-        json_kv_str(&j, "why", "opkg не найден");
+        json_kv_str(&j, "why", "нет " UPDATER);
         json_kv_str(&j, "available", "");
         json_obj_close(&j);
         if (json_done(&j) == 0)
@@ -902,30 +906,36 @@ static void check_update(const http_req_t *req, int fd)
        довольствуется свежим результатом. */
     int want_launch = (force[0] == '1') || !fresh;
     if (want_launch && now - g_update_launched >= UPDATE_GUARD) {
-        launch_update_check(bin);
+        launch_update_check();
         have = 0;   /* прежний ответ больше не показываем */
     }
 
     static char out[16 * 1024];
-    int  ok = 0;
+    int  ok = 0, failed = 0;
     char available[64] = "";
+    char why[256]      = "проверка ещё идёт";
 
+    /* Скрипт пишет строки вида available=…, xray=…, error=…. Версия в
+       фиде та же, что стоит, — значит, обновления нет: пустое поле. */
     if (have && slurp(UPDATE_FILE, out, sizeof(out)) > 0 && strstr(out, "## done")) {
         ok = 1;
+        why[0] = '\0';
         for (char *line = strtok(out, "\n"); line; line = strtok(NULL, "\n")) {
             char *t = str_trim(line);
-            if (strncmp(t, "shadowfox ", 10) != 0) continue;
-
-            /* Формат: «shadowfox - старая - новая». Берём последнее поле. */
-            char *last = strrchr(t, ' ');
-            if (last) str_copy(available, sizeof(available), last + 1);
-            break;
+            if (strncmp(t, "available=", 10) == 0) {
+                if (strcmp(t + 10, VERSION) != 0)
+                    str_copy(available, sizeof(available), t + 10);
+            } else if (strncmp(t, "error=", 6) == 0) {
+                ok = 0;
+                failed = 1;
+                str_copy(why, sizeof(why), t + 6);
+            }
         }
     }
 
     json_kv_bool(&j, "ok", ok);
-    json_kv_bool(&j, "pending", !ok && now - g_update_launched < 120);
-    json_kv_str(&j, "why", ok ? "" : "проверка ещё идёт");
+    json_kv_bool(&j, "pending", !ok && !failed && now - g_update_launched < 120);
+    json_kv_str(&j, "why", why);
     json_kv_str(&j, "available", available);
     json_obj_close(&j);
 
@@ -938,16 +948,15 @@ static void check_update(const http_req_t *req, int fd)
 
 static void do_update(const http_req_t *req, int fd)
 {
-    char bin[192] = "";
-    if (!opkg_path(bin, sizeof(bin))) {
-        http_send_text(fd, 500, "text/plain; charset=utf-8", "opkg не найден\n");
+    if (!updater_ok()) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "нет " UPDATER "\n");
         return;
     }
 
     char command[512];
     snprintf(command, sizeof(command),
-             "sleep 1; { date; %s update; %s upgrade shadowfox; date; } > %s 2>&1",
-             bin, bin, UPDATE_LOG);
+             "sleep 1; { date; " UPDATER " upgrade; date; } > %s 2>&1",
+             UPDATE_LOG);
 
     if (spawn_detached(command) != 0) {
         http_send_text(fd, 500, "text/plain; charset=utf-8", "не запустить\n");
@@ -966,16 +975,15 @@ static void do_update(const http_req_t *req, int fd)
    ловить DNS. Страница ждёт появления ядра, спрашивая состояние. */
 static void install_xray(const http_req_t *req, int fd)
 {
-    char bin[192] = "";
-    if (!opkg_path(bin, sizeof(bin))) {
-        http_send_text(fd, 500, "text/plain; charset=utf-8", "opkg не найден\n");
+    if (!updater_ok()) {
+        http_send_text(fd, 500, "text/plain; charset=utf-8", "нет " UPDATER "\n");
         return;
     }
 
     char command[512];
     snprintf(command, sizeof(command),
-             "sleep 1; { date; %s update; %s install shadowfox-xray; date; } > %s 2>&1",
-             bin, bin, XRAY_LOG);
+             "sleep 1; { date; " UPDATER " install shadowfox-xray; date; } > %s 2>&1",
+             XRAY_LOG);
 
     if (spawn_detached(command) != 0) {
         http_send_text(fd, 500, "text/plain; charset=utf-8", "не запустить\n");

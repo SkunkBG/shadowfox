@@ -1,7 +1,7 @@
 Package: @PKG@
 Version: @VERSION@
 Architecture: @ARCH@
-Depends: libc, ipset, iptables, ip-full, conntrack
+Depends: libc, ipset, iptables, ip-full, conntrack, openssl-util
 Installed-Size: @INSTALLED_SIZE@
 Maintainer: @MAINTAINER@
 Section: net

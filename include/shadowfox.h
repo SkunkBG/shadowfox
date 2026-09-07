@@ -15,4 +15,11 @@
 #define DEFAULT_PID_FILE    "/opt/var/run/shadowfoxd.pid"
 #define DEFAULT_LOG_FILE    "/opt/var/log/shadowfoxd.log"
 
+/* Ошибки ядра. На tmpfs, а не на флешке: ядро пишет их само, по строке
+   на каждое неудачное соединение, и на USB-накопителе это была бы
+   ежедневная порция записи ни за что. После перезагрузки файл пуст —
+   это ожидаемо, нам нужны последние ошибки, а не история. */
+#define XRAY_ERROR_LOG      "/tmp/shadowfox-xray.log"
+#define XRAY_ERROR_LOG_CAP  (256 * 1024)   /* сверх этого — обрезаем */
+
 #endif /* SHADOWFOX_H */

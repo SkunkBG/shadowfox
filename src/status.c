@@ -287,6 +287,15 @@ int status_print(const config_t *cfg)
                xpid, status_num(spath, "socks"));
         long r = status_num(spath, "xray_restarts");
         if (r > 0) printf("              перезапусков: %ld\n", r);
+
+        char last[200];
+        long lines = 0;
+        if (file_tail(XRAY_ERROR_LOG, last, sizeof(last), &lines) && lines > 0) {
+            printf("              ошибок в журнале: %ld (%s)\n", lines, XRAY_ERROR_LOG);
+            printf("              последняя: %s\n", last);
+        } else {
+            printf("              ошибок в журнале: нет\n");
+        }
     } else {
         printf("  своё ядро:  не запущено (нет %s?)\n", cfg->nodes_file);
     }

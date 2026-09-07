@@ -1,4 +1,5 @@
 #include "supervise.h"
+#include "shadowfox.h"
 #include "log.h"
 #include "util.h"
 
@@ -7,6 +8,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -34,6 +36,15 @@ int sv_start(sv_t *sv)
     if (access(sv->config, R_OK) != 0) {
         log_error("не прочитать конфиг %s: %s", sv->config, strerror(errno));
         return -1;
+    }
+
+    /* Журнал ошибок ядра растёт без нас: ядро дописывает его само.
+       Обрезаем не при каждом запуске — иначе после падения нечего
+       читать, — а когда он перерос предел. tmpfs не резиновая. */
+    struct stat lst;
+    if (stat(XRAY_ERROR_LOG, &lst) == 0 && lst.st_size > XRAY_ERROR_LOG_CAP) {
+        int lfd = open(XRAY_ERROR_LOG, O_WRONLY | O_TRUNC | O_NOFOLLOW);
+        if (lfd >= 0) close(lfd);
     }
 
     pid_t pid = fork();

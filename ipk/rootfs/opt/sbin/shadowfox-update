@@ -1,0 +1,124 @@
+#!/bin/sh
+# Проверенное обновление Shadow Fox.
+#
+# opkg не умеет проверять подпись одного фида, не проверяя все: у Entware
+# индексы не подписаны, и включить проверку в самом opkg значило бы
+# сломать его обновления. Поэтому проверяем сами: индекс нашего фида
+# подписан Ed25519, пакет сверяется по SHA-256 из подписанного индекса,
+# и только потом отдаётся opkg как локальный файл. Открытый ключ вшит
+# сюда: первая установка доверяет TLS, каждое обновление — подписи.
+# Ручной «opkg upgrade shadowfox» подпись не проверяет — это путь мимо.
+#
+#   shadowfox-update check                 -> available=… / xray=… / error=…
+#   shadowfox-update upgrade               обновить shadowfox
+#   shadowfox-update install shadowfox-xray
+set -u
+
+# SF_*: только для проверок в tools/check-update-script.sh.
+CONF=${SF_CONF:-/opt/etc/opkg/shadowfox.conf}
+TMP=${SF_TMP:-/opt/tmp}
+
+PUBKEY='-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAhBse0dtgVp/dS9eeYEXvpR6g/k3EwMuZMeNIT+8j9h8=
+-----END PUBLIC KEY-----'
+
+# Сначала Entware: демон запускает нас с PATH, где /opt/bin впереди,
+# но и при ручном запуске из прошивочного шелла нужен именно opkg и
+# openssl из Entware, а не что попало.
+find_bin() {
+    for p in /opt/bin /opt/sbin; do
+        [ -x "$p/$1" ] && { echo "$p/$1"; return 0; }
+    done
+    command -v "$1" 2>/dev/null
+}
+
+WGET=$(find_bin wget)    || WGET=""
+OPENSSL=${SF_OPENSSL:-$(find_bin openssl)} || OPENSSL=""
+OPKG=${SF_OPKG:-$(find_bin opkg)} || OPKG=""
+
+# Ошибка идёт в stderr: stdout у get_index занят адресом фида, и демон
+# читает оба потока вместе.
+die() { echo "error=$*" >&2; exit 1; }
+
+feed_url() {
+    [ -f "$CONF" ] || die "нет $CONF — фид не подключён"
+    sed -n 's#^src/gz shadowfox \(.*\)$#\1#p' "$CONF" | head -1
+}
+
+# file:// нужен проверкам: настоящий фид всегда https.
+fetch() {
+    case "$1" in
+        file://*) cp "${1#file://}" "$2" 2>/dev/null ;;
+        *)        [ -n "$WGET" ] || die "нет wget-ssl"
+                  "$WGET" -q -T 30 -O "$2" "$1" 2>/dev/null ;;
+    esac
+}
+
+field() {   # файл пакет поле
+    awk -v p="$2" -v f="$3:" '$1=="Package:"{cur=$2} cur==p && $1==f {print $2; exit}' "$1"
+}
+
+# Скачивает и проверяет индекс. Оставляет $WORK/Packages.
+get_index() {
+    [ -n "$OPENSSL" ] || die "нет openssl-util — подпись проверить нечем"
+    url=$(feed_url)
+    [ -n "$url" ] || die "в $CONF нет строки src/gz shadowfox"
+
+    fetch "$url/Packages"     "$WORK/Packages"     || die "не скачать индекс фида"
+    fetch "$url/Packages.sig" "$WORK/Packages.sig" || die "у фида нет подписи индекса"
+
+    printf '%s\n' "$PUBKEY" > "$WORK/pub.pem"
+    [ -n "${SF_PUBKEY_FILE:-}" ] && cp "$SF_PUBKEY_FILE" "$WORK/pub.pem"
+
+    "$OPENSSL" pkeyutl -verify -pubin -inkey "$WORK/pub.pem" -rawin \
+        -in "$WORK/Packages" -sigfile "$WORK/Packages.sig" >/dev/null 2>&1 \
+        || die "подпись индекса не сошлась — фид подменён или ключ другой"
+    echo "$url"
+}
+
+# Всё тело — в функции, а последняя строка — exit. Иначе при обновлении
+# shadowfox opkg перепишет этот самый файл, пока sh читает его построчно,
+# и остаток выполнится уже из новой версии с произвольного места.
+main() {
+WORK=$(mktemp -d "$TMP/sfupd.XXXXXX" 2>/dev/null) || WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+case "${1:-}" in
+check)
+    get_index >/dev/null || exit 1
+    v=$(field "$WORK/Packages" shadowfox Version)
+    x=$(field "$WORK/Packages" shadowfox-xray Version)
+    echo "available=${v:-}"
+    echo "xray=${x:-}"
+    echo "verified=1"
+    ;;
+
+upgrade|install)
+    pkg=${2:-shadowfox}
+    [ "$1" = upgrade ] && pkg=shadowfox
+    [ -n "$OPKG" ] || die "нет opkg"
+
+    url=$(get_index) || exit 1
+    file=$(field "$WORK/Packages" "$pkg" Filename)
+    sum=$(field "$WORK/Packages" "$pkg" SHA256sum)
+    ver=$(field "$WORK/Packages" "$pkg" Version)
+    [ -n "$file" ] && [ -n "$sum" ] || die "в индексе нет пакета $pkg с SHA256sum"
+
+    fetch "$url/$file" "$WORK/$file" || die "не скачать $file"
+    got=$("$OPENSSL" dgst -sha256 -r "$WORK/$file" | cut -d' ' -f1)
+    [ "$got" = "$sum" ] || die "SHA-256 пакета не совпал с подписанным индексом"
+
+    echo "verified=$pkg $ver"
+    # Зависимости opkg берёт из своих списков; обновим их, это не наш индекс.
+    "$OPKG" update >/dev/null 2>&1 || true
+    "$OPKG" install "$WORK/$file" 2>&1
+    ;;
+
+*)
+    echo "использование: shadowfox-update check | upgrade | install <пакет>" >&2
+    exit 2
+    ;;
+esac
+}
+
+main "$@"; exit $?

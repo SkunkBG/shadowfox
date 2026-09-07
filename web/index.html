@@ -889,6 +889,11 @@ function viewInfo(){
       <p style="margin:0">Отдельный процесс Shadow Fox на порту ${D.socks_port}</p>
       ${D.xray_version?`<div class="kv" style="margin-top:10px"><span>Версия ядра</span>
         <span><b>${esc(D.xray_version)}</b></span></div>`:''}
+      ${core?`<div class="kv"><span>Ошибок в журнале</span>
+        <span><b>${D.xray_errors||0}</b></span></div>`:''}
+      ${D.xray_last_error?`<div class="note" style="margin-top:8px;word-break:break-all">${UI.i}
+        Последняя: <code>${esc(D.xray_last_error)}</code><br>
+        Журнал целиком: <code>${esc(D.xray_error_log)}</code> на роутере, очищается перезагрузкой.</div>`:''}
     </div>
   </div>
 
@@ -1038,7 +1043,7 @@ function draw(){
 function updBox(){
   if(!updInfo) return UI.i+'Спрашиваю у opkg…';
   if(updInfo.pending) return UI.i+'Проверка идёт, это до минуты';
-  if(!updInfo.ok) return UI.i+'Не проверить: '+esc(updInfo.why||'opkg молчит');
+  if(!updInfo.ok) return UI.i+'Не проверить: '+esc(updInfo.why||'нет ответа');
   if(!updInfo.available) return UI.ok+'Установлена последняя версия';
   return UI.i+'Доступна версия <b>'+esc(updInfo.available)+'</b>';
 }

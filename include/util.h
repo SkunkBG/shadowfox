@@ -27,4 +27,8 @@ int   pidfile_read_alive(const char *path);
    Возвращает 1 при успехе. */
 int   iface_ipv4(const char *iface, char *dst, size_t dst_size);
 
+/* Сводка журнала: сколько строк и какая последняя (не пустая). Длинную
+   строку обрезает по размеру last. Возвращает 0, если файла нет. */
+int   file_tail(const char *path, char *last, size_t size, long *lines);
+
 #endif /* SHADOWFOX_UTIL_H */

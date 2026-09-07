@@ -160,9 +160,44 @@ static void test_args_survive_reload(void)
     CHECK(config_apply_args(&c2, 3, bad) != 0, "неизвестный флаг отвергнут");
 }
 
+static void test_file_tail(void)
+{
+    char path[] = "/tmp/sf-tail-XXXXXX";
+    int  fd = mkstemp(path);
+    CHECK(fd >= 0, "временный файл");
+
+    char last[64];
+    long lines = 99;
+
+    CHECK(file_tail("/nonexistent/sf", last, sizeof(last), &lines) == 0, "нет файла — 0");
+    CHECK(lines == 0 && last[0] == '\0', "нет файла — пусто");
+
+    CHECK(file_tail(path, last, sizeof(last), &lines) == 1, "пустой файл есть");
+    CHECK(lines == 0 && last[0] == '\0', "пустой файл — 0 строк");
+
+    const char *body = "первая\nвторая\n\nтретья длинная";
+    CHECK(write(fd, body, strlen(body)) > 0, "запись");
+    CHECK(file_tail(path, last, sizeof(last), &lines) == 1, "читается");
+    CHECK(lines == 3, "пустая строка не считается, хвост без \\n считается");
+    CHECK(strcmp(last, "третья длинная") == 0, "последняя строка");
+
+    /* Строка длиннее буфера чтения считается один раз. */
+    char big[1500];
+    memset(big, 'x', sizeof(big) - 1);
+    big[sizeof(big) - 1] = '\n';
+    CHECK(write(fd, "\n", 1) == 1 && write(fd, big, sizeof(big)) > 0, "длинная строка");
+    CHECK(file_tail(path, last, sizeof(last), &lines) == 1, "читается снова");
+    CHECK(lines == 4, "длинная строка — одна");
+    CHECK(strlen(last) == sizeof(last) - 1 && last[0] == 'x', "хвост обрезан по буферу");
+
+    close(fd);
+    unlink(path);
+}
+
 int main(void)
 {
     printf("check_config " VERSION "\n");
+    test_file_tail();
 
     test_str_trim();
     test_str_copy();
