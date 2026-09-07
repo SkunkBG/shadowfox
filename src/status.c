@@ -158,36 +158,23 @@ static long ipset_count(const char *bin, const char *set)
 
 static void print_rule_counters(const rt_t *rt)
 {
-    char binbuf[RT_BIN_MAX];
-    str_copy(binbuf, sizeof(binbuf), rt->iptables);
+    unsigned long marked = 0, restored = 0;
 
-    char t[] = "-t", mangle[] = "mangle", L[] = "-L";
-    char chain[] = RT_CHAIN, v[] = "-v", n[] = "-n", x[] = "-x";
-
-    char *argv[] = { binbuf, t, mangle, L, chain, v, n, x, NULL };
-    char  out[4096];
-
-    if (proc_run(argv, out, sizeof(out), 5) != 0) {
+    if (rt_counters(rt, &marked, &restored) != 0) {
         printf("  правила:    цепочки нет\n");
         return;
     }
 
-    /* Первые числа в строках правил — пакеты и байты. */
-    long marked = -1, restored = -1;
-    const char *line = out;
-    while ((line = strchr(line, '\n')) != NULL) {
-        line++;
-        long pkts = 0;
-        if (sscanf(line, " %ld", &pkts) != 1) continue;
-        if (strstr(line, "CONNMARK set") || strstr(line, "MARK set")) marked = pkts;
-        else if (strstr(line, "restore"))                            restored = pkts;
+    if (marked == 0 && restored == 0) {
+        /* Ноль сам по себе ещё не поломка: цепочка очищается при каждом
+           перечитывании конфига, а правило политики считает только новые
+           соединения. Говорим ровно то, что знаем. */
+        printf("  правила:    цепочка есть, совпадений пока нет\n");
+        return;
     }
 
-    if (marked >= 0)
-        printf("  правила:    помечено соединений %ld, восстановлено пакетов %ld\n",
-               marked, restored >= 0 ? restored : 0);
-    else
-        printf("  правила:    цепочка есть, совпадений пока нет\n");
+    printf("  правила:    помечено соединений %lu, восстановлено пакетов %lu\n",
+           marked, restored);
 }
 
 int status_print(const config_t *cfg)

@@ -53,6 +53,24 @@ void rt_plan_remove(rt_plan_t *p, const rt_t *r, const wl_t *w);
    провалилась. */
 int  rt_run(const rt_plan_t *p, const rt_t *r, char *err, unsigned err_size);
 
+/* Счётчики пакетов из вывода `iptables -L -v -x`.
+
+   Вынесено отдельной чистой функцией, потому что разбор здесь дважды
+   ошибался молча. Строки классифицируются по имени действия, а не по
+   точной подстроке: iptables печатает «CONNMARK set» для политики,
+   но «MARK xset» — для группы, заворачивающей на интерфейс. Проверка
+   на «MARK set» второе не ловила, и трафик таких групп не считался
+   вовсе, сколько бы его ни шло.
+
+   Складываем, а не берём последнее совпадение: правил в цепочке
+   столько же, сколько групп. */
+void rt_parse_counters(const char *text, unsigned long *marked,
+                       unsigned long *restored);
+
+/* То же, но опросив ядро по обеим семьям адресов. Возвращает 0, если
+   цепочка нашлась хотя бы в одной. */
+int  rt_counters(const rt_t *r, unsigned long *marked, unsigned long *restored);
+
 /* Печатает команду одной строкой — для тестов и журнала. */
 const char *rt_cmd_text(const rt_cmd_t *c, char *dst, unsigned size);
 

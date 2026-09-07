@@ -279,3 +279,66 @@ int rt_run(const rt_plan_t *p, const rt_t *r, char *err, unsigned err_size)
 
     return 0;
 }
+
+void rt_parse_counters(const char *text, unsigned long *marked,
+                       unsigned long *restored)
+{
+    if (!text) return;
+
+    const char *line = text;
+    for (;;) {
+        const char *nl  = strchr(line, '\n');
+        size_t      len = nl ? (size_t)(nl - line) : strlen(line);
+
+        long pkts = 0;
+        if (sscanf(line, " %ld", &pkts) == 1 && pkts >= 0) {
+            /* Искать надо в пределах строки, а не до конца текста:
+               strstr про перевод строки не знает, и правило пометки
+               находило слово «restore» из следующей строки. Поймано
+               тестом сразу после написания. */
+            int is_restore = memmem(line, len, "restore", 7) != NULL;
+            int is_mark    = memmem(line, len, "MARK", 4) != NULL;
+
+            /* Порядок важен: строка восстановления метки тоже содержит
+               «MARK». */
+            if (is_restore) {
+                if (restored) *restored += (unsigned long)pkts;
+            } else if (is_mark) {
+                if (marked) *marked += (unsigned long)pkts;
+            }
+        }
+
+        if (!nl) break;
+        line = nl + 1;
+    }
+}
+
+int rt_counters(const rt_t *r, unsigned long *marked, unsigned long *restored)
+{
+    if (!r) return -1;
+
+    if (marked)   *marked = 0;
+    if (restored) *restored = 0;
+
+    const char *bins[2] = { r->iptables, r->ip6tables };
+    int found = 0;
+
+    for (int i = 0; i < 2; i++) {
+        if (!bins[i][0]) continue;
+
+        char binbuf[RT_BIN_MAX];
+        str_copy(binbuf, sizeof(binbuf), bins[i]);
+
+        char t[] = "-t", mangle[] = "mangle", L[] = "-L";
+        char chain[] = RT_CHAIN, v[] = "-v", n[] = "-n", x[] = "-x";
+        char *argv[] = { binbuf, t, mangle, L, chain, v, n, x, NULL };
+
+        static char out[8192];
+        if (proc_run(argv, out, sizeof(out), 5) != 0) continue;
+
+        found = 1;
+        rt_parse_counters(out, marked, restored);
+    }
+
+    return found ? 0 : -1;
+}

@@ -620,6 +620,7 @@ void engine_tick(engine_t *e, time_t now)
        себе не говорит, молчит ли сеть или сокет ничего не получает. */
     if (now - e->last_stats >= 60) {
         e->last_stats = now;
+        rt_counters(&e->rt, &e->marked_conns, &e->restored_pkts);
         status_write(e, e->cfg);
     }
 

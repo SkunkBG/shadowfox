@@ -277,6 +277,41 @@ static void test_policy_without_mark(void)
           "без метки правил нет:\n%s", text);
 }
 
+/* Разбор счётчиков iptables. Проверка была ошибочной дважды подряд, и
+   оба раза молча: сначала считалось только последнее совпадение, потом
+   строка группы, заворачивающей на интерфейс, не попадала под шаблон
+   вовсе. Снаружи это выглядело как «трафик не метится». */
+static void test_counters(void)
+{
+    /* Настоящая форма вывода `iptables -t mangle -L SHADOWFOX -v -n -x`.
+       Действие для политики печатается как «CONNMARK set», а для группы
+       на интерфейс — как «MARK xset»: маска у второй не полная. */
+    const char *out =
+        "Chain SHADOWFOX (1 references)\n"
+        "    pkts      bytes target     prot opt in     out     source               destination\n"
+        "      17     1020 CONNMARK   all  --  *      *       0.0.0.0/0            0.0.0.0/0            "
+        "mark match ! 0x10/0xfffffff0 connmark match 0x0 match-set sf4_0_youtube dst CONNMARK xset 0x11/0xffffffff\n"
+        "     412    31000 CONNMARK   all  --  *      *       0.0.0.0/0            0.0.0.0/0            "
+        "match-set sf4_0_youtube dst CONNMARK restore mask 0xffffffff\n"
+        "       5      300 MARK       all  --  *      *       0.0.0.0/0            0.0.0.0/0            "
+        "match-set sf4_1_discord dst MARK xset 0x10000/0xffff0000\n";
+
+    unsigned long marked = 0, restored = 0;
+    rt_parse_counters(out, &marked, &restored);
+
+    CHECK(marked == 22, "помечено сложено по всем правилам: %lu", marked);
+    CHECK(restored == 412, "восстановлено: %lu", restored);
+
+    /* Пустой вывод и заголовок без правил не должны ничего насчитать. */
+    marked = restored = 0;
+    rt_parse_counters("Chain SHADOWFOX (1 references)\n pkts bytes target\n",
+                      &marked, &restored);
+    CHECK(marked == 0 && restored == 0, "пустая цепочка даёт нули");
+
+    rt_parse_counters(NULL, &marked, &restored);
+    CHECK(marked == 0 && restored == 0, "NULL не ломает разбор");
+}
+
 int main(void)
 {
     printf("check_routing " VERSION "\n");
@@ -292,6 +327,7 @@ int main(void)
     test_idempotent_shape();
     test_policy_target();
     test_policy_without_mark();
+    test_counters();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);

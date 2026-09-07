@@ -251,6 +251,7 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_int(&j, "matched", (long)e->matched);
     json_kv_bool(&j, "rules", e->rules_applied);
     json_kv_int(&j, "marked", (long)e->marked_conns);
+    json_kv_int(&j, "restored", (long)e->restored_pkts);
 
     /* Что уже сделано, а что нет: без этого со страницы непонятно,
        какой шаг настройки следующий. */
