@@ -695,7 +695,7 @@ function viewInfo(){
       <p class="sub">Состояние Shadow Fox и параметры работы</p></div></div>
 
   <div class="tiles">
-    ${tile(UI.gear,'Демон',
+    ${tile(UI.gear,'Служба',
       `<span style="color:var(--ok)">Работает</span>
        <div style="font-size:13.5px;color:var(--dim);font-weight:400"
             data-live="uptime">${esc(D.uptime)}</div>`,1)}
@@ -733,14 +733,14 @@ function viewInfo(){
         : ''}
       <span class="msg" id="m-upd"></span></div>
     <p style="margin-top:12px">Обновление ставится тем же <code>opkg</code>,
-    что и вручную. Демон при этом перезапускается, поэтому страница на
+    что и вручную. Служба при этом перезапускается, поэтому страница на
     несколько секунд потеряет связь и вернётся сама.</p>
   </div>
 
   <div class="card"><h3>Как это работает</h3>
     <div class="flow"><span>Домен</span><i>→</i><span>DNS</span><i>→</i>
       <span>Правило</span><i>→</i><span>Xray</span><i>→</i><span>Сервер</span></div>
-    <p style="margin:14px 0 0">Перехват DNS-ответов пассивный: если демон упадёт,
+    <p style="margin:14px 0 0">Перехват DNS-ответов пассивный: если служба упадёт,
       DNS у сети продолжит работать. Адреса в наборах стареют, чтобы не копить
       давно переехавшие.</p></div>
 
@@ -893,7 +893,7 @@ async function load(probed,quiet){
     if(D.dns==='bypass' && !dnsShown && $('#gate').hidden){ dnsShown=1; dnsWarn(); }
   }catch(e){
     $('#view').innerHTML='<div class="card"><p style="color:var(--bad)">'+
-      'Нет связи с демоном: '+esc(e.message)+'</p></div>';
+      'Нет связи со службой: '+esc(e.message)+'</p></div>';
   }
 }
 
@@ -981,7 +981,7 @@ function dnsWarn(){
   el.innerHTML=`<div class="box warn"><h3>Устройство не спрашивает роутер</h3>
     <p class="ctr">Адрес устройства: ${esc(D.peer||'неизвестен')}</p>
     <div class="fine">
-      <p>Демон видит DNS-ответы другим устройствам сети, но этому — ни одного.
+      <p>Служба видит DNS-ответы другим устройствам сети, но этому — ни одного.
       Значит имена оно разрешает мимо роутера, и <b>маршрутизация по доменам
       для него работать не будет</b>: адреса брать неоткуда. Подсети в списках
       при этом работают — они не зависят от DNS.</p>
@@ -1102,7 +1102,7 @@ document.addEventListener('click',async ev=>{
 
   if(ev.target.id==='upd-go'){
     if(!confirm('Обновить Shadow Fox до '+updInfo.available+'?\n'+
-                'Демон перезапустится, связь со страницей ненадолго пропадёт.'))
+                'Служба перезапустится, связь со страницей ненадолго пропадёт.'))
       return;
     const btn=ev.target, m=$('#m-upd');
     btn.disabled=true; m.className='msg'; m.textContent='обновляю…';

@@ -192,7 +192,7 @@ int status_print(const config_t *cfg)
 
     int pid = pidfile_read_alive(cfg->pid_file);
     if (!pid) {
-        printf("  демон:      не работает\n");
+        printf("  служба:     не работает\n");
         printf("  запустить:  shadowfox start\n");
         return 1;
     }
@@ -200,10 +200,10 @@ int status_print(const config_t *cfg)
     long started = status_num(spath, "started");
     if (started > 0) {
         long up = (long)time(NULL) - started;
-        printf("  демон:      работает, pid %d, uptime %ldч %ldм\n",
+        printf("  служба:     работает, pid %d, uptime %ldч %ldм\n",
                pid, up / 3600, (up % 3600) / 60);
     } else {
-        printf("  демон:      работает, pid %d\n", pid);
+        printf("  служба:     работает, pid %d\n", pid);
     }
     printf("  конфиг:     %s\n\n", cfg->conf_file);
 
@@ -268,8 +268,8 @@ int status_print(const config_t *cfg)
         /* Файл пишется демоном при запуске и раз в минуту. Если его нет,
            демон, скорее всего, ещё не закончил старт. Сообщать в этом
            случае «перехват выключен» значит выдавать незнание за факт. */
-        printf("  сведения от демона пока недоступны — он только что\n");
-        printf("  запустился. Повтори через несколько секунд.\n\n");
+        printf("  сведения от службы пока недоступны — она только что\n");
+        printf("  запустилась. Повтори через несколько секунд.\n\n");
 
         rt_t rt0;
         rt_init(&rt0);
