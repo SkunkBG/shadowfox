@@ -247,6 +247,9 @@ const scap_insn_t *scap_filter(unsigned *count)
 
 #ifdef __linux__
 
+/* htons: у dnscap.c он приезжает попутно через <sys/ioctl.h>, но
+   полагаться на это нельзя — включаем явно. */
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <linux/filter.h>
 #include <linux/if_ether.h>
