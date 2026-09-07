@@ -7,7 +7,7 @@ on:
     inputs:
       xray_version:
         description: Тег Xray-core
-        default: v26.2.6
+        default: v26.7.28
   push:
     tags: ['v*']
   schedule:
@@ -19,6 +19,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Выкладка выпуска требует права на запись: без него gh release
+    # падает, а по умолчанию токен процесса только читает.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -53,9 +57,11 @@ jobs:
 
       - name: Выложить в выпуск
         if: github.event_name != 'pull_request'
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -o pipefail
           VER="${{ github.event.inputs.xray_version || 'v26.7.28' }}"
           cat > /tmp/notes.md <<NOTES
           Урезанная сборка Xray-core $VER для Shadow Fox: только VLESS-клиент.
@@ -65,9 +71,11 @@ jobs:
 
           Пакеты отсюда подкладываются в фид основным процессом сборки.
           NOTES
-          gh release delete xray --yes --cleanup-tag 2>/dev/null || true
-          gh release create xray build/ipk/shadowfox-xray_*.ipk \
-            --title "Ядро Xray $VER" --notes-file /tmp/notes.md
+          {
+            gh release delete xray --yes --cleanup-tag 2>/dev/null || true
+            gh release create xray build/ipk/shadowfox-xray_*.ipk \
+              --title "Ядро Xray $VER" --notes-file /tmp/notes.md
+          } 2>&1 | tee -a /tmp/xray.log
 
       # Сравнение вариантов идёт после публикации: оно нужно, чтобы
       # видеть, во что обходится обрезка, но ронять из-за него выкладку
