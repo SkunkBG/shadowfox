@@ -27,6 +27,10 @@ int   pidfile_read_alive(const char *path);
    Возвращает 1 при успехе. */
 int   iface_ipv4(const char *iface, char *dst, size_t dst_size);
 
+/* Читает секрет из файла либо создаёт его: 24 случайных символа
+   [A-Za-z0-9], файл 0600. Возвращает 1, если в dst есть секрет. */
+int   secret_load_or_create(const char *path, char *dst, size_t size);
+
 /* Сводка журнала: сколько строк и какая последняя (не пустая). Длинную
    строку обрезает по размеру last. Возвращает 0, если файла нет. */
 int   file_tail(const char *path, char *last, size_t size, long *lines);

@@ -277,6 +277,41 @@ static void test_entry_counts(void)
     CHECK(c4[0] == -1, "NULL — нет данных");
 }
 
+typedef struct { int n, g[16], f[16]; char a[16][64]; long r[16]; } members_t;
+static void on_member(int group, int family, const char *addr, long remaining, void *ctx)
+{
+    members_t *m = ctx;
+    if (m->n >= 16) return;
+    m->g[m->n] = group; m->f[m->n] = family; m->r[m->n] = remaining;
+    snprintf(m->a[m->n], sizeof(m->a[m->n]), "%s", addr);
+    m->n++;
+}
+
+static void test_members(void)
+{
+    wl_t w;
+    load_lists(&w);
+
+    char text[2048];
+    snprintf(text, sizeof(text),
+        "Name: %s\nType: hash:net\nRevision: 7\nHeader: family inet hashsize 1024 maxelem 65536 timeout 86400\n"
+        "Size in memory: 1000\nReferences: 1\nNumber of entries: 3\nMembers:\n"
+        "142.250.74.14 timeout 86123\n10.0.0.0/8 timeout 86400\n142.250.74.15 timeout 5\n\n"
+        "Name: %s\nType: hash:net\nHeader: family inet6 hashsize 1024 maxelem 65536\n"
+        "Number of entries: 1\nMembers:\n2a00:1450:4001:82f::200e\n\n"
+        "Name: chuzhoi\nType: hash:ip\nMembers:\n8.8.8.8\n\n",
+        w.groups[0].ipset4, w.groups[1].ipset6);
+
+    members_t m = {0};
+    ips_members_parse(text, &w, on_member, &m);
+    CHECK(m.n == 3, "две записи v4 и одна v6, подсеть и чужой набор пропущены");
+    CHECK(m.g[0] == 0 && m.f[0] == 4 && !strcmp(m.a[0], "142.250.74.14") && m.r[0] == 86123,
+          "первая запись с остатком времени");
+    CHECK(m.g[1] == 0 && m.r[1] == 5, "вторая запись почти истекла");
+    CHECK(m.g[2] == 1 && m.f[2] == 6 && !strcmp(m.a[2], "2a00:1450:4001:82f::200e") && m.r[2] == -1,
+          "v6 без старения");
+}
+
 int main(void)
 {
     printf("check_ipsets " VERSION "\n");
@@ -293,6 +328,7 @@ int main(void)
     test_overflow_keeps_whole_lines();
     test_headers();
     test_entry_counts();
+    test_members();
 
     char cmd[160];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_dir);

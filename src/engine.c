@@ -27,7 +27,11 @@
    их приходило пять подряд. Пауза схлопывает всплеск в одно применение
    и разрывает цепную реакцию. */
 #define ENGINE_RESTORE_DELAY 2
-#define ENGINE_BREAK_BUDGET  20   /* обрывов соединений в секунду */
+/* Обрывов соединений в секунду. Было 20: на проводе это выглядело как
+   шквал коротких TLS-сессий к одному адресу, и провайдер с
+   распознаванием по поведению закрывал адрес сервера. Настоящему
+   трафику новых адресов в секунду нужны единицы. */
+#define ENGINE_BREAK_BUDGET  3
 
 /* Как часто смотреть на сокеты ядра. Чтение /proc, ни одного пакета. */
 #define ENGINE_TUNNEL_SAMPLE 30
@@ -333,6 +337,40 @@ static void note_xray_version(engine_t *e, time_t now)
     log_info("ядро Xray версии %s", e->xray_version);
 }
 
+/* Наполняет память известных адресов тем, что уже лежит в наборах.
+   Возраст записи восстанавливаем из остатка времени жизни, чтобы она
+   состарилась в памяти тогда же, когда и в наборе. */
+static void on_member(int group, int family, const char *addr, long remaining, void *ctx)
+{
+    engine_t     *e = ctx;
+    unsigned char bin[16];
+    int           af = family == 4 ? AF_INET : AF_INET6;
+    if (inet_pton(af, addr, bin) != 1) return;
+
+    time_t now = time(NULL);
+    time_t ttl = e->ipset_timeout > 0 ? e->ipset_timeout : 86400;
+    time_t at  = (remaining >= 0 && remaining < ttl) ? now - (ttl - remaining) : now;
+
+    if (e->known_count >= ENG_KNOWN_MAX) return;
+    int k = e->known_count++;
+    memset(e->known[k].addr, 0, sizeof(e->known[k].addr));
+    memcpy(e->known[k].addr, bin, family == 4 ? 4 : 16);
+    e->known[k].family = (unsigned char)family;
+    e->known[k].group  = (short)group;
+    e->known[k].at     = at;
+}
+
+static void warm_known(engine_t *e)
+{
+    if (!e->ips.bin[0]) return;
+    int rc = ips_list_members(&e->ips, &e->wl, on_member, e);
+    if (rc != 0 && e->known_count == 0)
+        log_warn("не прочитать наборы: первые соединения к известным адресам будут оборваны");
+    else
+        log_info("память адресов: %d из наборов%s", e->known_count,
+                 rc != 0 ? " (список обрезан)" : "");
+}
+
 static int load_lists(engine_t *e, const config_t *cfg)
 {
     char domains[CFG_PATH_MAX + 32];
@@ -340,8 +378,11 @@ static int load_lists(engine_t *e, const config_t *cfg)
 
     /* Память известных адресов хранит номер группы, а номера после
        перечитывания могут перераспределиться. Со старыми записями
-       добавления подавлялись бы не для той группы. Цена сброса — один
-       лишний обрыв на первый ClientHello к уже разложенному адресу. */
+       добавления подавлялись бы не для той группы. Сбрасываем, а ниже
+       наполняем заново из самих наборов: раньше «цена сброса» считалась
+       одним лишним обрывом, а на деле в первую минуту после каждого
+       запуска рвалось каждое соединение к уже разложенному адресу —
+       десятки TLS-сессий к серверу подряд, и провайдер закрывал его. */
     e->known_count = 0;
 
     snprintf(domains, sizeof(domains), "%s/domain.conf", cfg->conf_dir);
@@ -356,6 +397,7 @@ static int load_lists(engine_t *e, const config_t *cfg)
              e->wl.skipped);
 
     wl_classify_targets(&e->wl, NULL);
+    warm_known(e);
     return e->wl.group_count;
 }
 
@@ -577,6 +619,17 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     o.fragment    = cfg->fragment;
     o.fingerprint = cfg->fingerprint;
     o.error_log   = XRAY_ERROR_LOG;
+
+    static char secret[64];
+    secret[0] = '\0';
+    if (cfg->socks_secret[0]) {
+        if (secret_load_or_create(cfg->socks_secret, secret, sizeof(secret))) {
+            o.socks_user = "shadowfox";
+            o.socks_pass = secret;
+        } else {
+            log_warn("не создать %s — SOCKS без пароля", cfg->socks_secret);
+        }
+    }
 
     static char json[256 * 1024];
     if (xraycfg_build_list(&list, &o, json, sizeof(json)) != 0) {

@@ -27,7 +27,10 @@ void xraycfg_defaults(xraycfg_opts_t *o)
        Vision splice. Убран по итогам аудита. */
     o->fragment   = 1;
     o->fingerprint = "";
-    o->sniffing   = 1;
+    /* Сниффинг выключен: для маршрутизации внутри ядра он не нужен —
+       всё уходит в туннель, — а HydraRoute на той же линии живёт без
+       него. Меньше отличий от проверенной конфигурации. */
+    o->sniffing   = 0;
     o->log_level  = "warning";
     o->probe_url  = "https://www.gstatic.com/generate_204";
     o->probe_interval = "5m";
@@ -80,7 +83,18 @@ static void build_inbound(json_t *j, const xraycfg_opts_t *o)
 
     json_key(j, "settings");
     json_obj_open(j);
-    json_kv_str(j, "auth", "noauth");
+    if (o->socks_pass && o->socks_pass[0]) {
+        json_kv_str(j, "auth", "password");
+        json_key(j, "accounts");
+        json_arr_open(j);
+        json_obj_open(j);
+        json_kv_str(j, "user", o->socks_user && o->socks_user[0] ? o->socks_user : "shadowfox");
+        json_kv_str(j, "pass", o->socks_pass);
+        json_obj_close(j);
+        json_arr_close(j);
+    } else {
+        json_kv_str(j, "auth", "noauth");
+    }
     json_kv_bool(j, "udp", 1);
     json_obj_close(j);
 

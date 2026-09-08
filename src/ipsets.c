@@ -337,3 +337,69 @@ int ips_count_entries(ips_t *s, const wl_t *w, long *c4, long *c6)
     ips_entry_counts(out, w, c4, c6);
     return 0;
 }
+
+void ips_members_parse(const char *text, const wl_t *w,
+                       void (*cb)(int, int, const char *, long, void *), void *ctx)
+{
+    if (!text || !w || !cb) return;
+
+    int group = -1, family = 0, in_members = 0;
+    const char *line = text;
+    for (;;) {
+        const char *nl  = strchr(line, '\n');
+        size_t      len = nl ? (size_t)(nl - line) : strlen(line);
+
+        if (len > 6 && !strncmp(line, "Name: ", 6)) {
+            char name[WL_SETNAME_MAX];
+            size_t n = len - 6;
+            if (n >= sizeof(name)) n = sizeof(name) - 1;
+            memcpy(name, line + 6, n);
+            name[n] = '\0';
+            group = -1; family = 0; in_members = 0;
+            for (int i = 0; i < w->group_count; i++) {
+                if (!strcmp(name, w->groups[i].ipset4)) { group = i; family = 4; }
+                if (!strcmp(name, w->groups[i].ipset6)) { group = i; family = 6; }
+            }
+        } else if (len == 8 && !strncmp(line, "Members:", 8)) {
+            in_members = group >= 0;
+        } else if (in_members && len > 0 && group >= 0) {
+            char entry[128];
+            size_t n = len < sizeof(entry) - 1 ? len : sizeof(entry) - 1;
+            memcpy(entry, line, n);
+            entry[n] = '\0';
+
+            char *sp = strchr(entry, ' ');
+            long  remaining = -1;
+            if (sp) {
+                *sp = '\0';
+                const char *t = strstr(sp + 1, "timeout ");
+                if (t) remaining = atol(t + 8);
+            }
+            if (!strchr(entry, '/')) cb(group, family, entry, remaining, ctx);
+        } else if (len == 0) {
+            in_members = 0;
+        }
+
+        if (!nl) break;
+        line = nl + 1;
+    }
+}
+
+int ips_list_members(ips_t *s, const wl_t *w,
+                     void (*cb)(int, int, const char *, long, void *), void *ctx)
+{
+    if (!s || !w || !s->bin[0]) return -1;
+
+    char binbuf[IPS_BIN_MAX];
+    str_copy(binbuf, sizeof(binbuf), s->bin);
+    char list[] = "list";
+    char *argv[] = { binbuf, list, NULL };
+
+    /* Тысячи записей по ~30 байт: TikTok один даёт полторы тысячи. */
+    static char out[1024 * 1024];
+    int trunc = 0;
+    if (proc_run_capture(argv, out, sizeof(out), 15, &trunc) != 0) return -1;
+
+    ips_members_parse(out, w, cb, ctx);
+    return trunc ? -1 : 0;
+}

@@ -30,6 +30,7 @@ typedef struct {
     char        policy[WL_NAME_MAX_CFG];      /* политика для своего прокси */
     char        proxy_iface[32];              /* Proxy1 и т.п. */
     int         socks_port;                   /* порт своего socks */
+    char        socks_secret[CFG_PATH_MAX];   /* файл с паролем SOCKS, пусто — без пароля */
     char        nodes_file[CFG_PATH_MAX];     /* ссылки или подписка */
     char        xray_config[CFG_PATH_MAX];    /* куда писать конфиг */
     char        xray_bin[CFG_PATH_MAX];       /* пусто — искать самим */

@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -169,4 +170,46 @@ int file_tail(const char *path, char *last, size_t size, long *lines)
     if (last && size) str_trim(last);
     if (lines) *lines = n;
     return 1;
+}
+
+int secret_load_or_create(const char *path, char *dst, size_t size)
+{
+    if (!path || !dst || size < 2) return 0;
+    dst[0] = '\0';
+
+    FILE *f = fopen(path, "r");
+    if (f) {
+        char line[128];
+        if (fgets(line, sizeof(line), f)) str_copy(dst, size, str_trim(line));
+        fclose(f);
+        if (dst[0]) return 1;
+    }
+
+    static const char alphabet[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    unsigned char raw[24];
+    FILE *r = fopen("/dev/urandom", "rb");
+    if (!r) return 0;
+    size_t got = fread(raw, 1, sizeof(raw), r);
+    fclose(r);
+    if (got != sizeof(raw)) return 0;
+
+    char secret[sizeof(raw) + 1];
+    for (size_t i = 0; i < sizeof(raw); i++)
+        secret[i] = alphabet[raw[i] % (sizeof(alphabet) - 1)];
+    secret[sizeof(raw)] = '\0';
+
+    /* O_EXCL: если файл появился между чтением и записью, не затираем. */
+    int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
+    if (fd < 0) {
+        if (errno == EEXIST) return secret_load_or_create(path, dst, size);
+        return 0;
+    }
+    if (write(fd, secret, strlen(secret)) < 0 || write(fd, "\n", 1) < 0) {
+        close(fd);
+        unlink(path);
+        return 0;
+    }
+    close(fd);
+    return str_copy(dst, size, secret) == 0;
 }

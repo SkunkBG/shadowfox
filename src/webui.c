@@ -554,10 +554,17 @@ static void ndmc_run_plan(char *bin, const char **plan, int n,
         int   rc = proc_run(argv, out, sizeof(out), 15);
 
         if (rc != 0) failed++;
-        log_info("веб: ndmc «%s» -> %d", plan[i], rc);
+
+        /* Пароль подключения ни в журнал, ни на страницу. */
+        char shown[192];
+        str_copy(shown, sizeof(shown), plan[i]);
+        char *pw = strstr(shown, "authentication password ");
+        if (pw) str_copy(pw + 24, sizeof(shown) - (size_t)(pw + 24 - shown), "****");
+
+        log_info("веб: ndmc «%s» -> %d", shown, rc);
 
         int k = snprintf(report + used, sizeof(report) - (size_t)used,
-                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", plan[i]);
+                         "%s %s\n", rc == 0 ? "ok " : "СБОЙ", shown);
         if (k < 0 || (size_t)k >= sizeof(report) - (size_t)used) break;
         used += k;
     }
@@ -721,9 +728,16 @@ static void apply_proxy(const http_req_t *req, int fd, const config_t *cfg)
         return;
     }
 
-    static char cmds[9][160];
-    const char *plan[9];
+    static char cmds[11][160];
+    const char *plan[11];
     int n = 0;
+
+    /* Пароль тот же, что у ядра: файл общий. Если демон его ещё не
+       создал, создаём здесь — ядро подхватит при следующем запуске. */
+    char secret[64] = "";
+    if (cfg->socks_secret[0] &&
+        !secret_load_or_create(cfg->socks_secret, secret, sizeof(secret)))
+        log_warn("не прочитать %s — подключение без пароля", cfg->socks_secret);
 
     snprintf(cmds[n++], sizeof(cmds[0]), "interface %s", cfg->proxy_iface);
     snprintf(cmds[n++], sizeof(cmds[0]), "interface %s description Shadow-Fox",
@@ -738,6 +752,12 @@ static void apply_proxy(const http_req_t *req, int fd, const config_t *cfg)
              cfg->proxy_iface, lan, cfg->socks_port);
     snprintf(cmds[n++], sizeof(cmds[0]), "interface %s proxy socks5-udp",
              cfg->proxy_iface);
+    if (secret[0]) {
+        snprintf(cmds[n++], sizeof(cmds[0]), "interface %s authentication identity shadowfox",
+                 cfg->proxy_iface);
+        snprintf(cmds[n++], sizeof(cmds[0]), "interface %s authentication password %s",
+                 cfg->proxy_iface, secret);
+    }
     snprintf(cmds[n++], sizeof(cmds[0]), "interface %s up", cfg->proxy_iface);
     snprintf(cmds[n++], sizeof(cmds[0]), "system configuration save");
 

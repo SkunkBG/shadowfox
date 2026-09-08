@@ -68,6 +68,25 @@ void ips_entry_counts(const char *text, const wl_t *w, long *c4, long *c6);
 /* То же, спросив у ipset. Возвращает 0, если удалось. */
 int  ips_count_entries(ips_t *s, const wl_t *w, long *c4, long *c6);
 
+/* Члены наборов групп из полного вывода `ipset list`: после «Name: …»
+   идёт «Members:», затем по записи на строку — «1.2.3.4 timeout 86123»
+   либо подсеть «10.0.0.0/8». Подсети пропускаются: это статические
+   правила из ip.list, а не адреса, узнанные из DNS или SNI. remaining —
+   секунд до истечения записи, -1 если набор без старения.
+
+   Нужно движку при старте: без этого он забывал, какие адреса уже
+   разложены, и рвал соединения, которые и так шли через туннель. */
+void ips_members_parse(const char *text, const wl_t *w,
+                       void (*cb)(int group, int family, const char *addr,
+                                  long remaining, void *ctx),
+                       void *ctx);
+
+/* То же, спросив у ipset. Возвращает 0, если удалось целиком. */
+int  ips_list_members(ips_t *s, const wl_t *w,
+                      void (*cb)(int group, int family, const char *addr,
+                                 long remaining, void *ctx),
+                      void *ctx);
+
 /* Ставит в очередь добавление адреса в набор группы.
    family — 4 или 6, text — адрес в обычной записи. */
 void ips_queue_add(ips_t *s, const wl_t *w, int group, int family,

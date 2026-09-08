@@ -12,6 +12,8 @@ typedef struct {
     int  fragment;        /* резать TLS ClientHello — только для tls, не reality */
     const char *fingerprint;  /* перекрыть отпечаток uTLS, "" — из ссылки */
     int  sniffing;        /* определять домен для маршрутизации */
+    const char *socks_user;   /* пароль на вход: пусто — без него */
+    const char *socks_pass;
     const char *log_level;
     const char *error_log;      /* куда ядру писать ошибки; NULL — никуда */
     const char *probe_url;      /* чем балансировщик меряет задержку */

@@ -57,6 +57,8 @@ void config_defaults(config_t *cfg)
     cfg->socks_port = 1301;
     str_copy(cfg->nodes_file, sizeof(cfg->nodes_file),
              DEFAULT_CONF_DIR "/nodes.txt");
+    str_copy(cfg->socks_secret, sizeof(cfg->socks_secret),
+             DEFAULT_CONF_DIR "/socks.secret");
     str_copy(cfg->xray_config, sizeof(cfg->xray_config),
              DEFAULT_CONF_DIR "/xray.json");
 }
@@ -102,6 +104,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "proxyInterface")) {
         str_copy(cfg->proxy_iface, sizeof(cfg->proxy_iface), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "socksSecret")) {
+        str_copy(cfg->socks_secret, sizeof(cfg->socks_secret), value);
         return 0;
     }
 
@@ -371,6 +378,10 @@ int config_write_default(const char *path)
         "# /opt/sbin/shadowfox-xray, потом штатный xray в PATH.\n"
         "xrayBin=%s\n"
         "socksPort=%d\n"
+        "# Файл с паролем к своему SOCKS: создаётся сам при первом запуске\n"
+        "# и подставляется и в ядро, и в подключение роутера. Пусто — без\n"
+        "# пароля (вход и так закрыт правилом, но с паролем — как у всех).\n"
+        "socksSecret=%s\n"
         "proxyInterface=%s\n"
         "policy=%s\n"
         "\n"
@@ -395,7 +406,7 @@ int config_write_default(const char *path)
         "fingerprint=%s\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.web_proxy,
-        cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.socks_port,
+        cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.socks_port, cfg.socks_secret,
         cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no", cfg.probe_url,
         cfg.fragment ? "yes" : "no", cfg.fingerprint);
 

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 static int failures = 0;
 
@@ -137,7 +138,8 @@ static void test_config_write_default(void)
         "ipv6", "createPolicy", "ipsetTimeout", "web", "webPort",
         "routerHost", "routerPort", "webBind", "webToken", "webProxy",
         "nodesFile", "xrayConfig", "xrayBin", "socksPort", "proxyInterface",
-        "policy", "sniCapture", "tunnelProbe", "fragment", "fingerprint", NULL
+        "policy", "sniCapture", "tunnelProbe", "fragment", "fingerprint",
+        "socksSecret", NULL
     };
     {
         FILE *f = fopen(path, "r");
@@ -195,6 +197,30 @@ static void test_args_survive_reload(void)
     CHECK(config_apply_args(&c2, 3, bad) != 0, "неизвестный флаг отвергнут");
 }
 
+static void test_secret(void)
+{
+    char dir[] = "/tmp/shadowfox-sec-XXXXXX";
+    CHECK(mkdtemp(dir) != NULL, "временный каталог");
+    char path[512];
+    snprintf(path, sizeof(path), "%s/socks.secret", dir);
+
+    char a[64] = "", b[64] = "";
+    CHECK(secret_load_or_create(path, a, sizeof(a)) == 1, "секрет создан");
+    CHECK(strlen(a) == 24, "24 символа");
+    for (const char *c = a; *c; c++)
+        CHECK(((*c >= 'A' && *c <= 'Z') || (*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9')),
+              "только буквы и цифры");
+
+    struct stat st;
+    CHECK(stat(path, &st) == 0 && (st.st_mode & 0777) == 0600, "права 600");
+
+    CHECK(secret_load_or_create(path, b, sizeof(b)) == 1 && strcmp(a, b) == 0,
+          "повторное чтение отдаёт тот же секрет");
+
+    unlink(path);
+    rmdir(dir);
+}
+
 static void test_file_tail(void)
 {
     char path[] = "/tmp/sf-tail-XXXXXX";
@@ -233,6 +259,7 @@ int main(void)
 {
     printf("check_config " VERSION "\n");
     test_file_tail();
+    test_secret();
 
     test_str_trim();
     test_str_copy();
