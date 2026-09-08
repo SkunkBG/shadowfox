@@ -43,52 +43,14 @@ rm -f /opt/etc/shadowfox/shadowfox.conf-opkg
 # Списки создаём только при отсутствии. Файлами пакета их держать нельзя:
 # это пользовательские данные, и при каждой правке шаблона opkg оставлял
 # бы рядом domain.conf-opkg.
-if [ ! -f /opt/etc/shadowfox/domain.conf ]; then
-    cat > /opt/etc/shadowfox/domain.conf <<'DOMAINS'
-# Домены, которые нужно заворачивать в туннель.
-#
-#   [имя-группы]
-#   interface = HydraRoute     # политика Keenetic либо сетевой интерфейс
-#   example.com                # домен и все его поддомены
-#   *.wildcard.example.com     # только поддомены
-#   =exact.example.com         # точное совпадение
-#
-# Цель различается сама: если такое устройство есть в системе — трафик
-# заворачивается прямо в него; иначе это политика Keenetic, и метку для
-# неё демон спросит у роутера.
-#
-# Посмотреть, что получится: shadowfoxd --dry-run
-DOMAINS
-fi
-
-if [ ! -f /opt/etc/shadowfox/nodes.txt ]; then
-    cat > /opt/etc/shadowfox/nodes.txt <<'NODES'
-# Ссылки на серверы для своего экземпляра Xray, по одной в строке.
-# Принимаются vless:// либо целиком подписка в base64.
-#
-# При нескольких ссылках демон соберёт балансировщик и будет выбирать
-# самый быстрый узел.
-#
-# Пока файл без ссылок, свой Xray не запускается, и маршрутизация идёт
-# через то подключение, которое настроено вручную.
-NODES
-    # В ссылке лежит uuid, то есть ключ доступа к серверу.
-    chmod 600 /opt/etc/shadowfox/nodes.txt
-fi
-
-if [ ! -f /opt/etc/shadowfox/ip.list ]; then
-    cat > /opt/etc/shadowfox/ip.list <<'CIDRS'
-# Статические подсети, которые нужно заворачивать в туннель.
-#
-#   [имя-группы]
-#   interface = HydraRoute
-#   192.0.2.0/24
-#   2001:db8::/32
-#
-# Нужны для сервисов с зашитыми адресами, которые не спрашивают DNS, —
-# там перехват ответов бессилен.
-CIDRS
-fi
+# Списки создаём только при отсутствии из готовых образцов: YouTube,
+# TikTok, Discord, Telegram — как у HydraRoute, чтобы после установки
+# было что включить, а не пустой файл. Файлами пакета их держать нельзя:
+# это пользовательские данные, и при каждой правке образца opkg
+# оставлял бы рядом domain.conf-opkg. Образцы лежат в presets/ и всегда
+# доступны: cp /opt/etc/shadowfox/presets/* /opt/etc/shadowfox/
+[ -f /opt/etc/shadowfox/domain.conf ] || cp /opt/etc/shadowfox/presets/domain.conf /opt/etc/shadowfox/domain.conf
+[ -f /opt/etc/shadowfox/ip.list ]     || cp /opt/etc/shadowfox/presets/ip.list     /opt/etc/shadowfox/ip.list
 
 # Намеренно НЕ правим /opt/etc/init.d/rc.unslung.
 # neofit и hrneo вставляют туда `sleep 10`, чтобы дождаться сети роутера.
@@ -103,8 +65,9 @@ if [ -x /opt/bin/hrneo ] || [ -d /opt/etc/HydraRoute ]; then
     echo "[ИНФО] обнаружен HydraRoute."
     echo "       Общих файлов у них нет, службы уживаются."
     echo "       Но маршрутизацию теперь умеют оба. Свои списки Shadow Fox"
-    echo "       берёт из /opt/etc/shadowfox/domain.conf, и пока тот пуст,"
-    echo "       никаких правил не ставится."
+    echo "       берёт из /opt/etc/shadowfox/domain.conf; готовые группы там"
+    echo "       есть с установки, но правила ставятся только после того,"
+    echo "       как политика ShadowFox будет настроена на странице."
     echo "       Посмотреть, что будет сделано: shadowfoxd --dry-run"
 fi
 
