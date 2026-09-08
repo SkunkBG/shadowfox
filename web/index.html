@@ -1031,7 +1031,10 @@ function chrome(){
 function hhmm(t){ const d=new Date(t*1000); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }
 function tunnelText(){
   if(D.tunnel>0) return `<b style="color:var(--ok)">соединений с сервером ${D.tunnel_est}</b>${D.tunnel_why?', '+esc(D.tunnel_why):''}`;
-  if(D.tunnel<0) return `<b style="color:var(--bad)">не отвечает</b> с ${hhmm(D.tunnel_since)}: ${esc(D.tunnel_why||'')}`;
+  if(D.tunnel<0) return `<b style="color:var(--bad)">не отвечает</b> с ${hhmm(D.tunnel_since)}: ${esc(D.tunnel_why||'')}
+    <div class="note" style="margin-top:6px">${UI.i}Если с телефона по мобильной сети сервер открывается, адрес этой
+    линии закрыт на самом сервере: бан fail2ban, антискана или Torrent-Blocker ноды. Ложные срабатывания на
+    UDP приложений (Discord, TikTok, звонки) — обычное дело. На сервере: <code>nft list ruleset | grep -c ВАШ_АДРЕС</code>.</div>`;
   return 'соединений с сервером пока не было';
 }
 function draw(){
