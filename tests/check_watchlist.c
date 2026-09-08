@@ -62,13 +62,17 @@ static void test_groups_and_naming(void)
     CHECK(!strcmp(w.groups[0].iface, "Proxy0"), "интерфейс первой группы");
     CHECK(!strcmp(w.groups[1].iface, "Proxy1"), "интерфейс второй группы");
 
-    CHECK(!strcmp(w.groups[0].ipset4, "sf4_0_youtube"), "имя набора v4: %s",
+    /* Набор зовётся по цели, как у HydraRoute: все группы одной
+       политики кладут адреса в один набор. */
+    CHECK(!strcmp(w.groups[0].ipset4, "Proxy0"), "имя набора v4: %s",
           w.groups[0].ipset4);
-    CHECK(!strcmp(w.groups[0].ipset6, "sf6_0_youtube"), "имя набора v6: %s",
+    CHECK(!strcmp(w.groups[0].ipset6, "Proxy0v6"), "имя набора v6: %s",
           w.groups[0].ipset6);
+    CHECK(!strcmp(w.groups[1].ipset4, "Proxy1"), "набор второй цели: %s", w.groups[1].ipset4);
+    CHECK(wl_set_owner(&w, 1) == 1, "разные цели — разные владельцы");
 
     /* ipset не примет кириллицу — посторонние символы заменяются. */
-    CHECK(strspn(w.groups[1].ipset4, "abcdefghijklmnopqrstuvwxyz0123456789_")
+    CHECK(strspn(w.groups[1].ipset4, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.")
               == strlen(w.groups[1].ipset4),
           "в имени набора только допустимые символы: %s", w.groups[1].ipset4);
     CHECK(strlen(w.groups[1].ipset4) < WL_SETNAME_MAX, "имя набора влезает");

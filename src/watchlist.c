@@ -70,6 +70,34 @@ static void set_name(char *dst, size_t size, const char *prefix,
     dst[i] = '\0';
 }
 
+/* Имя набора по цели: имя политики или устройства как есть, из
+   допустимых для ipset символов, «v6» для второй семьи. Так же зовёт
+   свои наборы HydraRoute, и по `ipset list` сразу видно, куда что
+   ведёт. Пока цели нет — старое имя по номеру группы; правил на такую
+   группу всё равно не ставится. */
+static void target_set_names(wl_group_t *g)
+{
+    /* 28 символов имени: ipset принимает 31, «v6» занимает два. */
+    char clean[WL_SETNAME_MAX - 3];
+    size_t i = 0;
+    for (const char *c = g->iface; *c && i + 1 < sizeof(clean); c++) {
+        unsigned char ch = (unsigned char)*c;
+        if (isalnum(ch) || ch == '_' || ch == '-' || ch == '.') clean[i++] = (char)ch;
+    }
+    clean[i] = '\0';
+    if (!clean[0]) return;
+    snprintf(g->ipset4, sizeof(g->ipset4), "%.28s", clean);
+    snprintf(g->ipset6, sizeof(g->ipset6), "%.28sv6", clean);
+}
+
+int wl_set_owner(const wl_t *w, int group)
+{
+    if (!w || group < 0 || group >= w->group_count) return group;
+    for (int i = 0; i < group; i++)
+        if (!strcmp(w->groups[i].ipset4, w->groups[group].ipset4)) return i;
+    return group;
+}
+
 static int group_find_or_add(wl_t *w, const char *name)
 {
     for (int i = 0; i < w->group_count; i++)
@@ -254,9 +282,11 @@ static int load(wl_t *w, const char *path, int cidrs)
             continue;
         }
         if (parse_setting(s, "interface", &val)) {
-            if (group >= 0) str_copy(w->groups[group].iface,
-                                     sizeof(w->groups[group].iface), val);
-            else w->skipped++;
+            if (group >= 0) {
+                str_copy(w->groups[group].iface,
+                         sizeof(w->groups[group].iface), val);
+                target_set_names(&w->groups[group]);
+            } else w->skipped++;
             continue;
         }
 

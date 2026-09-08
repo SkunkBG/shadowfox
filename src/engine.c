@@ -66,6 +66,10 @@ int engine_fds(const engine_t *e, int *out, int max)
 static int note_addr(engine_t *e, int group, int family,
                      const unsigned char *addr, time_t now)
 {
+    /* Набор общий на цель: помним по владельцу набора, иначе адрес,
+       узнанный через группу YouTube, для группы Google выглядел бы
+       новым — и соединение рвалось бы зря. */
+    group = wl_set_owner(&e->wl, group);
     size_t alen = (family == 4) ? 4 : 16;
     time_t ttl  = e->ipset_timeout > 0 ? e->ipset_timeout : 86400;
 
@@ -538,6 +542,12 @@ static int apply_all(engine_t *e, char *err, unsigned err_size, int recreate)
     if (ips_flush(&e->ips, err, err_size) != 0) return -1;
 
     rt_plan_t plan;
+    /* Сначала убрать наши правила, которые больше не соответствуют
+       спискам (сменилась метка, цель, группа выключена), потом
+       поставить недостающие. Совпадающие не трогаются вовсе. */
+    int pruned = rt_prune_stale(&e->rt, &e->wl);
+    if (pruned) log_info("снято устаревших правил: %d", pruned);
+
     rt_plan_apply(&plan, &e->rt, &e->wl);
     if (rt_run(&plan, &e->rt, err, err_size) != 0) return -1;
 
@@ -906,7 +916,7 @@ void engine_tick(engine_t *e, time_t now)
        себе не говорит, молчит ли сеть или сокет ничего не получает. */
     if (now - e->last_stats >= 60) {
         e->last_stats = now;
-        rt_counters(&e->rt, &e->marked_conns, &e->restored_pkts);
+        rt_counters(&e->rt, &e->wl, &e->marked_conns, &e->restored_pkts);
         ips_count_entries(&e->ips, &e->wl, e->addr4, e->addr6);
         status_write(e, e->cfg);
     }

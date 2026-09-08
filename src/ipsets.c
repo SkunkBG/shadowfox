@@ -77,12 +77,16 @@ void ips_queue_create(ips_t *s, const wl_t *w, int timeout)
         /* Выключенной группе набор не нужен: правил на неё нет, а лишний
            набор потом уберёт уборка сирот. */
         if (!w->groups[i].enabled) continue;
+        /* Набор общий на цель — создаём один раз. */
+        if (wl_set_owner(w, i) != i) continue;
 
         /* -exist делает создание идемпотентным: после перезапуска демона
-           наборы уже есть, и это нормальная ситуация, а не ошибка. */
-        queue(s, "create %s hash:net family inet%s -exist\n",
+           наборы уже есть, и это нормальная ситуация, а не ошибка.
+           maxelem как у HydraRoute: 65536 TikTok с YouTube за неделю
+           выбирали. */
+        queue(s, "create %s hash:net family inet maxelem 262144%s -exist\n",
               w->groups[i].ipset4, tmo);
-        queue(s, "create %s hash:net family inet6%s -exist\n",
+        queue(s, "create %s hash:net family inet6 maxelem 262144%s -exist\n",
               w->groups[i].ipset6, tmo);
     }
 }
@@ -92,6 +96,7 @@ void ips_destroy(ips_t *s, const wl_t *w)
     if (!s || !w || !s->bin[0]) return;
 
     for (int i = 0; i < w->group_count; i++) {
+        if (wl_set_owner(w, i) != i) continue;
         for (int v = 0; v < 2; v++) {
             char bin[IPS_BIN_MAX];
             char cmd[]  = "destroy";

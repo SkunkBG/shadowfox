@@ -173,20 +173,19 @@ static long ipset_count(const char *bin, const char *set)
     return count;
 }
 
-static void print_rule_counters(const rt_t *rt)
+static void print_rule_counters(const rt_t *rt, const wl_t *w)
 {
     unsigned long marked = 0, restored = 0;
 
-    if (rt_counters(rt, &marked, &restored) != 0) {
-        printf("  правила:    цепочки нет\n");
+    if (rt_counters(rt, w, &marked, &restored) != 0) {
+        printf("  правила:    не прочитать\n");
         return;
     }
 
     if (marked == 0 && restored == 0) {
-        /* Ноль сам по себе ещё не поломка: цепочка очищается при каждом
-           перечитывании конфига, а правило политики считает только новые
-           соединения. Говорим ровно то, что знаем. */
-        printf("  правила:    цепочка есть, совпадений пока нет\n");
+        /* Ноль сам по себе ещё не поломка: правило политики считает
+           только новые соединения. Говорим ровно то, что знаем. */
+        printf("  правила:    совпадений пока нет\n");
         return;
     }
 
@@ -287,7 +286,7 @@ int status_print(const config_t *cfg)
 
         rt_t rt0;
         rt_init(&rt0);
-        if (rt_find_bins(&rt0)) print_rule_counters(&rt0);
+        if (rt_find_bins(&rt0)) print_rule_counters(&rt0, &wl);
         return 0;
     }
 
@@ -397,7 +396,7 @@ int status_print(const config_t *cfg)
 
     rt_t rt;
     rt_init(&rt);
-    if (rt_find_bins(&rt)) print_rule_counters(&rt);
+    if (rt_find_bins(&rt)) print_rule_counters(&rt, &wl);
 
     return 0;
 }

@@ -109,6 +109,13 @@ int wl_match_ip(const wl_t *w, int family, const unsigned char *addr);
    Возвращает число групп, оказавшихся политиками Keenetic. */
 int wl_classify_targets(wl_t *w, const char *sysnet_dir);
 
+/* Наборы общие на цель: все группы, ведущие в одну политику или на одно
+   устройство, кладут адреса в один набор, как у HydraRoute (набор
+   зовётся именем политики). Эта функция даёт номер группы-владельца
+   набора — первой с тем же набором, — чтобы память адресов и подсчёты
+   не считали один набор дважды. */
+int wl_set_owner(const wl_t *w, int group);
+
 const char *wl_domain_text(const wl_t *w, int index);
 
 /* Печатает подсеть в привычном виде "192.0.2.0/24".

@@ -66,11 +66,11 @@ static void test_create_commands(void)
 
     const char *q = ips_pending(&s);
     /* hash:net, а не hash:ip: в наборы кладутся и подсети из ip.list. */
-    CHECK(strstr(q, "create sf4_0_youtube hash:net family inet -exist") != NULL,
+    CHECK(strstr(q, "create Proxy0 hash:net family inet maxelem 262144 -exist") != NULL,
           "набор v4 для группы: %s", q);
-    CHECK(strstr(q, "create sf6_0_youtube hash:net family inet6 -exist") != NULL,
+    CHECK(strstr(q, "create Proxy0v6 hash:net family inet6 maxelem 262144 -exist") != NULL,
           "набор v6 для группы");
-    CHECK(strstr(q, "create sf4_1_soc hash:net family inet -exist") != NULL,
+    CHECK(strstr(q, "create Proxy1 hash:net family inet maxelem 262144 -exist") != NULL,
           "набор второй группы");
     /* -exist делает создание идемпотентным: после перезапуска демона
        наборы уже есть, и это норма. */
@@ -81,9 +81,9 @@ static void test_create_commands(void)
     ips_t t;
     ips_init(&t, "/не/важно");
     ips_queue_create(&t, &w, 3600);
-    CHECK(strstr(ips_pending(&t), "family inet timeout 3600 -exist") != NULL,
+    CHECK(strstr(ips_pending(&t), "family inet maxelem 262144 timeout 3600 -exist") != NULL,
           "время жизни попадает в создание: %s", ips_pending(&t));
-    CHECK(strstr(ips_pending(&t), "family inet6 timeout 3600 -exist") != NULL,
+    CHECK(strstr(ips_pending(&t), "family inet6 maxelem 262144 timeout 3600 -exist") != NULL,
           "и в набор v6 тоже");
 }
 
@@ -99,9 +99,9 @@ static void test_add_commands(void)
     ips_queue_add(&s, &w, 1, 6, "2001:db8::1");
 
     const char *q = ips_pending(&s);
-    CHECK(strstr(q, "add sf4_0_youtube 142.250.74.78 -exist") != NULL,
+    CHECK(strstr(q, "add Proxy0 142.250.74.78 -exist") != NULL,
           "адрес v4 в набор своей группы: %s", q);
-    CHECK(strstr(q, "add sf6_1_soc 2001:db8::1 -exist") != NULL,
+    CHECK(strstr(q, "add Proxy1v6 2001:db8::1 -exist") != NULL,
           "адрес v6 в набор v6");
 
     /* Мусор на вход не должен превращаться в команду. */
@@ -122,9 +122,9 @@ static void test_cidrs_go_to_sets(void)
     ips_queue_cidrs(&s, &w);
 
     const char *q = ips_pending(&s);
-    CHECK(strstr(q, "add sf4_0_youtube 192.0.2.0/24 -exist") != NULL,
+    CHECK(strstr(q, "add Proxy0 192.0.2.0/24 -exist") != NULL,
           "подсеть v4 попала в набор: %s", q);
-    CHECK(strstr(q, "add sf6_0_youtube 2001:db8::/32 -exist") != NULL,
+    CHECK(strstr(q, "add Proxy0v6 2001:db8::/32 -exist") != NULL,
           "подсеть v6 попала в набор v6");
 }
 
@@ -159,7 +159,7 @@ static void test_flush_feeds_stdin(void)
         got[n] = '\0';
         fclose(f);
     }
-    CHECK(strstr(got, "create sf4_0_youtube") != NULL,
+    CHECK(strstr(got, "create Proxy0") != NULL,
           "ipset получил команды на stdin: %s", got);
 
     /* Пустая очередь не должна порождать процесс. */

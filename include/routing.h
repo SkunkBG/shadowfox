@@ -22,8 +22,9 @@
 #define RT_ARG_LEN   48
 #define RT_BIN_MAX   128
 
-/* Своя цепочка: чистить и наполнять можно свободно, не задевая чужие
-   правила в PREROUTING. */
+/* Прежняя своя цепочка в mangle. Правила теперь стоят прямо в
+   PREROUTING, как у HydraRoute; имя нужно только чтобы снять цепочку
+   у тех, кто обновился. */
 #define RT_CHAIN     "SHADOWFOX"
 #define RT_GUARD     "SHADOWFOX_IN"   /* закрывает порт ядра от сети */
 
@@ -50,8 +51,8 @@ typedef struct {
     rt_cmd_t cmds[RT_CMDS_MAX];
     int      count;
     int      overflow;
-    char     batch4[RT_BATCH_BYTES];   /* для iptables-restore, пусто — нет */
-    char     batch6[RT_BATCH_BYTES];   /* для ip6tables-restore */
+    char     batch4[RT_BATCH_BYTES];   /* для iptables-restore (защита порта), пусто — нет */
+    char     batch6[RT_BATCH_BYTES];   /* не используется, оставлено для формы */
 } rt_plan_t;
 
 typedef struct {
@@ -87,12 +88,22 @@ int  rt_run(const rt_plan_t *p, const rt_t *r, char *err, unsigned err_size);
 
    Складываем, а не берём последнее совпадение: правил в цепочке
    столько же, сколько групп. */
-void rt_parse_counters(const char *text, unsigned long *marked,
+void rt_parse_counters(const char *text, const wl_t *w, unsigned long *marked,
                        unsigned long *restored);
 
-/* То же, но опросив ядро по обеим семьям адресов. Возвращает 0, если
-   цепочка нашлась хотя бы в одной. */
-int  rt_counters(const rt_t *r, unsigned long *marked, unsigned long *restored);
+/* То же, но опросив ядро по обеим семьям адресов: `-L PREROUTING`, из
+   него только строки с нашими наборами. Возвращает 0, если удалось. */
+int  rt_counters(const rt_t *r, const wl_t *w, unsigned long *marked, unsigned long *restored);
+
+/* Устаревшие правила в дампе `-S PREROUTING`: наши по набору, но не
+   совпадающие с тем, что должно стоять (сменилась метка политики,
+   цель, группа выключена). cb вызывается на каждое, без «-A PREROUTING».
+   Чистая функция — для тестов. Возвращает число найденных. */
+int  rt_stale_rules(const char *dump, const wl_t *w, int v6,
+                    void (*cb)(const char *rule, void *ctx), void *ctx);
+
+/* То же с живого ядра, с удалением. Возвращает число снятых. */
+int  rt_prune_stale(const rt_t *r, const wl_t *w);
 
 /* Печатает команду одной строкой — для тестов и журнала. */
 const char *rt_cmd_text(const rt_cmd_t *c, char *dst, unsigned size);
