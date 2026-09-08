@@ -554,6 +554,17 @@ static int apply_all(engine_t *e, char *err, unsigned err_size, int recreate)
    Отсутствие файла со ссылками — не ошибка: тогда своего ядра просто
    нет, а маршрутизация продолжает работать через то подключение,
    которое настроено вручную. */
+/* Ссылок больше нет или они негодны — ядро со старыми гасим: иначе
+   трафик шёл бы через сервер, которого в файле уже нет. */
+static void stop_own_xray(engine_t *e, const char *why)
+{
+    if (!e->xray_managed) return;
+    log_info("ядро останавливается: %s", why);
+    probe_abort(&e->probe);
+    sv_stop(&e->xray);
+    e->xray_managed = 0;
+}
+
 static void start_own_xray(engine_t *e, const config_t *cfg)
 {
     /* Отметка от прежней кнопки «выключить ядро». Кнопки больше нет, и
@@ -566,6 +577,7 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     FILE *f = fopen(cfg->nodes_file, "r");
     if (!f) {
         log_info("файла %s нет, свой Xray не запускается", cfg->nodes_file);
+        stop_own_xray(e, "файла ссылок нет");
         return;
     }
 
@@ -577,6 +589,7 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
 
     if (truncated) {
         log_error("%s больше %zu байт", cfg->nodes_file, sizeof(body) - 1);
+        stop_own_xray(e, "файл ссылок не прочитан");
         return;
     }
 
@@ -598,6 +611,7 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
                      list.items[i].tag[0] ? list.items[i].tag : "без имени");
     if (added <= 0) {
         log_error("в %s нет ни одной понятной ссылки", cfg->nodes_file);
+        stop_own_xray(e, "ссылок не осталось");
         return;
     }
     if (list.skipped)
@@ -609,6 +623,7 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     if (!iface_ipv4(cfg->capture_iface, lan, sizeof(lan))) {
         log_error("не узнать адрес на %s, свой Xray не запускается",
                   cfg->capture_iface);
+        stop_own_xray(e, "нет адреса интерфейса");
         return;
     }
 
@@ -637,6 +652,24 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
         return;
     }
 
+    /* Конфиг тот же и ядро живо — не перезапускаем. Раньше любое
+       сохранение списков на странице перезапускало ядро: все соединения
+       через туннель рвались, и клиенты разом открывали десятки новых
+       рукопожатий к серверу. Пять таких волн за шесть минут — и
+       провайдер закрыл адрес сервера. Ядро касается только ссылок. */
+    if (e->xray_managed && e->xray.pid > 0) {
+        static char current[256 * 1024];
+        FILE *cf = fopen(cfg->xray_config, "r");
+        size_t clen = cf ? fread(current, 1, sizeof(current) - 1, cf) : 0;
+        if (cf) fclose(cf);
+        current[clen] = '\0';
+        if (clen && strcmp(current, json) == 0) {
+            log_info("конфиг Xray не изменился, ядро работает дальше");
+            return;
+        }
+        stop_own_xray(e, "конфиг изменился");
+    }
+
     apply_opts_t ao;
     apply_defaults(&ao);
     str_copy(ao.config_path, sizeof(ao.config_path), cfg->xray_config);
@@ -644,7 +677,8 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
 
     char aerr[512] = "";
     if (apply_config(&ao, json, aerr, sizeof(aerr)) != 0) {
-        /* Конфиг не принят — запускать ядро с ним нельзя. */
+        /* Конфиг не принят — запускать ядро с ним нельзя. Прежнее, если
+           живо, пусть работает: рабочий сервер лучше никакого. */
         log_error("Xray отверг конфиг: %s", aerr);
         return;
     }
@@ -839,13 +873,8 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
         e->rules_applied = 0;
     }
 
-    /* Ссылки могли смениться вместе со списками, поэтому ядро
-       перезапускаем: иначе трафик пошёл бы через прежний сервер. */
-    probe_abort(&e->probe);
-    if (e->xray_managed) {
-        sv_stop(&e->xray);
-        e->xray_managed = 0;
-    }
+    /* Ссылки могли смениться вместе со списками. Перезапустит ли ядро,
+       решает start_own_xray, сравнив новый конфиг с записанным. */
     start_own_xray(e, cfg);
 
     int have = load_lists(e, cfg);
