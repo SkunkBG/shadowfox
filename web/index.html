@@ -673,12 +673,11 @@ function viewConn(){
       ${D.have_link?'<span class="badge ok">Настроен</span>'
                    :'<span class="badge">Не настроен</span>'}
       ${tag?`<span class="badge tag">${esc(serverFlag(tag))} ${esc(tag)}</span>`:''}</div>
-    <p style="margin:0 0 4px">Ссылка VLESS</p>
-    <label>Ссылки подключения</label>
+    <label>Ссылка подключения</label>
     ${nodesMode==='masked'
-      ? `<div class="field"><code>${esc(first)||'пусто'}</code>
+      ? `<div class="field"><code style="filter:blur(5px);user-select:none;pointer-events:none" aria-hidden="true">${first?'vless://xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx@xxxxxxxxxx.xxx:443?security=reality&amp;sni=xxxxxxxxxx':'пусто'}</code>
            <button class="b ghost sm" id="nodes-show">${UI.eye}Показать</button></div>
-         <p style="margin:8px 0 0;font-size:13px">Ключ скрыт</p>
+         <p style="margin:8px 0 0;font-size:13px">Ссылка скрыта целиком: ни адрес сервера, ни ключ на странице не видны</p>
          <div class="bar"><button class="b" id="nodes-new"
            style="width:100%;justify-content:center">Заменить подключение</button></div>`
       : `<textarea class="wide" id="nodes" spellcheck="false" placeholder="vless://..."
@@ -746,13 +745,11 @@ function viewConn(){
       Своя сборка Xray, около 10 МБ</div>`}
     ${stat(UI.router,'Подключение роутера',D.proxy_ready,
            D.proxy_ready?P+' создано':P+' не создано',
-           `<button class="b sm ${D.proxy_ready?'ghost':''}"
-             id="mkproxy">Создать</button>`)}
+           D.proxy_ready?'<span></span>':`<button class="b sm" id="mkproxy">Создать</button>`)}
     <div class="msg" id="m-proxy" style="margin:-6px 0 14px 60px"></div>
     ${stat(UI.shield,'Политика доступа',D.policy_ready,
            D.policy_ready?POL+' готова':POL+' не настроена',
-           `<button class="b sm ${D.policy_ready?'ghost':''}"
-             id="mkpolicy">Настроить</button>`)}
+           D.policy_ready?'<span></span>':`<button class="b sm" id="mkpolicy">Настроить</button>`)}
     <div class="msg" id="m-policy" style="margin:-6px 0 14px 60px"></div>
 
   <div class="card"><h3>Настройка роутера</h3>
@@ -892,11 +889,10 @@ function viewInfo(){
       ${core?`<div class="kv"><span>Туннель</span><span>${tunnelText()}</span></div>`:''}
       <div class="note" style="margin-top:6px">${UI.i}Состояние читается из сокетов ядра, наружу ничего не отправляется:
         Shadow Fox сам не создаёт трафика через туннель.</div>
-      ${core?`<div class="kv"><span>Записей в журнале</span>
-        <span><b>${D.xray_errors||0}</b></span></div>`:''}
-      ${D.xray_last_error?`<div class="note" style="margin-top:8px;word-break:break-all">${UI.i}
-        Последняя: <code>${esc(D.xray_last_error)}</code><br>
-        Журнал целиком: <code>${esc(D.xray_error_log)}</code> на роутере, очищается перезагрузкой.</div>`:''}
+      ${core?`<div class="kv"><span>Журнал ядра</span>
+        <span>${D.xray_errors||0} записей · <code>${esc(D.xray_error_log||'')}</code></span></div>`:''}
+      ${D.xray_last_error&&!/started$/.test(D.xray_last_error)?`<div class="note" style="margin-top:8px">${UI.i}Последняя запись:
+        <div style="margin-top:6px;word-break:break-all"><code>${esc(D.xray_last_error)}</code></div></div>`:''}
     </div>
   </div>
 
