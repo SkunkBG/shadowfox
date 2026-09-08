@@ -13,6 +13,12 @@ static const char *IPTABLES_CANDIDATES[] = {
 static const char *IP6TABLES_CANDIDATES[] = {
     "/opt/sbin/ip6tables", "/usr/sbin/ip6tables", "/sbin/ip6tables", NULL
 };
+static const char *IPTR_CANDIDATES[] = {
+    "/opt/sbin/iptables-restore", "/usr/sbin/iptables-restore", "/sbin/iptables-restore", NULL
+};
+static const char *IP6TR_CANDIDATES[] = {
+    "/opt/sbin/ip6tables-restore", "/usr/sbin/ip6tables-restore", "/sbin/ip6tables-restore", NULL
+};
 static const char *IP_CANDIDATES[] = {
     "/opt/sbin/ip", "/opt/bin/ip", "/usr/sbin/ip", "/sbin/ip", NULL
 };
@@ -46,6 +52,10 @@ int rt_find_bins(rt_t *r)
     /* ip6tables может отсутствовать — тогда просто не трогаем IPv6. */
     if (!find_first(IP6TABLES_CANDIDATES, r->ip6tables, sizeof(r->ip6tables)))
         r->ipv6 = 0;
+
+    /* restore не обязателен: без него — прежний путь, по команде. */
+    find_first(IPTR_CANDIDATES, r->iptables_restore, sizeof(r->iptables_restore));
+    find_first(IP6TR_CANDIDATES, r->ip6tables_restore, sizeof(r->ip6tables_restore));
 
     return ok;
 }
@@ -88,6 +98,22 @@ static void add(rt_plan_t *p, int may_fail, const char *const *args)
     p->count++;
 }
 
+static void add_ensure(rt_plan_t *p, int how, const char *const *args)
+{
+    int before = p->count;
+    add(p, 1, args);
+    if (p->count > before) p->cmds[p->count - 1].ensure = how;
+}
+
+/* Дописывает строку в текст для iptables-restore. Переполнение помечает
+   план негодным: полцепочки хуже, чем ничего. */
+static void batch(rt_plan_t *p, char *buf, const char *line)
+{
+    size_t used = strlen(buf), len = strlen(line);
+    if (used + len + 1 >= RT_BATCH_BYTES) { p->overflow++; return; }
+    memcpy(buf + used, line, len + 1);
+}
+
 /* Метка пишется с маской: младшая половина принадлежит другим
    программам, затирать её нельзя. */
 static void mark_text(char *dst, unsigned size, unsigned mark)
@@ -96,11 +122,17 @@ static void mark_text(char *dst, unsigned size, unsigned mark)
 }
 
 static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
-                        const char *ipflag, const wl_t *w, int v6, int remove)
+                        const char *ipflag, const wl_t *w, int v6, int remove,
+                        char *restore)
 {
     const char *table_arg = "mangle";
+    const int   atomic    = !remove && restore != NULL;
 
-    if (!remove) {
+    if (atomic) {
+        /* Объявление цепочки в --noflush чистит только её и в том же
+           коммите наполняет: ни одного пакета без правил. */
+        batch(p, restore, "*mangle\n:" RT_CHAIN " - [0:0]\n");
+    } else if (!remove) {
         /* Своя цепочка — её можно чистить целиком, не трогая чужое. */
         const char *mk[] = { tables, "-t", table_arg, "-N", RT_CHAIN, NULL };
         add(p, 1, mk);
@@ -132,6 +164,20 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
             snprintf(guard, sizeof(guard), "0x%x/0xfffffff0",
                      g->policy_mark & 0xFFFFFFF0u);
 
+            if (atomic) {
+                char line[320];
+                snprintf(line, sizeof(line),
+                         "-A " RT_CHAIN " -m mark ! --mark %s -m connmark --mark 0x0 "
+                         "-m set --match-set %s dst -j CONNMARK --set-xmark %s\n",
+                         guard, set, pmark);
+                batch(p, restore, line);
+                snprintf(line, sizeof(line),
+                         "-A " RT_CHAIN " -m set --match-set %s dst -j CONNMARK "
+                         "--restore-mark --nfmask 0xffffffff --ctmask 0xffffffff\n", set);
+                batch(p, restore, line);
+                continue;
+            }
+
             const char *set_rule[] = {
                 tables, "-t", table_arg, "-A", RT_CHAIN,
                 "-m", "mark", "!", "--mark", guard,
@@ -141,13 +187,13 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
             };
             add(p, 0, set_rule);
 
-            const char *restore[] = {
+            const char *restore_rule[] = {
                 tables, "-t", table_arg, "-A", RT_CHAIN,
                 "-m", "set", "--match-set", set, "dst",
                 "-j", "CONNMARK", "--restore-mark",
                 "--nfmask", "0xffffffff", "--ctmask", "0xffffffff", NULL
             };
-            add(p, 0, restore);
+            add(p, 0, restore_rule);
             continue;
         }
 
@@ -158,7 +204,13 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
         char table[16];
         snprintf(table, sizeof(table), "%u", g->table);
 
-        if (!remove) {
+        if (atomic) {
+            char line[200];
+            snprintf(line, sizeof(line),
+                     "-A " RT_CHAIN " -m set --match-set %s dst -j MARK --set-xmark %s\n",
+                     set, mark);
+            batch(p, restore, line);
+        } else if (!remove) {
             const char *rule[] = {
                 tables, "-t", table_arg, "-A", RT_CHAIN,
                 "-m", "set", "--match-set", set, "dst",
@@ -193,11 +245,22 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
         }
     }
 
-    /* Врезку в PREROUTING всегда снимаем перед вставкой: так повторный
-       вызов не плодит дубли, а снятие получается тем же кодом. */
     const char *unhook[] = {
         tables, "-t", table_arg, "-D", "PREROUTING", "-j", RT_CHAIN, NULL
     };
+
+    if (atomic) {
+        batch(p, restore, "COMMIT\n");
+        /* Врезка ставится только если её нет — без снятия, без зазора. */
+        const char *chk[] = {
+            tables, "-t", table_arg, "-C", "PREROUTING", "-j", RT_CHAIN, NULL
+        };
+        add_ensure(p, 1, chk);
+        return;
+    }
+
+    /* Врезку в PREROUTING всегда снимаем перед вставкой: так повторный
+       вызов не плодит дубли, а снятие получается тем же кодом. */
     add(p, 1, unhook);
 
     if (!remove) {
@@ -225,12 +288,30 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
    через br0. Поэтому закрываем порт для всего, что пришло не с петли,
    и прокси-клиент под правило не попадает. Своя цепочка в filter, с
    врезкой в начало INPUT: правило точечное, чужому не мешает. */
-static void plan_guard(rt_plan_t *p, const char *tables, int port, int remove)
+static void plan_guard(rt_plan_t *p, const char *tables, int port, int remove,
+                       char *restore)
 {
     if (port <= 0) return;
 
     char dport[16];   /* %d по максимуму типа — десять знаков */
     snprintf(dport, sizeof(dport), "%d", port);
+
+    if (!remove && restore) {
+        char line[160];
+        batch(p, restore, "*filter\n:" RT_GUARD " - [0:0]\n");
+        snprintf(line, sizeof(line),
+                 "-A " RT_GUARD " ! -i lo -p tcp --dport %s -j DROP\n", dport);
+        batch(p, restore, line);
+        snprintf(line, sizeof(line),
+                 "-A " RT_GUARD " ! -i lo -p udp --dport %s -j DROP\n", dport);
+        batch(p, restore, line);
+        batch(p, restore, "COMMIT\n");
+        const char *chk[] = {
+            tables, "-t", "filter", "-C", "INPUT", "-j", RT_GUARD, NULL
+        };
+        add_ensure(p, 2, chk);
+        return;
+    }
 
     const char *unhook[] = {
         tables, "-t", "filter", "-D", "INPUT", "-j", RT_GUARD, NULL
@@ -278,12 +359,15 @@ static void plan_both(rt_plan_t *p, const rt_t *r, const wl_t *w, int remove)
     const char *ipt = r->iptables[0] ? r->iptables : "<нет:iptables>";
     const char *ipb = r->ip[0]       ? r->ip       : "<нет:ip>";
 
-    plan_family(p, ipt, ipb, "-4", w, 0, remove);
+    char *b4 = (!remove && r->iptables_restore[0])  ? p->batch4 : NULL;
+    char *b6 = (!remove && r->ip6tables_restore[0]) ? p->batch6 : NULL;
+
+    plan_family(p, ipt, ipb, "-4", w, 0, remove, b4);
     if (r->ipv6 && r->ip6tables[0])
-        plan_family(p, r->ip6tables, ipb, "-6", w, 1, remove);
+        plan_family(p, r->ip6tables, ipb, "-6", w, 1, remove, b6);
 
     /* Ядро слушает на адресе IPv4, поэтому и закрываем только его. */
-    plan_guard(p, ipt, r->guard_port, remove);
+    plan_guard(p, ipt, r->guard_port, remove, b4);
 }
 
 void rt_plan_apply(rt_plan_t *p, const rt_t *r, const wl_t *w)
@@ -306,21 +390,67 @@ int rt_run(const rt_plan_t *p, const rt_t *r, char *err, unsigned err_size)
         return -1;
     }
 
+    /* Сначала атомарные подмены цепочек, потом команды: врезка ставится
+       уже в наполненную цепочку. */
+    const char *bins[2]  = { r->iptables_restore, r->ip6tables_restore };
+    const char *texts[2] = { p->batch4, p->batch6 };
+    for (int f = 0; f < 2; f++) {
+        if (!texts[f][0] || !bins[f][0]) continue;
+        char binbuf[RT_BIN_MAX], noflush[] = "--noflush";
+        str_copy(binbuf, sizeof(binbuf), bins[f]);
+        char *argv[] = { binbuf, noflush, NULL };
+        char  out[512];
+        int   rc = proc_run_input(argv, texts[f], out, sizeof(out), r->timeout);
+        if (rc != 0) {
+            if (err && err_size)
+                snprintf(err, err_size, "%s --noflush -> %d: %s", bins[f], rc, out);
+            return -1;
+        }
+    }
+
     for (int i = 0; i < p->count; i++) {
         const rt_cmd_t *c = &p->cmds[i];
         if (!c->argc) continue;
 
-        char *argv[RT_ARGS_MAX + 1];
-        char  copy[RT_ARGS_MAX][RT_ARG_LEN];
+        char *argv[RT_ARGS_MAX + 2];
+        char  copy[RT_ARGS_MAX + 1][RT_ARG_LEN];
+        int   argc = c->argc;
 
         for (int k = 0; k < c->argc; k++) {
             memcpy(copy[k], c->argv[k], RT_ARG_LEN);
             argv[k] = copy[k];
         }
-        argv[c->argc] = NULL;
+        argv[argc] = NULL;
 
         char out[512];
         int  rc = proc_run(argv, out, sizeof(out), r->timeout);
+
+        if (c->ensure && rc != 0) {
+            /* Проверка не прошла — ставим. -C стоит на месте действия. */
+            int at = -1;
+            for (int k = 0; k < argc; k++) if (!strcmp(copy[k], "-C")) at = k;
+            if (at < 0) continue;
+            if (c->ensure == 2 && argc < RT_ARGS_MAX) {
+                /* -I <цепочка> 1: сдвигаем хвост на одну позицию. */
+                for (int k = argc; k > at + 2; k--) memcpy(copy[k], copy[k - 1], RT_ARG_LEN);
+                str_copy(copy[at + 2], RT_ARG_LEN, "1");
+                argc++;
+                for (int k = 0; k < argc; k++) argv[k] = copy[k];
+                argv[argc] = NULL;
+                str_copy(copy[at], RT_ARG_LEN, "-I");
+            } else {
+                str_copy(copy[at], RT_ARG_LEN, "-A");
+            }
+            rc = proc_run(argv, out, sizeof(out), r->timeout);
+            if (rc != 0) {
+                char text[512];
+                if (err && err_size)
+                    snprintf(err, err_size, "%s -> %d: %s",
+                             rt_cmd_text(c, text, sizeof(text)), rc, out);
+                return -1;
+            }
+            continue;
+        }
 
         if (rc != 0 && !c->may_fail) {
             char text[512];

@@ -4,7 +4,6 @@
 #include "config.h"
 #include "dnscap.h"
 #include "ipsets.h"
-#include "probe.h"
 #include "tcpstat.h"
 #include "rci.h"
 #include "snicap.h"
@@ -51,15 +50,7 @@ typedef struct engine {
     unsigned long tunnel_retrans;      /* повторов на установленных, последний срез */
     unsigned long tunnel_retrans_prev;
     int     tunnel_retrans_grow;       /* повторы растут между срезами */
-    char    tunnel_why[PROBE_WHY_MAX];
-
-    /* Ручная проверка насквозь — только по кнопке, одним запросом. */
-    probe_t probe;
-    int     probe_wanted;
-    time_t  probe_at;          /* когда закончилась последняя ручная */
-    int     probe_ok;
-    int     probe_ms;
-    char    probe_why[PROBE_WHY_MAX];
+    char    tunnel_why[160];
 
     int    rules_applied;
     int    capturing;

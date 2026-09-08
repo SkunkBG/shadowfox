@@ -32,8 +32,11 @@ void config_defaults(config_t *cfg)
     /* По умолчанию включён: без него остаются слепые зоны, которые
        снаружи выглядят как «правило настроено, а сайт идёт мимо».
        Выключатель оставлен на случай, когда захват на 443 мешает. */
-    cfg->sni_capture   = 1;
-    str_copy(cfg->probe_url, sizeof(cfg->probe_url), "http://www.gstatic.com/generate_204");
+    /* Выключен по умолчанию: перехват выпускает первое соединение
+       наружу с открытым именем и потом рвёт его — HydraRoute, который на
+       той же линии живёт месяцами, этого не делает. Кто понимает цену,
+       включает сам. */
+    cfg->sni_capture   = 0;
 
     /* Фрагментация включена (действует только на обычный TLS, см.
        xraycfg.c). Отпечаток по умолчанию не перекрываем — берётся из
@@ -192,12 +195,7 @@ int config_set(config_t *cfg, const char *key, const char *value)
     }
 
     if (!strcasecmp(key, "tunnelProbe")) {
-        /* «no» и пустое — не проверять. */
-        if (!value[0] || !parse_bool(value, 1))
-            cfg->probe_url[0] = '\0';
-        else
-            str_copy(cfg->probe_url, sizeof(cfg->probe_url), value);
-        return 0;
+        return 0;   /* устаревший ключ: проверки насквозь больше нет */
     }
 
     if (!strcasecmp(key, "createPolicy")) {
@@ -387,16 +385,10 @@ int config_write_default(const char *path)
         "\n"
         "# Чтение имени сервера из TLS ClientHello. Закрывает то, чего не\n"
         "# видит перехват DNS: тёплый кеш устройства, свой DoH у клиента,\n"
-        "# зашитый в приложении адрес. Требует пакет conntrack, чтобы\n"
-        "# оборвать соединение, успевшее уйти мимо туннеля.\n"
+        "# зашитый в приложении адрес. Цена: первое соединение уходит\n"
+        "# наружу с открытым именем и потом рвётся — провайдер с\n"
+        "# распознаванием по поведению это видит. Выключено по умолчанию.\n"
         "sniCapture=%s\n"
-        "\n"
-        "# Адрес для ручной проверки туннеля насквозь — по кнопке на\n"
-        "# странице, одним запросом. Автоматической проверки нет и не\n"
-        "# будет: ровный ритм одинаковых запросов выдаёт туннель\n"
-        "# провайдеру. Живость туннеля демон видит пассивно, по сокетам\n"
-        "# ядра. «no» — убрать и кнопку.\n"
-        "tunnelProbe=%s\n"
         "\n"
         "# Устойчивость к DPI. fragment режет TLS ClientHello у обычного TLS;\n"
         "# для Reality не применяется — там имя сервера открытое по замыслу.\n"
@@ -407,7 +399,7 @@ int config_write_default(const char *path)
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.web_proxy,
         cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.socks_port, cfg.socks_secret,
-        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no", cfg.probe_url,
+        cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no",
         cfg.fragment ? "yes" : "no", cfg.fingerprint);
 
     fclose(f);

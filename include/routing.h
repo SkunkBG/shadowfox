@@ -31,17 +31,34 @@ typedef struct {
     char argv[RT_ARGS_MAX][RT_ARG_LEN];
     int  argc;
     int  may_fail;   /* удаление несуществующего правила — не ошибка */
+    /* «Поставить, если нет»: argv — форма проверки с -C; если она не
+       проходит, команда выполняется с -A (1) либо -I <цепочка> 1 (2).
+       Так врезка в чужую цепочку не плодит дублей и не снимается
+       перед вставкой — а снятие было зазором без метки. */
+    int  ensure;
 } rt_cmd_t;
+
+/* Текст для iptables-restore --noflush: своя цепочка объявляется и
+   наполняется одной атомарной операцией. Раньше цепочка чистилась и
+   наполнялась десятками отдельных вызовов iptables; секунду-две она
+   стояла пустой, все туннельные соединения теряли метку, уходили
+   напрямую и обрывались — и клиенты разом переустанавливали их через
+   сервер. У HydraRoute ровно поэтому правила ставятся так. */
+#define RT_BATCH_BYTES (4096 + 512 * WL_GROUPS_MAX)
 
 typedef struct {
     rt_cmd_t cmds[RT_CMDS_MAX];
     int      count;
     int      overflow;
+    char     batch4[RT_BATCH_BYTES];   /* для iptables-restore, пусто — нет */
+    char     batch6[RT_BATCH_BYTES];   /* для ip6tables-restore */
 } rt_plan_t;
 
 typedef struct {
     char iptables[RT_BIN_MAX];
     char ip6tables[RT_BIN_MAX];
+    char iptables_restore[RT_BIN_MAX];    /* пусто — атомарной подмены нет */
+    char ip6tables_restore[RT_BIN_MAX];
     char ip[RT_BIN_MAX];
     int  ipv6;       /* обслуживать ли IPv6 */
     int  timeout;

@@ -46,7 +46,6 @@ void engine_init(engine_t *e)
     scap_init(&e->sni);
     rci_init(&e->rci);
     sv_init(&e->xray, "", "");
-    probe_init(&e->probe);
 }
 
 int engine_fds(const engine_t *e, int *out, int max)
@@ -56,8 +55,6 @@ int engine_fds(const engine_t *e, int *out, int max)
     int n = 0;
     if (e->capturing && n < max) out[n++] = e->cap.fd;
     if (e->sniffing  && n < max) out[n++] = e->sni.fd;
-    int pfd = probe_fd(&e->probe);
-    if (pfd >= 0 && n < max) out[n++] = pfd;
     return n;
 }
 
@@ -560,7 +557,6 @@ static void stop_own_xray(engine_t *e, const char *why)
 {
     if (!e->xray_managed) return;
     log_info("ядро останавливается: %s", why);
-    probe_abort(&e->probe);
     sv_stop(&e->xray);
     e->xray_managed = 0;
 }
@@ -742,39 +738,6 @@ static void tunnel_sample(engine_t *e, time_t now)
     }
 }
 
-/* Ручная проверка насквозь — одним запросом по кнопке. Не по
-   расписанию: ровный ритм одинаковых запросов и был тем, по чему
-   провайдер распознавал туннель. */
-static void manual_probe(engine_t *e, time_t now)
-{
-    if (e->probe.state != PROBE_IDLE && e->probe.state != PROBE_DONE) {
-        if (!probe_poll(&e->probe, (long)now)) return;
-        e->probe_at = now;
-        e->probe_ok = e->probe.ok;
-        e->probe_ms = e->probe.ok ? e->probe.ms : 0;
-        str_copy(e->probe_why, sizeof(e->probe_why), e->probe.why);
-        if (e->probe_ok) log_info("ручная проверка: туннель отвечает, %d мс", e->probe_ms);
-        else             log_warn("ручная проверка: туннель не отвечает: %s", e->probe_why);
-        probe_abort(&e->probe);
-        return;
-    }
-    if (!e->probe_wanted) return;
-    e->probe_wanted = 0;
-    if (!e->xray_managed || e->xray.pid <= 0 || !e->cfg || !e->cfg->probe_url[0] ||
-        !e->xray_listen[0]) {
-        e->probe_at = now;
-        e->probe_ok = 0;
-        str_copy(e->probe_why, sizeof(e->probe_why), "ядро не запущено или проверка выключена");
-        return;
-    }
-    if (probe_start(&e->probe, e->xray_listen, e->cfg->socks_port,
-                    e->cfg->probe_url, (long)now) != 0) {
-        e->probe_at = now;
-        e->probe_ok = 0;
-        str_copy(e->probe_why, sizeof(e->probe_why), e->probe.why);
-        probe_abort(&e->probe);
-    }
-}
 
 /* Всё, что движок берёт из конфига, — в одном месте. Раньше это делал
    только engine_start, а engine_reload — нет: правишь createPolicy,
@@ -823,7 +786,6 @@ void engine_stop(engine_t *e)
 {
     if (!e) return;
 
-    probe_abort(&e->probe);
     if (e->xray_managed) {
         sv_stop(&e->xray);
         e->xray_managed = 0;
@@ -930,7 +892,6 @@ void engine_tick(engine_t *e, time_t now)
     /* Подхватываем падение своего ядра и перезапускаем с паузой. */
     if (e->xray_managed) sv_tick(&e->xray, now);
     tunnel_sample(e, now);
-    manual_probe(e, now);
 
     if (e->restore_due && now >= e->restore_due) {
         e->restore_due = 0;
@@ -976,6 +937,8 @@ void engine_print_plan(const engine_t *e)
        из вывода не понять, нашлись ли программы вообще. */
     printf("# программы\n");
     printf("iptables:  %s\n",  e->rt.iptables[0]  ? e->rt.iptables  : "НЕ НАЙДЕН");
+    printf("iptables-restore: %s\n", e->rt.iptables_restore[0] ? e->rt.iptables_restore
+                                       : "нет — цепочка ставится по команде, с зазором");
     printf("ip6tables: %s\n",  e->rt.ip6tables[0] ? e->rt.ip6tables : "нет, IPv6 выключен");
     printf("ip:        %s\n",  e->rt.ip[0]        ? e->rt.ip        : "НЕ НАЙДЕН");
     printf("ipset:     %s\n",  e->ips.bin[0]      ? e->ips.bin      : "НЕ НАЙДЕН");
@@ -1014,10 +977,14 @@ void engine_print_plan(const engine_t *e)
     ips_queue_cidrs(&preview, &e->wl);
     fputs(ips_pending(&preview), stdout);
 
+    if (plan.batch4[0]) { printf("# iptables-restore --noflush <<EOF\n%sEOF\n", plan.batch4); }
+    if (plan.batch6[0]) { printf("# ip6tables-restore --noflush <<EOF\n%sEOF\n", plan.batch6); }
+
     printf("# правила\n");
     for (int i = 0; i < plan.count; i++) {
         char line[512];
         printf("%s%s\n", rt_cmd_text(&plan.cmds[i], line, sizeof(line)),
+               plan.cmds[i].ensure   ? "   # если проверка не прошла — поставить" :
                plan.cmds[i].may_fail ? "   # отсутствие не ошибка" : "");
     }
 }

@@ -190,13 +190,6 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_int(&j, "tunnel_est", e->tunnel_established);
     json_kv_int(&j, "tunnel_pending", e->tunnel_pending);
     json_kv_str(&j, "tunnel_why", e->tunnel_why);
-    json_kv_bool(&j, "probe_allowed", cfg->probe_url[0] != '\0');
-    json_kv_bool(&j, "probe_running", e->probe_wanted ||
-                 (e->probe.state != PROBE_IDLE && e->probe.state != PROBE_DONE));
-    json_kv_int(&j, "probe_at", (long)e->probe_at);
-    json_kv_bool(&j, "probe_ok", e->probe_ok);
-    json_kv_int(&j, "probe_ms", e->probe_ms);
-    json_kv_str(&j, "probe_why", e->probe_why);
     json_kv_bool(&j, "capture", e->capturing);
     json_kv_str(&j, "iface", cfg->capture_iface);
     json_kv_int(&j, "seen", (long)e->cap.seen);
@@ -1616,15 +1609,6 @@ static void handle(const http_req_t *req, int fd, void *ctx)
 
     if (!strcmp(req->path, "/xray") && !strcmp(req->method, "POST")) {
         install_xray(req, fd);
-        return;
-    }
-
-    if (!strcmp(req->path, "/probe") && !strcmp(req->method, "POST")) {
-        /* Одна проверка насквозь по просьбе человека. Это его же
-           запрос через туннель, от обычного не отличимый. */
-        c->engine->probe_wanted = 1;
-        log_info("веб: ручная проверка туннеля, запрос с %s", req->peer);
-        http_send_text(fd, 200, "text/plain; charset=utf-8", "проверка запущена\n");
         return;
     }
 

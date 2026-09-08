@@ -111,6 +111,64 @@ static void test_apply_plan(void)
     CHECK(del && ins && del < ins, "снятие идёт раньше вставки");
 }
 
+/* С iptables-restore цепочки подменяются атомарно: в тексте для
+   restore — объявление цепочки и правила, в командах — ни одного -F,
+   а врезка ставится проверкой -C вместо снятия и вставки. */
+static void test_atomic_plan(void)
+{
+    wl_t w;  load_lists(&w);
+    rt_t r;  setup(&r, 1);
+    snprintf(r.iptables_restore,  sizeof(r.iptables_restore),  "/opt/sbin/iptables-restore");
+    snprintf(r.ip6tables_restore, sizeof(r.ip6tables_restore), "/opt/sbin/ip6tables-restore");
+    r.guard_port = 1301;
+
+    w.groups[0].target      = WL_TARGET_POLICY;
+    w.groups[0].policy_mark = 0xffffaaa;
+    w.groups[1].target      = WL_TARGET_IFACE;
+
+    rt_plan_t p;
+    rt_plan_apply(&p, &r, &w);
+    CHECK(p.overflow == 0, "план поместился");
+
+    char text[8192];
+    plan_text(&p, text, sizeof(text));
+
+    CHECK(strstr(p.batch4, "*mangle\n:SHADOWFOX - [0:0]\n") != NULL, "цепочка объявлена в restore");
+    CHECK(strstr(p.batch4, "-A SHADOWFOX -m mark ! --mark 0xffffaa0/0xfffffff0 -m connmark --mark 0x0 "
+                           "-m set --match-set sf4_0_youtube dst -j CONNMARK --set-xmark 0xffffaaa/0xffffffff\n") != NULL,
+          "правило политики в restore:\n%s", p.batch4);
+    CHECK(strstr(p.batch4, "-A SHADOWFOX -m set --match-set sf4_0_youtube dst -j CONNMARK --restore-mark") != NULL,
+          "возврат метки в restore");
+    CHECK(strstr(p.batch4, "-A SHADOWFOX -m set --match-set sf4_1_soc dst -j MARK --set-xmark") != NULL,
+          "группа-устройство тоже в restore");
+    CHECK(strstr(p.batch4, "*filter\n:SHADOWFOX_IN - [0:0]\n-A SHADOWFOX_IN ! -i lo -p tcp --dport 1301 -j DROP\n") != NULL,
+          "защита порта в restore");
+    CHECK(strstr(p.batch6, "*mangle\n:SHADOWFOX - [0:0]\n") != NULL && strstr(p.batch6, "sf6_0_youtube") != NULL,
+          "v6 в своём restore");
+    CHECK(strstr(p.batch6, "*filter") == NULL, "защита порта только v4");
+
+    CHECK(strstr(text, " -F ") == NULL, "ни одного сброса цепочки командой");
+    CHECK(strstr(text, "-N SHADOWFOX") == NULL, "цепочка не создаётся командой");
+    CHECK(strstr(text, "-D PREROUTING") == NULL, "врезка не снимается");
+    CHECK(strstr(text, "-t mangle -C PREROUTING -j SHADOWFOX") != NULL, "врезка проверяется");
+    CHECK(strstr(text, "-t filter -C INPUT -j SHADOWFOX_IN") != NULL, "врезка защиты проверяется");
+
+    int ensures = 0, inserts = 0;
+    for (int i = 0; i < p.count; i++) {
+        if (p.cmds[i].ensure) ensures++;
+        if (p.cmds[i].ensure == 2) inserts++;
+    }
+    CHECK(ensures == 3 && inserts == 1, "три врезки-проверки, одна из них в начало INPUT");
+
+    /* Снятие — прежним путём, restore для него не нужен. */
+    rt_plan_t rm;
+    rt_plan_remove(&rm, &r, &w);
+    CHECK(rm.batch4[0] == '\0' && rm.batch6[0] == '\0', "снятие без restore");
+    plan_text(&rm, text, sizeof(text));
+    CHECK(strstr(text, "-D PREROUTING -j SHADOWFOX") != NULL && strstr(text, "-X SHADOWFOX") != NULL,
+          "снятие командами");
+}
+
 static void test_ipv6_added_only_when_asked(void)
 {
     wl_t w;  load_lists(&w);
@@ -386,6 +444,7 @@ int main(void)
     snprintf(g_dir, sizeof(g_dir), "%s", tpl);
 
     test_apply_plan();
+    test_atomic_plan();
     test_ipv6_added_only_when_asked();
     test_remove_plan();
     test_group_without_interface_skipped();
