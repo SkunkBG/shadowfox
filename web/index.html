@@ -300,6 +300,115 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
   .htop{flex-wrap:wrap}
   .htop .sp{display:none}
 }
+
+/* ================= Ночь и лиса: стекло и свечение =================
+   Слой поверх прежних правил: те же классы, новые материалы. Ночь —
+   не чёрная, а индиго после заката; свечение бирюзовое, в цвет логотипа. */
+:root{
+  --bg:#0a0d1e;--side:rgba(13,17,40,.62);--panel:rgba(18,23,52,.58);
+  --card:rgba(22,28,62,.52);--soft:rgba(7,10,26,.58);--line:rgba(168,178,255,.13);
+  --edge:rgba(255,255,255,.07);--fg:#eef1ff;--dim:#98a3cc;
+  --acc:#22c8e6;--acc-soft:rgba(34,200,230,.14);--acc2:#22c8e6;
+  --ok:#5eeab2;--bad:#ff6b8a;--warn:#ffc46b;
+  --glow:rgba(34,200,230,.45);--glow-ok:rgba(94,234,178,.55);--glow-bad:rgba(255,107,138,.55);
+  --ink:#04222a;
+}
+:root[data-theme=light]{
+  --bg:#eceef8;--side:rgba(255,255,255,.62);--panel:rgba(255,255,255,.66);
+  --card:rgba(255,255,255,.6);--soft:rgba(235,238,250,.75);--line:rgba(40,50,110,.13);
+  --edge:rgba(255,255,255,.9);--fg:#171b30;--dim:#606a8e;
+  --acc:#0d9fbc;--acc-soft:rgba(13,159,188,.13);--acc2:#0d9fbc;
+  --ok:#12996a;--bad:#d7385e;--warn:#c07a12;
+  --glow:rgba(13,159,188,.35);--glow-ok:rgba(18,153,106,.35);--glow-bad:rgba(215,56,94,.35);
+  --ink:#f2fbfd;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme=dark]){
+    --bg:#eceef8;--side:rgba(255,255,255,.62);--panel:rgba(255,255,255,.66);
+    --card:rgba(255,255,255,.6);--soft:rgba(235,238,250,.75);--line:rgba(40,50,110,.13);
+    --edge:rgba(255,255,255,.9);--fg:#171b30;--dim:#606a8e;
+    --acc:#0d9fbc;--acc-soft:rgba(13,159,188,.13);--acc2:#0d9fbc;
+    --ok:#12996a;--bad:#d7385e;--warn:#c07a12;
+    --glow:rgba(13,159,188,.35);--glow-ok:rgba(18,153,106,.35);--glow-bad:rgba(215,56,94,.35);
+    --ink:#f2fbfd;
+  }
+}
+/* Аврора: бирюзовое пятно у логотипа, фиолетовое в глубине, редкие звёзды. */
+body{background:var(--bg)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(900px 520px at 6% -6%, rgba(34,200,230,.20), transparent 62%),
+    radial-gradient(760px 620px at 98% 100%, rgba(99,80,255,.30), transparent 60%),
+    radial-gradient(520px 420px at 60% 40%, rgba(120,90,255,.10), transparent 60%),
+    radial-gradient(1.2px 1.2px at 12% 32%, rgba(255,255,255,.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 18%, rgba(255,255,255,.45) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 44% 74%, rgba(255,255,255,.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 90% 58%, rgba(255,255,255,.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 88%, rgba(255,255,255,.35) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 66% 8%, rgba(255,255,255,.5) 50%, transparent 51%);
+}
+:root[data-theme=light] body::before{
+  background:
+    radial-gradient(900px 520px at 6% -6%, rgba(34,200,230,.18), transparent 62%),
+    radial-gradient(760px 620px at 98% 100%, rgba(120,110,255,.22), transparent 60%),
+    radial-gradient(520px 420px at 60% 40%, rgba(80,190,255,.12), transparent 60%);
+}
+@media (prefers-color-scheme:light){ :root:not([data-theme=dark]) body::before{
+    background:
+    radial-gradient(900px 520px at 6% -6%, rgba(34,200,230,.18), transparent 62%),
+    radial-gradient(760px 620px at 98% 100%, rgba(120,110,255,.22), transparent 60%),
+    radial-gradient(520px 420px at 60% 40%, rgba(80,190,255,.12), transparent 60%);
+}}
+a{color:var(--acc2)}
+
+/* Стекло: полупрозрачная панель, размытый фон, светлая кромка сверху. */
+aside,.card,.rule,.tile,.stat,.fold,.g,.pill,.tbtn,.save,.modal>div,.badge,.search{
+  background:var(--panel);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
+  box-shadow:inset 0 1px 0 var(--edge),0 12px 32px rgba(0,0,0,.28)}
+.g{background:var(--card)}
+.badge,.search,.tbtn{box-shadow:inset 0 1px 0 var(--edge)}
+aside{background:var(--side);border-right:1px solid var(--line);box-shadow:none}
+.g .ico,.tile .ic,.stat .ic,.flow span,.field,textarea.wide,.g .list,.g textarea{
+  background:var(--soft);border-color:var(--line)}
+.stat:has(button):hover,.tbtn:hover{border-color:var(--acc);box-shadow:inset 0 1px 0 var(--edge),0 0 0 1px var(--acc-soft),0 0 22px var(--glow)}
+
+/* Свечение там, где оно значит что-то: живой туннель, беда, действие. */
+.dot.ok{box-shadow:0 0 10px 1px var(--glow-ok)}
+.dot.bad{box-shadow:0 0 10px 1px var(--glow-bad)}
+.dot.warn{box-shadow:0 0 10px 1px rgba(255,196,107,.5)}
+.pill:has(.dot.ok){border-color:rgba(94,234,178,.35)}
+.pill:has(.dot.bad){border-color:rgba(255,107,138,.4);box-shadow:inset 0 1px 0 var(--edge),0 0 24px var(--glow-bad)}
+.b{background:linear-gradient(180deg,#3fd6f0,#17b6d4);color:var(--ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 0 1px rgba(34,200,230,.35),0 8px 24px var(--glow)}
+.b:hover{filter:brightness(1.06)}
+.b.ghost,.b.out{background:var(--soft);color:var(--fg);box-shadow:inset 0 1px 0 var(--edge)}
+.b.out{color:var(--acc);border-color:rgba(34,200,230,.5)}
+.b.ghost:hover,.b.out:hover{border-color:var(--acc);box-shadow:inset 0 1px 0 var(--edge),0 0 18px var(--glow)}
+aside nav button.on{background:var(--acc-soft);color:var(--acc);
+  box-shadow:inset 0 0 0 1px rgba(34,200,230,.25),0 0 18px var(--glow)}
+.sw.on{background:linear-gradient(180deg,#3fd6f0,#17b6d4);box-shadow:0 0 14px var(--glow)}
+.g textarea{border-color:rgba(34,200,230,.6);box-shadow:0 0 0 3px var(--acc-soft)}
+textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.card h4{color:var(--acc)}
+.core{border-color:rgba(255,107,138,.45)}
+.core:hover{background:rgba(255,107,138,.1);box-shadow:0 0 18px var(--glow-bad)}
+.save{box-shadow:inset 0 1px 0 var(--edge),0 16px 40px rgba(0,0,0,.45),0 0 30px var(--glow)}
+
+/* Лиса светится: медленное дыхание, выключается по просьбе системы. */
+.brand b{color:var(--acc);text-shadow:0 0 18px var(--glow)}
+.brand .mark,.brand svg{filter:drop-shadow(0 0 12px var(--glow));animation:breathe 5s ease-in-out infinite}
+@keyframes breathe{0%,100%{filter:drop-shadow(0 0 10px var(--glow))}50%{filter:drop-shadow(0 0 22px var(--glow))}}
+@media (prefers-reduced-motion:reduce){.brand .mark,.brand svg{animation:none}}
+
+/* Телефон: размытие фона на слабом железе тормозит прокрутку — стекло
+   становится плотнее, но без размытия; глазом почти не отличить. */
+@media (max-width:880px){
+  aside,.card,.rule,.tile,.stat,.fold,.g,.pill,.tbtn,.save,.modal>div,.badge,.search{
+    -webkit-backdrop-filter:none;backdrop-filter:none}
+  :root{--side:rgba(13,17,40,.94);--panel:rgba(18,23,52,.92);--card:rgba(22,28,62,.9);--soft:rgba(7,10,26,.8)}
+  :root[data-theme=light]{--side:rgba(255,255,255,.94);--panel:rgba(255,255,255,.94);--card:rgba(255,255,255,.92)}
+}
 </style>
 
 <div class="app">
