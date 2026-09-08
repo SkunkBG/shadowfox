@@ -890,6 +890,11 @@ function viewInfo(){
       ${D.xray_version?`<div class="kv" style="margin-top:10px"><span>Версия ядра</span>
         <span><b>${esc(D.xray_version)}</b></span></div>`:''}
       ${core?`<div class="kv"><span>Туннель</span><span>${tunnelText()}</span></div>`:''}
+      ${core&&D.probe_allowed?`<div class="bar" style="margin-top:8px">
+        <button class="b ghost sm" id="probe-run" ${D.probe_running?'disabled':''}>${D.probe_running?'Проверяю…':'Проверить насквозь'}</button>
+        <span class="msg" id="m-probe">${probeText()}</span></div>
+      <div class="note" style="margin-top:6px">${UI.i}Один запрос через туннель по твоей команде. Автоматической проверки нет:
+        ровный ритм одинаковых запросов выдаёт туннель провайдеру.</div>`:''}
       ${core?`<div class="kv"><span>Записей в журнале</span>
         <span><b>${D.xray_errors||0}</b></span></div>`:''}
       ${D.xray_last_error?`<div class="note" style="margin-top:8px;word-break:break-all">${UI.i}
@@ -1027,10 +1032,14 @@ function chrome(){
 
 function hhmm(t){ const d=new Date(t*1000); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }
 function tunnelText(){
-  if(!D.tunnel_probe) return 'проверка выключена';
-  if(D.tunnel>0) return `<b style="color:var(--ok)">отвечает</b>, ${D.tunnel_ms} мс`;
+  if(D.tunnel>0) return `<b style="color:var(--ok)">соединений с сервером ${D.tunnel_est}</b>${D.tunnel_why?', '+esc(D.tunnel_why):''}`;
   if(D.tunnel<0) return `<b style="color:var(--bad)">не отвечает</b> с ${hhmm(D.tunnel_since)}: ${esc(D.tunnel_why||'')}`;
-  return 'ещё не проверялся';
+  return 'соединений с сервером пока не было';
+}
+function probeText(){
+  if(D.probe_running) return '';
+  if(!D.probe_at) return '';
+  return D.probe_ok?`ответил, ${D.probe_ms} мс (${hhmm(D.probe_at)})`:`не ответил: ${esc(D.probe_why||'')} (${hhmm(D.probe_at)})`;
 }
 function draw(){
   chrome();
@@ -1406,6 +1415,11 @@ document.addEventListener('click',async ev=>{
     try{ localStorage.removeItem('sf-disclaimer'); }catch(e){}
     gate(); return; }
 
+  if(ev.target.id==='probe-run'){
+    ev.target.disabled=true; ev.target.textContent='Проверяю…';
+    fetch('/probe',{method:'POST'}).then(()=>{ let n=0; const t=setInterval(()=>{ load(); if(++n>12) clearInterval(t); },1500); });
+    return;
+  }
   if(ev.target.id==='upd-check'){
     const btn=ev.target, m=$('#m-upd');
     btn.disabled=true; m.className='msg'; m.textContent='спрашиваю opkg…';

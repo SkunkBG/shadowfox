@@ -5,6 +5,7 @@
 #include "dnscap.h"
 #include "ipsets.h"
 #include "probe.h"
+#include "tcpstat.h"
 #include "rci.h"
 #include "snicap.h"
 #include "supervise.h"
@@ -37,16 +38,28 @@ typedef struct engine {
     time_t xray_ver_try;       /* когда пробовали спросить */
     char   xray_listen[64];    /* где слушает наш SOCKS */
 
-    /* Живой ли туннель. Процесс ядра — ещё не туннель: сервер может
-       лежать при живом процессе, и об этом узнавали бы по нерабочему
-       YouTube. Проверка идёт насквозь, через свой SOCKS. */
-    probe_t probe;
-    time_t  probe_next;        /* когда проверять в следующий раз */
-    int     tunnel_state;      /* 0 — не проверяли, 1 — отвечает, -1 — нет */
+    /* Живой ли туннель — пассивно, по TCP-сокетам самого ядра к
+       серверу. Активная проверка по расписанию была сердцебиением, по
+       которому провайдер распознавал туннель, и снята; см. tcpstat.h. */
+    int     node_ports[TCPSTAT_PORTS_MAX];
+    int     node_port_count;
+    time_t  tunnel_sampled;    /* когда смотрели сокеты последний раз */
+    int     tunnel_state;      /* 0 — нет данных, 1 — соединения есть, -1 — сервер не отвечает */
     time_t  tunnel_since;      /* с какого момента в этом состоянии */
-    time_t  tunnel_at;         /* когда проверяли последний раз */
-    int     tunnel_ms;         /* задержка последнего удачного ответа */
+    int     tunnel_established;
+    int     tunnel_pending;    /* SYN без ответа */
+    unsigned long tunnel_retrans;      /* повторов на установленных, последний срез */
+    unsigned long tunnel_retrans_prev;
+    int     tunnel_retrans_grow;       /* повторы растут между срезами */
     char    tunnel_why[PROBE_WHY_MAX];
+
+    /* Ручная проверка насквозь — только по кнопке, одним запросом. */
+    probe_t probe;
+    int     probe_wanted;
+    time_t  probe_at;          /* когда закончилась последняя ручная */
+    int     probe_ok;
+    int     probe_ms;
+    char    probe_why[PROBE_WHY_MAX];
 
     int    rules_applied;
     int    capturing;

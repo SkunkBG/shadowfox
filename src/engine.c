@@ -29,11 +29,8 @@
 #define ENGINE_RESTORE_DELAY 2
 #define ENGINE_BREAK_BUDGET  20   /* обрывов соединений в секунду */
 
-/* Расписание проверки туннеля. Живой проверяем раз в минуту, упавший —
-   чаще, чтобы восстановление заметить без долгой ложной тревоги. */
-#define ENGINE_PROBE_FIRST 5
-#define ENGINE_PROBE_OK    60
-#define ENGINE_PROBE_FAIL  20
+/* Как часто смотреть на сокеты ядра. Чтение /proc, ни одного пакета. */
+#define ENGINE_TUNNEL_SAMPLE 30
 
 void engine_init(engine_t *e)
 {
@@ -602,61 +599,92 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     log_info("конфиг Xray записан: узлов %d, socks %s:%d",
              list.count, lan, cfg->socks_port);
 
+    /* Порты серверов — по ним пассивная проверка отличает соединения
+       ядра с сервером от его же соединений с клиентами. */
+    e->node_port_count = 0;
+    for (int i = 0; i < list.count && e->node_port_count < TCPSTAT_PORTS_MAX; i++) {
+        int port = list.items[i].port, dup = 0;
+        for (int k = 0; k < e->node_port_count; k++) if (e->node_ports[k] == port) dup = 1;
+        if (!dup) e->node_ports[e->node_port_count++] = port;
+    }
+
     sv_init(&e->xray, ao.xray_bin, cfg->xray_config);
     if (sv_start(&e->xray) == 0) {
         e->xray_managed = 1;
         str_copy(e->xray_listen, sizeof(e->xray_listen), lan);
-        /* Первую проверку — через несколько секунд: ядру надо успеть
-           открыть порт. */
-        e->probe_next = time(NULL) + ENGINE_PROBE_FIRST;
     }
 }
 
-/* Проверка туннеля: запуск по расписанию, продвижение по шагам, итог.
-   Об изменении состояния пишем в журнал и сразу выкладываем статус,
-   чтобы страница и --status не ждали минутного круга. */
-static void tunnel_probe(engine_t *e, time_t now)
+/* Пассивная проверка: сокеты ядра к серверу. Установленные есть —
+   туннель жив. Только SYN без ответа — адрес сервера для нас закрыт.
+   «Не отвечает» держится, пока не появится установленное: между
+   попытками ядра сокетов нет вовсе, и без этого состояние мигало бы
+   «нет данных». */
+static void tunnel_sample(engine_t *e, time_t now)
+{
+    if (!e->xray_managed || e->xray.pid <= 0 || !e->node_port_count) return;
+    if (now - e->tunnel_sampled < ENGINE_TUNNEL_SAMPLE) return;
+    e->tunnel_sampled = now;
+
+    tcpstat_t st;
+    if (tcpstat_collect(e->xray.pid, e->node_ports, e->node_port_count, &st) != 0) return;
+
+    e->tunnel_established  = st.established;
+    e->tunnel_pending      = st.syn_sent;
+    e->tunnel_retrans_grow = st.established > 0 && st.retrans > e->tunnel_retrans_prev;
+    e->tunnel_retrans_prev = st.retrans;
+    e->tunnel_retrans      = st.retrans;
+
+    int next = e->tunnel_state;
+    const char *why = "";
+    if (st.established > 0) {
+        next = 1;
+        if (e->tunnel_retrans_grow) why = "соединения есть, но данные повторяются — сервер не подтверждает";
+    } else if (st.syn_sent > 0) {
+        next = -1;
+        why = "ядро стучится к серверу, ответа нет — адрес закрыт для этой линии";
+    }
+    str_copy(e->tunnel_why, sizeof(e->tunnel_why), why);
+
+    if (next != e->tunnel_state) {
+        e->tunnel_state = next;
+        e->tunnel_since = now;
+        if (next > 0) log_info("туннель: соединения с сервером установлены");
+        else          log_warn("туннель: %s", why);
+        status_write(e, e->cfg);
+    }
+}
+
+/* Ручная проверка насквозь — одним запросом по кнопке. Не по
+   расписанию: ровный ритм одинаковых запросов и был тем, по чему
+   провайдер распознавал туннель. */
+static void manual_probe(engine_t *e, time_t now)
 {
     if (e->probe.state != PROBE_IDLE && e->probe.state != PROBE_DONE) {
         if (!probe_poll(&e->probe, (long)now)) return;
-
-        e->tunnel_at = now;
-        int st = e->probe.ok ? 1 : -1;
-        if (e->probe.ok) e->tunnel_ms = e->probe.ms;
-        str_copy(e->tunnel_why, sizeof(e->tunnel_why), e->probe.why);
-
-        if (st != e->tunnel_state) {
-            e->tunnel_since = now;
-            if (st > 0) log_info("туннель отвечает, %d мс", e->tunnel_ms);
-            else        log_warn("туннель не отвечает: %s", e->tunnel_why);
-            e->tunnel_state = st;
-        }
-        /* Файл состояния — после каждой проверки, а не раз в минуту:
-           иначе --status показывал «проверен 107 с назад» при интервале
-           в 60, потому что удачная повторная проверка ничего не меняла
-           и записи не вызывала. */
-        status_write(e, e->cfg);
-        e->probe_next = now + (st > 0 ? ENGINE_PROBE_OK : ENGINE_PROBE_FAIL);
+        e->probe_at = now;
+        e->probe_ok = e->probe.ok;
+        e->probe_ms = e->probe.ok ? e->probe.ms : 0;
+        str_copy(e->probe_why, sizeof(e->probe_why), e->probe.why);
+        if (e->probe_ok) log_info("ручная проверка: туннель отвечает, %d мс", e->probe_ms);
+        else             log_warn("ручная проверка: туннель не отвечает: %s", e->probe_why);
         probe_abort(&e->probe);
         return;
     }
-
-    if (!e->xray_managed || e->xray.pid <= 0) return;
-    if (!e->cfg || !e->cfg->probe_url[0] || !e->xray_listen[0]) return;
-    if (now < e->probe_next) return;
-
+    if (!e->probe_wanted) return;
+    e->probe_wanted = 0;
+    if (!e->xray_managed || e->xray.pid <= 0 || !e->cfg || !e->cfg->probe_url[0] ||
+        !e->xray_listen[0]) {
+        e->probe_at = now;
+        e->probe_ok = 0;
+        str_copy(e->probe_why, sizeof(e->probe_why), "ядро не запущено или проверка выключена");
+        return;
+    }
     if (probe_start(&e->probe, e->xray_listen, e->cfg->socks_port,
                     e->cfg->probe_url, (long)now) != 0) {
-        /* Не смогли даже начать: это тоже ответ. */
-        e->tunnel_at = now;
-        str_copy(e->tunnel_why, sizeof(e->tunnel_why), e->probe.why);
-        if (e->tunnel_state != -1) {
-            e->tunnel_state = -1;
-            e->tunnel_since = now;
-            log_warn("туннель не отвечает: %s", e->tunnel_why);
-            status_write(e, e->cfg);
-        }
-        e->probe_next = now + ENGINE_PROBE_FAIL;
+        e->probe_at = now;
+        e->probe_ok = 0;
+        str_copy(e->probe_why, sizeof(e->probe_why), e->probe.why);
         probe_abort(&e->probe);
     }
 }
@@ -819,7 +847,8 @@ void engine_tick(engine_t *e, time_t now)
 
     /* Подхватываем падение своего ядра и перезапускаем с паузой. */
     if (e->xray_managed) sv_tick(&e->xray, now);
-    tunnel_probe(e, now);
+    tunnel_sample(e, now);
+    manual_probe(e, now);
 
     if (e->restore_due && now >= e->restore_due) {
         e->restore_due = 0;

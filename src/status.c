@@ -79,7 +79,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "tunnel=%d\n"
         "tunnel_since=%ld\n"
         "tunnel_at=%ld\n"
-        "tunnel_ms=%d\n"
+        "tunnel_est=%d\n"
+        "tunnel_pending=%d\n"
         "tunnel_why=%s\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
@@ -91,8 +92,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->sni_names, e->sni_new, e->sni_broken, e->sni.drop_bad,
         e->cap.drop_foreign, e->sni.drop_foreign, e->sni_throttled,
         e->sni.partial_kept, e->sni.reassembled, e->sni.partial_lost,
-        e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_at,
-        e->tunnel_ms, e->tunnel_why);
+        e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_sampled,
+        e->tunnel_established, e->tunnel_pending, e->tunnel_why);
 
     fclose(f);
     rename(tmp, path);
@@ -302,8 +303,9 @@ int status_print(const config_t *cfg)
         char why[128] = "";
         status_get(spath, "tunnel_why", why, sizeof(why));
         if (tunnel > 0) {
-            printf("  туннель:    отвечает, %ld мс, проверен %ld с назад\n",
-                   status_num(spath, "tunnel_ms"), at > 0 ? tnow - at : 0);
+            printf("  туннель:    соединений с сервером %ld, срез %ld с назад%s%s\n",
+                   status_num(spath, "tunnel_est"), at > 0 ? tnow - at : 0,
+                   why[0] ? "\n              " : "", why);
         } else if (tunnel < 0) {
             char when[32] = "";
             if (since > 0) {
@@ -312,7 +314,7 @@ int status_print(const config_t *cfg)
             }
             printf("  туннель:    НЕ ОТВЕЧАЕТ с %s: %s\n", when, why);
         } else {
-            printf("  туннель:    ещё не проверялся\n");
+            printf("  туннель:    соединений с сервером пока не было\n");
         }
 
         char last[200];
