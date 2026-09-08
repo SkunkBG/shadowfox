@@ -20,7 +20,7 @@
 #define PROBE_TIMEOUT   10      /* секунд на всю проверку */
 #define PROBE_HOST_MAX  128
 #define PROBE_PATH_MAX  128
-#define PROBE_WHY_MAX   96
+#define PROBE_WHY_MAX   160   /* кириллица по два байта */
 
 typedef enum {
     PROBE_IDLE = 0,

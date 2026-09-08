@@ -11,6 +11,9 @@ typedef enum {
 
 /* path == NULL или "" — писать в stderr. Возвращает 0 при успехе. */
 int  log_open(const char *path, log_level_t level);
+/* Подхватывает зону из /opt/etc/TZ, если TZ не задан: нужно и
+   --status, который печатает время вне демона. */
+void log_adopt_timezone(void);
 void log_close(void);
 void log_reopen(void);            /* после ротации, по SIGHUP */
 void log_set_level(log_level_t level);

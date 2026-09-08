@@ -16,7 +16,7 @@ static char        g_path[256];
 /* init.d не подхватывает окружение профиля, поэтому TZ демону не
    достаётся и метки времени уходят в UTC, расходясь с часами роутера.
    Entware держит зону в /opt/etc/TZ — читаем оттуда. */
-static void adopt_timezone(void)
+void log_adopt_timezone(void)
 {
     if (getenv("TZ")) return;
 
@@ -84,7 +84,7 @@ log_level_t log_level_from_string(const char *s)
 
 int log_open(const char *path, log_level_t level)
 {
-    adopt_timezone();
+    log_adopt_timezone();
     g_level = level;
     log_close();
 

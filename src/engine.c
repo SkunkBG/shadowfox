@@ -639,10 +639,10 @@ static void tunnel_sample(engine_t *e, time_t now)
     const char *why = "";
     if (st.established > 0) {
         next = 1;
-        if (e->tunnel_retrans_grow) why = "соединения есть, но данные повторяются — сервер не подтверждает";
+        if (e->tunnel_retrans_grow) why = "данные повторяются, сервер не подтверждает";
     } else if (st.syn_sent > 0) {
         next = -1;
-        why = "ядро стучится к серверу, ответа нет — адрес закрыт для этой линии";
+        why = "ядро стучится к серверу, ответа нет";
     }
     str_copy(e->tunnel_why, sizeof(e->tunnel_why), why);
 

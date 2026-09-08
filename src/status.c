@@ -4,6 +4,7 @@
 #include "proc.h"
 #include "routing.h"
 #include "shadowfox.h"
+#include "log.h"
 #include "util.h"
 #include "watchlist.h"
 
@@ -195,6 +196,7 @@ static void print_rule_counters(const rt_t *rt)
 
 int status_print(const config_t *cfg)
 {
+    log_adopt_timezone();
     if (!cfg) return 1;
 
     char spath[CFG_PATH_MAX + 16];
@@ -300,7 +302,7 @@ int status_print(const config_t *cfg)
         long at     = status_num(spath, "tunnel_at");
         long since  = status_num(spath, "tunnel_since");
         long tnow   = (long)time(NULL);
-        char why[128] = "";
+        char why[192] = "";
         status_get(spath, "tunnel_why", why, sizeof(why));
         if (tunnel > 0) {
             printf("  туннель:    соединений с сервером %ld, срез %ld с назад%s%s\n",
