@@ -1237,7 +1237,10 @@ static void send_login(int fd, const char *message)
     snprintf(page, sizeof(page),
         "<!doctype html><meta charset=utf-8>"
         "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
-        "<title>Shadow Fox</title><style>"
+        "<title>Shadow Fox</title>"
+        "<link rel=icon type=image/png href=/logo.png>"
+        "<link rel=apple-touch-icon href=/logo.png>"
+        "<style>"
         ":root{color-scheme:dark light}"
         "@font-face{font-family:Cinzel;font-weight:600;font-display:swap;"
         "src:url(/cinzel.woff2) format('woff2')}"
@@ -1575,9 +1578,10 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         return;
     }
 
-    if (!strcmp(req->path, "/logo.png")) {
+    if (!strcmp(req->path, "/logo.png") || !strcmp(req->path, "/favicon.ico")) {
         /* Без проверки входа: картинка нужна самой форме входа, а тайны
-           в ней нет. */
+           в ней нет. favicon.ico браузеры спрашивают сами, ещё до
+           разметки — отдаём тот же PNG, они его принимают. */
         http_send_gzip(fd, "image/png", web_logo, web_logo_len);
         return;
     }
