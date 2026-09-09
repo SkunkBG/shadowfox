@@ -408,6 +408,17 @@ textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(
 .core:hover{background:rgba(217,154,43,.1);box-shadow:0 0 18px var(--glow-amber)}
 .save{box-shadow:inset 0 1px 0 var(--edge),0 16px 40px rgba(0,0,0,.45),0 0 30px var(--glow)}
 
+/* Блик по силуэту, как в исходном логотипе: белая полоса пробегает раз
+   в пять секунд, маска — та же картинка, второго файла нет. */
+.markw{position:relative;display:inline-block;flex:0 0 auto;width:46px;height:46px}
+.markw img{display:block;width:100%;height:100%}
+.markw::after{content:"";position:absolute;inset:0;pointer-events:none;
+  -webkit-mask:url(/logo.png) center/contain no-repeat;mask:url(/logo.png) center/contain no-repeat;
+  background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.08) 44%,rgba(255,255,255,.6) 50%,rgba(255,255,255,.1) 56%,transparent 62%);
+  background-size:300% 100%;background-position:150% 0;animation:glint 5s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes glint{0%{background-position:150% 0}72%,100%{background-position:-150% 0}}
+@media (prefers-reduced-motion:reduce){.markw::after{animation:none;display:none}}
+@media (max-width:880px){.markw{width:38px;height:38px}}
 /* Лиса светится своим бирюзовым, а не цветом панели: медленное дыхание, выключается по просьбе системы. */
 .brand b{color:var(--acc);text-shadow:0 0 18px var(--glow)}
 .brand .mark,.brand svg{filter:drop-shadow(0 0 12px rgba(0,168,192,.5));animation:breathe 5s ease-in-out infinite}
@@ -427,8 +438,8 @@ textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(
 <div class="app">
   <aside>
     <a class="brand" href="/">
-      <!--ЛОГОТИП: тот же файл, что на экране входа -->
-      <img class="mark" src="/logo.png" alt="" width="46" height="46">
+      <!--ЛОГОТИП: тот же файл, что на экране входа; обёртка несёт блик -->
+      <span class="markw"><img class="mark" src="/logo.png" alt="" width="46" height="46"></span>
       <!--/ЛОГОТИП-->
       <span><b>Shadow&nbsp;Fox</b><i id="ver"></i>
         <span id="verupd" hidden></span></span>
