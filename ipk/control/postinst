@@ -18,6 +18,19 @@ chmod 0755 /opt/etc/ndm/ifstatechanged.d/015-shadowfox.sh 2>/dev/null || true
 # Короткая команда управления: `shadowfox status`, `shadowfox restart` и т.д.
 ln -sf /opt/etc/init.d/S99shadowfox /opt/bin/shadowfox
 
+# Политика ShadowFox — сразу при установке, как у HydraRoute: на странице
+# остаётся только создать подключение, и оно само войдёт в политику.
+# Команда идемпотентна, при обновлении ничего не меняет.
+ndmc=""
+for c in /opt/bin/ndmc /opt/sbin/ndmc /usr/bin/ndmc /usr/sbin/ndmc /bin/ndmc /sbin/ndmc; do
+    [ -x "$c" ] && { ndmc="$c"; break; }
+done
+if [ -n "$ndmc" ] && ! "$ndmc" -c "show running-config" 2>/dev/null | grep -q "^ip policy ShadowFox"; then
+    "$ndmc" -c "ip policy ShadowFox" >/dev/null 2>&1 && \
+    "$ndmc" -c "system configuration save" >/dev/null 2>&1 && \
+    echo "[ИНФО] политика ShadowFox создана в роутере"
+fi
+
 mkdir -p /opt/etc/shadowfox
 
 # Файл настроек не лежит в пакете, а пишется демоном при первой

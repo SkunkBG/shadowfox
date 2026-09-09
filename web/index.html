@@ -258,6 +258,18 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
 /* ---- окна ---- */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;
   display:grid;place-items:center;padding:22px}
+/* Занавес на время долгих дел: установка ядра, сохранение, настройка
+   роутера. Как у HydraRoute — колёсико и одна строка, что происходит. */
+.busy{position:fixed;inset:0;z-index:70;display:grid;place-items:center;
+  background:rgba(6,8,22,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.busy .ring{width:56px;height:56px;border-radius:50%;border:4px solid rgba(255,255,255,.12);
+  border-top-color:var(--acc);animation:spin 1s linear infinite;
+  box-shadow:0 0 24px var(--glow)}
+.busy .t{margin-top:18px;font-size:17px;color:var(--fg)}
+.busy .s{margin-top:6px;font-size:13px;color:var(--dim)}
+.busy>div{text-align:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.busy .ring{animation:none;border-top-color:var(--acc)}}
 .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;
   width:min(740px,100%);max-height:86vh;overflow:auto;padding:26px 28px 22px;
   box-shadow:0 20px 70px rgba(0,0,0,.5)}
@@ -1259,16 +1271,26 @@ async function load(probed,quiet){
   }
 }
 
+/* Занавес с колёсиком. Текст — что делаем, подстрочник — чего ждать. */
+function busy(text,sub){
+  let el=$('#busy');
+  if(!text){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='busy'; el.className='busy'; document.body.appendChild(el); }
+  el.innerHTML=`<div><div class="ring" style="margin:0 auto"></div><div class="t">${esc(text)}</div>${sub?`<div class="s">${esc(sub)}</div>`:''}</div>`;
+}
+
 async function save(what,text,msgId){
   const m=msgId?$('#'+msgId):null;
   if(m){ m.className='msg'; m.textContent='сохраняю…'; }
+  busy('Сохраняю…');
   try{
     const r=await fetch(api('/save?what='+what),{method:'POST',body:text});
     const t=(await r.text()).trim();
     if(m){ m.className=r.ok?'msg ok':'msg bad'; m.textContent=t||(r.ok?'готово':'ошибка'); }
     if(r.ok){ if(what==='nodes') nodesMode='masked'; dirty=false; setTimeout(load,1500); }
+    busy();
     return r.ok;
-  }catch(e){ if(m){ m.className='msg bad'; m.textContent=e.message; } return false; }
+  }catch(e){ busy(); if(m){ m.className='msg bad'; m.textContent=e.message; } return false; }
 }
 
 /* Куда заворачивать: список от роутера плюс «своё имя». Отдельным
@@ -1554,10 +1576,11 @@ document.addEventListener('click',async ev=>{
     if(!confirm('Поставить ядро Xray через opkg?\n'+
                 'Оно весит несколько мегабайт, займёт минуту-другую.')) return;
     btn.disabled=true; m.className='msg'; m.textContent='ставлю, это небыстро…';
+    busy('Выполняется установка…','Ядро Xray, около 10 МБ. Минута-другая.');
     try{
       const r=await fetch(api('/xray'),{method:'POST'});
       const t=(await r.text()).trim();
-      if(!r.ok){ m.className='msg bad'; m.textContent=t; btn.disabled=false; return; }
+      if(!r.ok){ busy(); m.className='msg bad'; m.textContent=t; btn.disabled=false; return; }
       for(let i=0;i<60;i++){
         await new Promise(r=>setTimeout(r,4000));
         try{
@@ -1566,26 +1589,35 @@ document.addEventListener('click',async ev=>{
              этом могло встать. Та же починка, что у обновления демона. */
           if(rr.status===401){ location.reload(); return; }
           if(rr.ok){ const d=await rr.json();
-            if(d.xray_bin){ await load(); return; } }
+            if(d.xray_bin){ busy(); await load(); return; } }
         }catch(e){}
       }
+      busy();
       m.className='msg bad';
       m.textContent='ядро не появилось — смотри /opt/var/log/shadowfox-xray-install.log';
-    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    }catch(e){ busy(); m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 
   if(ev.target.id==='mkproxy'){
+    /* Один шаг: подключение и политика к нему. Раньше было две кнопки,
+       и вторую забывали — метка ставилась, а заворачивать было некуда. */
     const btn=ev.target, m=$('#m-proxy');
-    if(!confirm('Создать подключение '+D.proxy_name+' в роутере?\n'+
-                'Это прокси SOCKS5 на порт '+D.socks_port+', где слушает ядро.')) return;
+    if(!confirm('Создать подключение '+D.proxy_name+' в роутере и настроить политику '+D.policy_name+'?\n'+
+                'Подключение — прокси SOCKS5 на порт '+D.socks_port+', где слушает ядро.\n'+
+                'В политике будет разрешено только оно, остальные запрещены.')) return;
     btn.disabled=true; m.className='msg'; m.textContent='создаю…';
+    busy('Настраиваю роутер…','Подключение '+D.proxy_name+' и политика '+D.policy_name);
     try{
       const r=await fetch(api('/proxy'),{method:'POST'});
       const t=(await r.text()).trim();
-      m.className=r.ok?'msg ok':'msg bad';
-      m.innerHTML=r.ok?'готово':'<pre style="margin-top:8px">'+esc(t)+'</pre>';
-      if(r.ok) setTimeout(load,1500);
-    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+      if(!r.ok){ busy(); m.className='msg bad'; m.innerHTML='<pre style="margin-top:8px">'+esc(t)+'</pre>'; btn.disabled=false; return; }
+      const r2=await fetch(api('/policy'),{method:'POST'});
+      const t2=(await r2.text()).trim();
+      busy();
+      m.className=r2.ok?'msg ok':'msg bad';
+      m.innerHTML=r2.ok?'готово':'<pre style="margin-top:8px">'+esc(t2)+'</pre>';
+      if(r2.ok) setTimeout(load,1500);
+    }catch(e){ busy(); m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 
   if(ev.target.id==='mkpolicy'){
@@ -1594,13 +1626,15 @@ document.addEventListener('click',async ev=>{
                 'В ней будет разрешено только подключение '+D.proxy_name+
                 ', остальные запрещены.')) return;
     btn.disabled=true; m.className='msg'; m.textContent='настраиваю…';
+    busy('Настраиваю роутер…','Политика '+D.policy_name);
     try{
       const r=await fetch(api('/policy'),{method:'POST'});
       const t=(await r.text()).trim();
+      busy();
       m.className=r.ok?'msg ok':'msg bad';
       m.innerHTML=r.ok?'готово':'<pre style="margin-top:8px">'+esc(t)+'</pre>';
       if(r.ok) setTimeout(load,1500);
-    }catch(e){ m.className='msg bad'; m.textContent=e.message; }
+    }catch(e){ busy(); m.className='msg bad'; m.textContent=e.message; }
     btn.disabled=false; return; }
 
   const dset=ev.target.closest('[data-dnsset]');
