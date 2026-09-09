@@ -1301,6 +1301,15 @@ static void send_login(int fd, const char *message)
         "<noscript><div class=bad>Для входа нужен JavaScript: ответ роутеру "
         "считается в браузере, чтобы пароль не уходил по сети</div></noscript>"
         "%s%s%s</form>"
+        /* Язык — тот же ключ, что у страницы: localStorage общий. */
+        "<script>(function(){var l;try{l=localStorage.getItem('sf-lang')}catch(e){}"
+        "if(!l)l=(navigator.language||'ru').toLowerCase().indexOf('ru')===0?'ru':'en';"
+        "if(l==='ru')return;document.documentElement.lang='en';"
+        "var m={'Логин и пароль администратора роутера':'Router administrator login and password',"
+        "'Логин':'Login','Пароль':'Password','Войти':'Sign in',"
+        "'Для входа нужен JavaScript: ответ роутеру считается в браузере, чтобы пароль не уходил по сети':"
+        "'JavaScript is required: the answer to the router is computed in the browser so the password never leaves it'};"
+        "document.querySelectorAll('p,label,button,noscript div').forEach(function(e){var t=e.textContent.trim();if(m[t])e.textContent=m[t]});})()</script>"
         "<script src=/login.js></script>",
         message && *message ? "<div class=bad>" : "",
         message && *message ? safe : "",

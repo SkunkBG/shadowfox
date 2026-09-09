@@ -443,6 +443,7 @@ textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(
     <div class="grow"></div>
     <div class="sep"></div>
     <button class="srow" id="theme"></button>
+    <button class="srow" id="lang"></button>
     <a class="srow" href="https://github.com/SkunkBG/shadowfox"
        target="_blank" rel="noopener" id="gh"></a>
     <a class="srow" href="https://web.tribute.tg/d/OHz"
@@ -1110,6 +1111,81 @@ function disclaimer(){ return `
     текст на него не распространяется.</p>`; }
 
 /* ---- обвязка ---- */
+/* ---- язык ----
+   Перевод накладывается на готовую разметку: словарь по целым абзацам
+   с их выделениями и по коротким подписям, числа — по правилам. Так
+   исходник остаётся русским и читаемым, а английский живёт в одном
+   месте. Тексты от демона переводятся тем же словарём. */
+const EN={"<span class=\"emo\">🔌</span>Подключения":"<span class=\"emo\">🔌</span>Connections","<span class=\"emo\">🔀</span>Правила":"<span class=\"emo\">🔀</span>Rules","<span class=\"emo\">ℹ️</span>Информация":"<span class=\"emo\">ℹ️</span>Information","Тема<span class=\"sp\"></span>":"Theme<span class=\"sp\"></span>","Поддержать<span class=\"sp\"></span>":"Support<span class=\"sp\"></span>","Выход":"Sign out","Условия использования":"Terms of use","Подключения":"Connections","Настройка сервера и проверка готовности":"Server setup and readiness check","Сервер":"Server","Ссылка подключения":"Connection link","Показать":"Show","Ссылка скрыта целиком: ни адрес сервера, ни ключ на странице не видны":"The link is hidden entirely: neither the server address nor the key is shown on this page","Заменить подключение":"Replace connection","Устойчивость к DPI":"DPI resilience","Ручки Xray, которые решают, доживёт ли туннель до следующего месяца. Выбирать тут нечего — включено то, что имеет смысл, и только там, где имеет.":"The Xray knobs that decide whether the tunnel survives until next month. Nothing to choose here: what makes sense is on, and only where it makes sense.","DNS роутера":"Router DNS","Маршрутизация по доменам опирается на DNS-ответы, которые роутер отдаёт сети. Если провайдерский резолвер подменяет адреса, в наборы попадёт подделка, и заворачивать будет нечего. Поэтому вышестоящие серверы лучше держать свои.":"Domain routing relies on the DNS answers the router hands to the network. If the ISP resolver forges addresses, the sets fill with fakes and there is nothing to route. Better to keep your own upstream servers.","Меняются они в панели роутера: <b>Параметры системы → Профили DNS</b>. Там же включается DNS-over-TLS и DNS-over-HTTPS, чтобы запросы самого роутера наружу шли закрыто.":"They are set in the router panel: <b>System settings → DNS profiles</b>. DNS-over-TLS and DNS-over-HTTPS are enabled there too, so the router's own queries leave encrypted.","Снятый флажок <b>«Разрешён транзит запросов»</b> в настройках профиля заворачивает на роутер и тех, кому DNS прописали вручную. На DNS-over-HTTPS внутри браузера он не действует — там запрос идёт по HTTPS, и его не видит никто.":"Unticking <b>“Allow query forwarding”</b> in the profile settings also redirects devices with a manually set DNS to the router. It has no effect on DNS-over-HTTPS inside a browser: that query travels over HTTPS and nobody sees it.","Домены, IP и подсети<span class=\"sp\"></span><span class=\"chev\"></span>":"Domains, IPs and subnets<span class=\"sp\"></span><span class=\"chev\"></span>","В группах правил пишется по одной записи в строке. Поддомены попадают сами: <code>googlevideo.com</code> ловит и <code>rr1.googlevideo.com</code>.":"Rule groups take one entry per line. Subdomains are included automatically: <code>googlevideo.com</code> also catches <code>rr1.googlevideo.com</code>.","Адрес или подсеть пишутся так же — они нужны сервисам, которые DNS не спрашивают, и там перехват ответов бессилен.":"An address or a subnet is written the same way. They are needed for services that never ask DNS, where capturing answers cannot help.","Настройка роутера":"Router setup","Всё, что Shadow Fox может сделать за тебя. Каждая кнопка меняет настройки роутера и сначала показывает, что именно выполнит.":"Everything Shadow Fox can do for you. Each button changes router settings and shows exactly what it will run first.","Чистые серверы DNS":"Clean DNS servers","Cloudflare, Google и Quad9 по DNS-over-TLS и DNS-over-HTTPS. Серверы <b>добавляются</b>, существующие не трогаются.":"Cloudflare, Google and Quad9 over DNS-over-TLS and DNS-over-HTTPS. Servers are <b>added</b>; existing ones are left alone.","Только недостающие":"Only missing","Выбрать всё":"Select all","Снять всё":"Clear all","<span class=\"box\"></span> <span>Cloudflare<i>DoT и DoH</i></span>":"<span class=\"box\"></span> <span>Cloudflare<i>DoT and DoH</i></span>","<span class=\"box\"></span> <span>Google<i>DoT и DoH</i></span>":"<span class=\"box\"></span> <span>Google<i>DoT and DoH</i></span>","<span class=\"box\"></span> <span>Quad9<i>DoT и DoH</i></span>":"<span class=\"box\"></span> <span>Quad9<i>DoT and DoH</i></span>","Установить":"Install","Если провайдерский DNS останется включён, роутер будет спрашивать и его — а он обычно ближе и быстрее наших, значит отвечать будет чаще, и толку от чистых серверов немного.":"If the ISP DNS stays enabled, the router keeps asking it too. It is usually closer and faster than ours, so it answers more often, and the clean servers do little good.","Внешний доступ к интерфейсу":"External access to this page","Страница откроется по адресу <code>https://shadowfox.<i>твоё доменное имя</i></code> — и из дома, и из интернета.":"The page opens at <code>https://shadowfox.<i>your domain name</i></code>, both at home and from the internet.","HTTPS и пароль делает сам роутер: у нас свой вход есть, но выставлять его наружу незачем, когда рядом есть штатный. Пароль тот же, что от панели роутера.":"HTTPS and the password are handled by the router itself: we have our own login, but there is no reason to expose it when the built-in one is right there. The password is the router panel password.","Опубликовать":"Publish","Работает только если у роутера есть имя KeenDNS. Если его нет, команды выполнятся, а открываться будет нечему — имя заводится в панели роутера, раздел <b>Доменное имя</b>.":"Works only if the router has a KeenDNS name. Without it the commands run, but there is nothing to open: the name is created in the router panel, section <b>Domain name</b>.","Ядро Xray":"Xray core","В фидах Entware ядра нет, поэтому мы собираем своё — апстрим без изменений, около 10 мегабайт. Оно лежит в нашем же фиде и ставится кнопкой на карточке ядра.":"Entware feeds carry no core, so we build our own: unmodified upstream, about 10 megabytes. It lives in our feed and installs with the button on the core card.","Ставится оно в <code>/opt/sbin/shadowfox-xray</code> и не конфликтует со штатным пакетом, если тот когда-нибудь появится: обе сборки могут стоять рядом.":"It installs to <code>/opt/sbin/shadowfox-xray</code> and does not conflict with a stock package, should one ever appear: both builds can live side by side.","Подключение и политика доступа":"Connection and access policy","Цепочка такая: правило указывает на политику, политика разрешает подключение, подключение ведёт на порт нашего ядра. Без любого звена метка ставится, а заворачивать некуда — и молча себя это не проявит.":"The chain: a rule points to a policy, the policy allows a connection, the connection leads to our core's port. Without any link the mark is set but there is nowhere to route, and it fails silently.","Кнопка <b>«Настроить»</b> на карточке политики выше делает вторую часть сама: создаёт политику <code>ShadowFox</code>, разрешает в ней <code>Proxy1</code> и запрещает остальные подключения. Список подключений берётся у роутера, а не выдумывается.":"The <b>“Configure”</b> button on the policy card above does the second part: creates the <code>ShadowFox</code> policy, allows <code>Proxy1</code> in it and denies the other connections. The list of connections comes from the router, not from guesswork.","Кнопка <b>«Создать»</b> на карточке подключения делает первую часть: заводит <code>Proxy1</code> как прокси SOCKS5 на порт ядра. Те же команды можно выполнить руками — <code>ndmc</code> принимает их по одной:":"The <b>“Create”</b> button on the connection card does the first part: sets up <code>Proxy1</code> as a SOCKS5 proxy to the core's port. The same commands can be run by hand; <code>ndmc</code> takes them one at a time:","Отменить":"Cancel","Сохранить и применить":"Save and apply","Прочти перед тем, как настраивать маршрутизацию":"Read this before setting up routing","<b>Назначение.</b> Shadow Fox — инструмент выборочной маршрутизации. Он направляет трафик к заранее указанным доменам через то подключение, которое пользователь настроил сам. Программа не предоставляет доступ к сети, не содержит серверов и не связана ни с одним поставщиком услуг: сервер, ключ и списки задаёт пользователь.":"<b>Purpose.</b> Shadow Fox is a selective routing tool. It directs traffic to listed domains through a connection the user has configured themselves. The program provides no network access, contains no servers and is tied to no service provider: the server, the key and the lists are set by the user.","<b>Что программа делает с трафиком.</b> Чтобы сопоставить домен с адресом, Shadow Fox читает в локальной сети ответы DNS и имя сервера из приветствия TLS. Прочитанное используется только на самом роутере: адреса складываются в наборы, по которым расставляются правила маршрутизации. Содержимое соединений не расшифровывается и не изменяется. Журнал посещённых сайтов не ведётся, данные не передаются автору и никуда за пределы роутера не отправляются.":"<b>What the program does with traffic.</b> To match a domain to an address, Shadow Fox reads DNS answers on the local network and the server name from the TLS hello. What it reads is used only on the router: addresses go into sets that routing rules are built on. Connection contents are neither decrypted nor modified. No browsing log is kept; no data is sent to the author or anywhere outside the router.","<b>Без гарантий.</b> Shadow Fox распространяется «как есть», без каких-либо гарантий, обязательств или заверений, явных либо подразумеваемых, включая гарантии пригодности для конкретных целей и непрерывности работы. Использование осуществляется пользователем на собственный риск.":"<b>No warranty.</b> Shadow Fox is provided “as is”, without any warranty, obligation or representation, express or implied, including fitness for a particular purpose and uninterrupted operation. Use is at the user's own risk.","<b>Ответственность пользователя.</b> Пользователь несёт полную ответственность за результаты своей конфигурации, за соблюдение требований законодательства государства, на территории которого он находится, а также условий договора с поставщиком услуг связи и правил сети, в которой работает оборудование. Используя программу, пользователь подтверждает, что действует сознательно и добровольно, принимая все риски и возможные последствия.":"<b>User responsibility.</b> The user bears full responsibility for the results of their configuration, for compliance with the laws of the state they are in, and with the terms of their service provider and the rules of the network the equipment runs on. By using the program the user confirms that they act knowingly and voluntarily, accepting all risks and possible consequences.","<b>Ограничение ответственности.</b> Автор не несёт ответственности за любые последствия использования или невозможности использования программы, включая, но не ограничиваясь:":"<b>Limitation of liability.</b> The author is not liable for any consequences of using or being unable to use the program, including but not limited to:","сбои, неисправности, ошибки или иные нарушения работы оборудования, программного обеспечения и сетевых сервисов;":"failures, malfunctions, errors or other disruptions of equipment, software and network services;","утрату, повреждение, искажение или несанкционированное раскрытие данных;":"loss, damage, corruption or unauthorised disclosure of data;","нарушения требований законодательства и иных нормативных актов;":"violations of laws and other regulations;","любой прямой, косвенный, случайный, непредвиденный, репутационный или иной ущерб, включая упущенную выгоду.":"any direct, indirect, incidental, consequential, reputational or other damage, including lost profit.","Это относится к ущербу, возникшему вследствие действий, бездействия, ошибок или иных обстоятельств, связанных с использованием программы, в том числе если автор был уведомлён о возможности таких последствий. Настоящее ограничение применяется в максимально допустимой законом степени.":"This applies to damage arising from actions, inaction, errors or other circumstances connected with the use of the program, including where the author was advised of the possibility of such consequences. This limitation applies to the fullest extent permitted by law.","<b>Сторонние компоненты.</b> В состав поставки входит ядро Xray-core, распространяемое правообладателем на собственных условиях. Настоящий текст на него не распространяется.":"<b>Third-party components.</b> The package includes the Xray-core engine, distributed by its rights holder under its own terms. This text does not cover it.","Принимаю":"I accept","Правила маршрутизации":"Routing rules","Управляйте группами доменов и IP-адресов":"Manage groups of domains and IP addresses","Правило":"Rule","Группа":"Group","Редактировать":"Edit","Информация":"Information","Состояние Shadow Fox и параметры работы":"Shadow Fox status and settings","Параметры системы":"System parameters","<i class=\"dot ok\"></i> <b style=\"color:var(--ok)\">Работает</b>":"<i class=\"dot ok\"></i> <b style=\"color:var(--ok)\">Running</b>","<i class=\"dot bad\"></i> <b style=\"color:var(--bad)\">Не запущено</b>":"<i class=\"dot bad\"></i> <b style=\"color:var(--bad)\">Not running</b>","Отдельный процесс Shadow Fox на порту 1301":"A separate Shadow Fox process on port 1301","Обновление":"Update","Проверить":"Check","Обновление ставится тем же <code>opkg</code>, что и вручную. Служба при этом перезапускается, поэтому страница на несколько секунд потеряет связь и вернётся сама.":"Updates install through the same <code>opkg</code> as by hand. The service restarts, so the page loses connection for a few seconds and comes back on its own.","Как это работает":"How it works","Заворачиваем по адресам, а не по именам: метка вешается на IP-пакет, поэтому правило может сработать только тогда, когда адрес известен.":"Routing is by address, not by name: the mark goes on an IP packet, so a rule can only fire once the address is known.","<b>Из ответа DNS</b> — заранее, до первого соединения. Перехват пассивный: служба только слушает ответы роутера устройствам и ничего не шлёт; если она упадёт, DNS у сети продолжит работать. Так же устроен HydraRoute.":"<b>From the DNS answer</b>: in advance, before the first connection. The capture is passive: the service only listens to the router's answers to devices and sends nothing; if it dies, the network's DNS keeps working. HydraRoute works the same way.","<b>Из имени в TLS</b> — второй путь, выключенный по умолчанию (<code>sniCapture</code>). Он закрывает тёплый кеш устройства и свой DoH у браузера, но ценой: первое соединение уходит наружу с открытым именем и потом обрывается, чтобы приложение открыло его через туннель. Провайдер с распознаванием по поведению такую пару видит.":"<b>From the TLS server name</b>: the second path, off by default (<code>sniCapture</code>). It covers a device's warm cache and a browser's own DoH, at a price: the first connection leaves with the name in the open and is then cut so the app reopens it through the tunnel. A provider with behavioural detection sees that pair.","Адреса в наборах стареют, чтобы не копить давно переехавшие. Остаются незакрытыми ECH, где имя спрятано внутри шифрования, и iCloud Private Relay, который сам по себе отдельный туннель.":"Addresses in the sets expire so that long-moved ones do not pile up. Still uncovered: ECH, where the name is hidden inside encryption, and iCloud Private Relay, which is a separate tunnel in itself.","Условия использования и отказ от ответственности<span class=\"sp\"></span><span class=\"chev\"></span>":"Terms of use and disclaimer<span class=\"sp\"></span><span class=\"chev\"></span>","<a href=\"#\" id=\"reshow\">Показать при следующем входе</a>":"<a href=\"#\" id=\"reshow\">Show again on next sign-in</a>","Показать при следующем входе":"Show again on next sign-in","Туннель работает":"Tunnel is up","Туннель не отвечает":"Tunnel not responding","Ядро работает":"Core is running","Ядро не запущено":"Core not running","Настроен":"Configured","Не настроен":"Not configured","Фрагментация ClientHello":"ClientHello fragmentation","Для обычного TLS: приветствие режется на части, и имя сервера не собирается в один пакет. Для Reality не применяется — там имя открытое по замыслу, а резать его значило бы только тормозить каждое соединение.":"For plain TLS: the hello is split into pieces, so the server name never sits in one packet. Not applied to Reality: there the name is open by design, and splitting would only slow every connection.","Отпечаток uTLS: из ссылки":"uTLS fingerprint: from the link","Каким браузером представляется соединение. Берётся из ссылки — так, как выдала панель; если там пусто, chrome. Одинаковый редкий отпечаток у всех был бы приметой, а самый частый — лучшее прикрытие.":"Which browser the connection pretends to be. Taken from the link as the panel issued it; if empty, chrome. One rare fingerprint shared by everyone would be a tell; the most common one is the best cover.","читаю настройки роутера…":"reading router settings…","Конфигурация проверяется ядром перед применением: негодная не заменит рабочую":"The core validates the configuration before it is applied: a broken one never replaces a working one","Установлено, версия":"Installed, version","Не установлено":"Not installed","Подключение роутера":"Router connection","Политика доступа":"Access policy","Настройки роутера прочитать не удалось, про провайдерский DNS сказать нечего":"Could not read router settings, nothing to say about the ISP DNS","ничего не выбрано":"nothing selected","Есть изменения":"Unsaved changes","Можно добавлять домены, IP и подсети":"Add domains, IPs and subnets","Служба":"Service","Работает":"Running","Не запущено":"Not running","Адресов":"Addresses","Пакетов":"Packets","Ответов":"Answers","Версия":"Version","Перехват":"Capture","DNS устройства":"Device DNS","Через роутер":"Via the router","Мимо роутера":"Bypassing the router","Пока не видно":"Not visible yet","Правила":"Rules","Установлены":"Installed","Помечено":"Marked","соединений":"connections","Модель":"Model","Прошивка":"Firmware","Версия ядра":"Core version","Туннель":"Tunnel","Состояние читается из сокетов ядра, наружу ничего не отправляется: Shadow Fox сам не создаёт трафика через туннель.":"The state is read from the core's sockets; nothing is sent out: Shadow Fox never generates tunnel traffic of its own.","Журнал ядра":"Core log","Последняя запись:":"Last record:","Установлено":"Installed","Установлена последняя версия":"Latest version installed","Проверка идёт, это до минуты":"Checking, up to a minute","обновление идёт, жду перезапуска…":"updating, waiting for restart…","Домен":"Domain","Адрес":"Address","Кнопка":"Button","Тема":"Theme","Поддержать":"Support","Выключить":"Turn off","Включить":"Turn on","Удалить группу":"Delete group","Найти группу или домен":"Find a group or domain","Новая группа":"New group","без цели":"no target","без имени":"unnamed","пусто":"empty","Нет":"No","Готово":"Done","готово":"done","ошибка":"error","Закрыть":"Close","создаю…":"creating…","сохраняю…":"saving…","Сохраняю…":"Saving…","обновляю…":"updating…","проверяю…":"checking…","выполняю…":"running…","настраиваю…":"configuring…","спрашиваю opkg…":"asking opkg…","ставлю, это небыстро…":"installing, this takes a while…","Выполняется установка…":"Installing…","Ядро Xray, около 10 МБ. Минута-другая.":"Xray core, about 10 MB. A minute or two.","Настраиваю роутер…":"Configuring the router…","Куда заворачивать":"Where to route","Имя политики Keenetic либо интерфейса:":"Keenetic policy or interface name:","Новых адресов":"New addresses","Оборвано соединений":"Connections cut","Обрывов придержано":"Cuts held back","Имён под правилами":"Names matched by rules","Перехват имён TLS":"TLS name capture","соединений с сервером пока не было":"no connections to the server yet","не отвечает":"not responding","ядро стучится к серверу, ответа нет":"the core is knocking, the server does not answer","данные повторяются, сервер не подтверждает":"data is being retransmitted, the server does not acknowledge","проверка ещё идёт":"check still running","Доступна версия":"Version available","Обновить":"Update","Создать":"Create","Настроить":"Configure","Сохранить":"Save","Скрыть":"Hide","Сохранить и запустить":"Save and start","Ключ скрыт":"Key hidden","на роутере, очищается перезагрузкой.":"on the router, cleared by a reboot.","Если с телефона по мобильной сети сервер открывается, адрес этой линии закрыт на самом сервере: бан fail2ban, антискана или Torrent-Blocker ноды. Ложные срабатывания на UDP приложений (Discord, TikTok, звонки) — обычное дело. На сервере: <code>nft list ruleset | grep -c ВАШ_АДРЕС</code>.":"If the server opens from a phone on mobile data, this line's address is blocked on the server itself: a fail2ban, antiscan or node Torrent-Blocker ban. False positives on app UDP traffic (Discord, TikTok, calls) are common. On the server: <code>nft list ruleset | grep -c YOUR_ADDRESS</code>."};
+const EN_RULES=[
+  [/^(\d+)ч (\d+)м$/, (m)=>m[1]+'h '+m[2]+'m'],
+  [/^(\d+) (запись|записи|записей)$/, (m)=>m[1]+(m[1]==='1'?' entry':' entries')],
+  [/^(\d+) (записей|записи|запись) ·$/, (m)=>m[1]+(m[1]==='1'?' record ·':' records ·')],
+  [/^(\d+) (адрес|адреса|адресов) в наборе$/, (m)=>m[1]+(m[1]==='1'?' address':' addresses')+' in the set'],
+  [/^(\d+) (адрес|адреса|адресов)$/, (m)=>m[1]+(m[1]==='1'?' address':' addresses')],
+  [/^(\d+) (группа|группы|групп)$/, (m)=>m[1]+(m[1]==='1'?' group':' groups')],
+  [/^соединений с сервером (\d+)$/, (m)=>m[1]+' connections to the server'],
+  [/^Установлено, версия (.+)$/, (m)=>'Installed, version '+m[1]],
+  [/^(\S+) создано$/, (m)=>m[1]+' created'],
+  [/^(\S+) не создано$/, (m)=>m[1]+' not created'],
+  [/^(\S+) готова$/, (m)=>m[1]+' ready'],
+  [/^(\S+) не настроена$/, (m)=>m[1]+' not configured'],
+  [/^Доступна версия (.*)$/, (m)=>'Version available '+m[1]],
+  [/^Не проверить: (.*)$/, (m)=>'Cannot check: '+(EN[m[1]]||m[1])],
+  [/^с (\S+): (.*)$/, (m)=>'since '+m[1]+': '+(EN[m[2]]||m[2])],
+  [/^Нет связи со службой: (.*)$/, (m)=>'No connection to the service: '+m[1]],
+];
+function lang(){
+  try{ const l=localStorage.getItem('sf-lang'); if(l) return l; }catch(e){}
+  return ((navigator.language||'ru').toLowerCase().startsWith('ru'))?'ru':'en';
+}
+function L(ru,en){ return lang()==='ru'?ru:en; }
+function flipLang(){
+  const l=lang()==='ru'?'en':'ru';
+  try{ localStorage.setItem('sf-lang',l); }catch(e){}
+  document.documentElement.lang=l;
+  location.reload();
+}
+const TR_BLOCK=new Set(['P','H1','H2','H3','H4','LI','LABEL','BUTTON','SMALL','TD','TH','DT','DD','SUMMARY','A']);
+const TR_INLINE=new Set(['B','I','CODE','A','SPAN','BR','EM','STRONG','U','svg','KBD']);
+function trNorm(s){ return s.replace(/\s+/g,' ').trim(); }
+function trInline(el){ return [...el.childNodes].every(n=>n.nodeType===3||(n.nodeType===1&&(n.tagName==='svg'||(TR_INLINE.has(n.tagName)&&trInline(n))))); }
+function trText(t){
+  const k=trNorm(t); if(!k||!/[А-яЁё]/.test(k)) return null;
+  if(EN[k]!=null) return EN[k];
+  for(const [re,fn] of EN_RULES){ const m=k.match(re); if(m) return fn(m); }
+  return null;
+}
+let trBusy=false;
+function translate(root){
+  if(lang()==='ru'||trBusy) return;
+  trBusy=true;
+  try{
+    root=root||document.body;
+    for(const el of root.querySelectorAll('*')){
+      if(el.closest('svg')) continue;
+      /* Без отметки «уже переведено»: шапка перерисовывается по-русски
+         при каждой смене раздела, и отметка на том же элементе мешала
+         бы перевести её снова. Английский ключ просто не совпадёт. */
+      if(TR_BLOCK.has(el.tagName)&&trInline(el)){
+        const svg=el.querySelector(':scope>svg');
+        const key=trNorm(el.innerHTML.replace(/<svg[\s\S]*?<\/svg>/g,''));
+        if(EN[key]!=null){ el.innerHTML=(svg?svg.outerHTML:'')+EN[key]; }
+      }
+    }
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT); const nodes=[]; let n;
+    while(n=w.nextNode()){ if(n.parentElement&&n.parentElement.closest('script,style')) continue; nodes.push(n); }
+    for(const node of nodes){
+      const v=node.nodeValue, r=trText(v); if(r==null) continue;
+      const lead=v.match(/^\s*/)[0], tail=v.match(/\s*$/)[0];
+      node.nodeValue=lead+r+tail;
+    }
+    root.querySelectorAll('[placeholder],[title]').forEach(e=>{ for(const a of ['placeholder','title']){ const v=e.getAttribute(a); if(v&&EN[v]) e.setAttribute(a,EN[v]); } });
+  } finally { trBusy=false; }
+}
+document.documentElement.lang=lang();
+new MutationObserver(()=>{ if(lang()!=='ru') requestAnimationFrame(()=>translate()); }).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+
 function chrome(){
   $('#ver').textContent=D.version;
 
@@ -1137,6 +1213,7 @@ function chrome(){
   const dark=theme()==='dark';
   $('#theme').innerHTML=(dark?UI.moon:UI.sun)+'Тема<span class="sp"></span>'+UI.right;
   $('#theme2').innerHTML=dark?UI.moon:UI.sun;
+  $('#lang').innerHTML='<span class="emo">'+(lang()==='ru'?'🇬🇧':'🇷🇺')+'</span>'+(lang()==='ru'?'English':'Русский')+'<span class="sp"></span>'+UI.right;
   $('#gh').innerHTML=UI.gh+'GitHub<span class="sp"></span>'+UI.out;
   $('#donate').innerHTML=UI.heart+'Поддержать<span class="sp"></span>'+UI.out;
 
@@ -1317,7 +1394,7 @@ function pickTarget(list){
     el.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>{
       const v=b.dataset.target;
       if(v) return done(v);
-      const t=prompt('Имя политики Keenetic либо интерфейса:', D.policy_name);
+      const t=prompt(L('Имя политики Keenetic либо интерфейса:','Keenetic policy or interface name:'), D.policy_name);
       done(t && t.trim() ? t.trim() : null);
     });
   });
@@ -1476,6 +1553,7 @@ document.addEventListener('click',async ev=>{
            draw(); return; }
 
   if(ev.target.closest('#theme')||ev.target.closest('#theme2')) return flipTheme();
+  if(ev.target.closest('#lang')) return flipLang();
 
   const f=ev.target.closest('[data-fold]');
   if(f && ev.target.closest('button') && !ev.target.closest('.body')){
@@ -1494,7 +1572,7 @@ document.addEventListener('click',async ev=>{
 
   const del=ev.target.closest('[data-del]');
   if(del){ const el=del.closest('.g'), rules=collect();
-    if(!confirm('Удалить группу «'+rules[+el.dataset.r].groups[+el.dataset.g].name+'»?')) return;
+    if(!confirm(L('Удалить группу «','Delete group “')+rules[+el.dataset.r].groups[+el.dataset.g].name+L('»?','”?'))) return;
     rules[+el.dataset.r].groups.splice(+el.dataset.g,1);
     D.domains=buildDomains(rules); edit={}; touch(); draw(); return; }
 
@@ -1519,8 +1597,8 @@ document.addEventListener('click',async ev=>{
        исчезала с ответом «сохранено». */
     const empty=[];
     for(const r of collect()) for(const g of r.groups) if(!g.lines.length) empty.push(g.name);
-    if(empty.length && !confirm('Пустые группы будут удалены: '+empty.join(', ')+
-                                '.\nСохранить без них?')) return;
+    if(empty.length && !confirm(L('Пустые группы будут удалены: ','Empty groups will be removed: ')+empty.join(', ')+
+                                L('.\nСохранить без них?','.\nSave without them?'))) return;
     const btn=ev.target; btn.disabled=true;
     D.domains=buildDomains(collect(true));
     const ok=await save('domains',D.domains,'m-rules');
@@ -1547,8 +1625,8 @@ document.addEventListener('click',async ev=>{
     return; }
 
   if(ev.target.id==='upd-go'){
-    if(!confirm('Обновить Shadow Fox до '+updInfo.available+'?\n'+
-                'Служба перезапустится, связь со страницей ненадолго пропадёт.'))
+    if(!confirm(L('Обновить Shadow Fox до ','Update Shadow Fox to ')+updInfo.available+'?\n'+
+                L('Служба перезапустится, связь со страницей ненадолго пропадёт.','The service restarts; the page loses connection for a moment.')))
       return;
     const btn=ev.target, m=$('#m-upd');
     btn.disabled=true; m.className='msg'; m.textContent='обновляю…';
@@ -1577,8 +1655,8 @@ document.addEventListener('click',async ev=>{
 
   if(ev.target.id==='getxray'){
     const btn=ev.target, m=$('#m-xray');
-    if(!confirm('Поставить ядро Xray через opkg?\n'+
-                'Оно весит несколько мегабайт, займёт минуту-другую.')) return;
+    if(!confirm(L('Поставить ядро Xray через opkg?\n','Install the Xray core via opkg?\n')+
+                L('Оно весит несколько мегабайт, займёт минуту-другую.','It is several megabytes and takes a minute or two.'))) return;
     btn.disabled=true; m.className='msg'; m.textContent='ставлю, это небыстро…';
     busy('Выполняется установка…','Ядро Xray, около 10 МБ. Минута-другая.');
     try{
@@ -1606,9 +1684,9 @@ document.addEventListener('click',async ev=>{
     /* Один шаг: подключение и политика к нему. Раньше было две кнопки,
        и вторую забывали — метка ставилась, а заворачивать было некуда. */
     const btn=ev.target, m=$('#m-proxy');
-    if(!confirm('Создать подключение '+D.proxy_name+' в роутере и настроить политику '+D.policy_name+'?\n'+
-                'Подключение — прокси SOCKS5 на порт '+D.socks_port+', где слушает ядро.\n'+
-                'В политике будет разрешено только оно, остальные запрещены.')) return;
+    if(!confirm(L('Создать подключение ','Create connection ')+D.proxy_name+L(' в роутере и настроить политику ',' in the router and configure policy ')+D.policy_name+'?\n'+
+                L('Подключение — прокси SOCKS5 на порт ','The connection is a SOCKS5 proxy to port ')+D.socks_port+L(', где слушает ядро.\n',', where the core listens.\n')+
+                L('В политике будет разрешено только оно, остальные запрещены.','Only it will be allowed in the policy; the rest are denied.'))) return;
     btn.disabled=true; m.className='msg'; m.textContent='создаю…';
     busy('Настраиваю роутер…','Подключение '+D.proxy_name+' и политика '+D.policy_name);
     try{
@@ -1626,9 +1704,9 @@ document.addEventListener('click',async ev=>{
 
   if(ev.target.id==='mkpolicy'){
     const btn=ev.target, m=$('#m-policy');
-    if(!confirm('Настроить политику '+D.policy_name+' в роутере?\n'+
-                'В ней будет разрешено только подключение '+D.proxy_name+
-                ', остальные запрещены.')) return;
+    if(!confirm(L('Настроить политику ','Configure policy ')+D.policy_name+L(' в роутере?\n',' in the router?\n')+
+                L('В ней будет разрешено только подключение ','Only connection ')+D.proxy_name+
+                L(', остальные запрещены.',' will be allowed; the rest are denied.'))) return;
     btn.disabled=true; m.className='msg'; m.textContent='настраиваю…';
     busy('Настраиваю роутер…','Политика '+D.policy_name);
     try{
@@ -1666,10 +1744,10 @@ document.addEventListener('click',async ev=>{
       m.className='msg bad'; m.textContent='ничего не выбрано'; return; }
 
     let what=[];
-    if(picked.length) what.push('добавить '+picked.map(x=>x.name).join(', '));
-    if(isp.length) what.push('отключить DNS провайдера на '+isp.join(', '));
-    if(!confirm('В настройках роутера: '+what.join('; ')+
-                '?\nСуществующие серверы не удаляются.')) return;
+    if(picked.length) what.push(L('добавить ','add ')+picked.map(x=>x.name).join(', '));
+    if(isp.length) what.push(L('отключить DNS провайдера на ','disable ISP DNS on ')+isp.join(', '));
+    if(!confirm(L('В настройках роутера: ','In router settings: ')+what.join('; ')+
+                L('?\nСуществующие серверы не удаляются.','?\nExisting servers are kept.'))) return;
     btn.disabled=true; m.className='msg'; m.textContent='выполняю…';
     try{
       const r=await fetch(api('/dns?sets='+picked.map(x=>x.key).join(',')+
@@ -1686,8 +1764,8 @@ document.addEventListener('click',async ev=>{
   if(ev.target.id==='web-pub'){
     const btn=ev.target, m=$('#m-web');
     const nm=(dnsInfo&&dnsInfo.web_name)||'shadowfox';
-    if(!confirm('Опубликовать интерфейс наружу как '+nm+'?\n'+
-                'Роутер откроет его по HTTPS и будет спрашивать свой пароль.')) return;
+    if(!confirm(L('Опубликовать интерфейс наружу как ','Publish this page externally as ')+nm+'?\n'+
+                L('Роутер откроет его по HTTPS и будет спрашивать свой пароль.','The router serves it over HTTPS and asks for its own password.'))) return;
     btn.disabled=true; m.className='msg'; m.textContent='настраиваю…';
     try{
       const r=await fetch(api('/web'),{method:'POST'});
