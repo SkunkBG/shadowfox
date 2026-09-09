@@ -12,7 +12,10 @@
 #define WL_IFACE_MAX    32
 #define WL_SETNAME_MAX  32          /* ipset не принимает имена длиннее 31 */
 #define WL_DOMAINS_MAX  4096
-#define WL_CIDRS_MAX    1024
+/* 4096: у WhatsApp и Telegram по нескольку сотен зашитых адресов на
+   каждую семью, и на 1024 живые списки не помещались — хвост молча
+   отбрасывался. По 20 байт на запись это 80 КБ. */
+#define WL_CIDRS_MAX    4096
 #define WL_POOL_BYTES   (192 * 1024)
 
 /* Метки и таблицы маршрутизации.

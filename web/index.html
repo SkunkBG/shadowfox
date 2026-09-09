@@ -637,6 +637,8 @@ function viewRules(){
     return `<div class="rule">
       <div class="top"><b>${esc(r.target||'без цели')}</b>
         <span class="badge">${plural(r.groups.length,'группа','группы','групп')}</span>
+        ${targetAddr(r.groups)}
+        ${targetAddr(r.groups)}
         <div class="sp"></div>
         <button class="b sm" data-addgrp="${i}">${UI.plus}Группа</button></div>
       <div class="grid">${shown.map(({g,k})=>{
@@ -669,12 +671,14 @@ function viewRules(){
 
 /* Сколько адресов набрала группа — из наборов ipset, снимок раз в
    минуту. До сих пор здесь был ноль, и всё смотрели через консоль. */
-function addrText(name){
-  const g=(D.groups||[]).find(x=>x.name===name);
-  if(!g || g.addrs4==null) return '';
+/* Набор общий на цель, поэтому число адресов у всех групп одно и
+   печатается один раз, в шапке правила. У группы остаётся число записей. */
+function addrText(name){ return ''; }
+function targetAddr(groups){
+  const g=(D.groups||[]).find(x=>groups.some(y=>y.name===x.name) && x.addrs4!=null && (x.addrs4>=0||x.addrs6>=0));
+  if(!g) return '';
   const n=Math.max(0,g.addrs4)+Math.max(0,g.addrs6);
-  if(g.addrs4<0 && g.addrs6<0) return '';
-  return ' · '+plural(n,'адрес','адреса','адресов');
+  return `<span class="badge">${plural(n,'адрес','адреса','адресов')} в наборе</span>`;
 }
 
 /* ---- раздел «Подключения» ---- */

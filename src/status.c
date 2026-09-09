@@ -261,18 +261,24 @@ int status_print(const config_t *cfg)
            «наборы ещё не созданы» значило бы намекать на поломку. */
         if (!g->enabled) continue;
 
-        if (have_ipset) {
+    }
+
+    /* Набор общий на цель: адреса печатаем по наборам, а не по группам,
+       иначе одно и то же число повторялось бы семь раз. */
+    if (have_ipset) {
+        for (int i = 0; i < wl.group_count; i++) {
+            const wl_group_t *g = &wl.groups[i];
+            if (!g->enabled || !g->iface[0] || wl_set_owner(&wl, i) != i) continue;
+
             long c4 = ipset_count(ipbin, g->ipset4);
             long c6 = ipset_count(ipbin, g->ipset6);
-
-            if (c4 == IPSET_NO_SET && c6 == IPSET_NO_SET) {
-                printf("        наборы ещё не созданы\n");
-            } else if (c4 == IPSET_UNKNOWN || c6 == IPSET_UNKNOWN) {
-                printf("        наборы есть, число записей не прочитать\n");
-            } else {
-                printf("        адресов: v4 %ld, v6 %ld\n",
-                       c4 >= 0 ? c4 : 0, c6 >= 0 ? c6 : 0);
-            }
+            if (c4 == IPSET_NO_SET && c6 == IPSET_NO_SET)
+                printf("    набор %s: ещё не создан\n", g->ipset4);
+            else if (c4 == IPSET_UNKNOWN || c6 == IPSET_UNKNOWN)
+                printf("    набор %s: есть, число записей не прочитать\n", g->ipset4);
+            else
+                printf("    набор %s: адресов v4 %ld, v6 %ld\n",
+                       g->ipset4, c4 >= 0 ? c4 : 0, c6 >= 0 ? c6 : 0);
         }
     }
     printf("\n");
