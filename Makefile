@@ -1,6 +1,6 @@
 PROJECT  = shadowfoxd
 PKG      = shadowfox
-VERSION  = 0.1.0
+VERSION  = 1.0.0
 REVISION = 1
 
 # Кросс-компиляторы musl. На macOS их нет — собирай через `make docker-all`
