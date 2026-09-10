@@ -822,10 +822,12 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     }
 
     static char json[256 * 1024];
-    int built = json_mode ? xraycfg_build_from_json(chosen, &o, json, sizeof(json))
+    char berr[128] = "";
+    int built = json_mode ? xraycfg_build_from_json(chosen, &o, json, sizeof(json), berr, sizeof(berr))
                           : xraycfg_build_list(&list, &o, json, sizeof(json));
     if (built != 0) {
-        log_error("не удалось собрать конфиг Xray");
+        log_error("не удалось собрать конфиг Xray%s%s", berr[0] ? ": " : "", berr);
+        if (json_mode) stop_own_xray(e, "конфиг панели отвергнут");
         return;
     }
 
@@ -1043,6 +1045,13 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
 
     adopt_config(e, cfg);
 
+    /* Ссылки могли смениться вместе со списками. Перезапустит ли ядро,
+       решает start_own_xray, сравнив новый конфиг с записанным. Это
+       делается до снятия правил: загрузка подписки может занять до
+       40 секунд, и всё это время трафик обязан идти в туннель, а не
+       напрямую к провайдеру. */
+    start_own_xray(e, cfg);
+
     /* Старые правила снимаем по старым спискам: после перечитывания
        имена групп могут поменяться, и снимать станет нечего. */
     if (e->rules_applied) {
@@ -1052,10 +1061,6 @@ int engine_reload(engine_t *e, const config_t *cfg, char *err, unsigned err_size
         rt_run(&plan, &e->rt, ignore, sizeof(ignore));
         e->rules_applied = 0;
     }
-
-    /* Ссылки могли смениться вместе со списками. Перезапустит ли ядро,
-       решает start_own_xray, сравнив новый конфиг с записанным. */
-    start_own_xray(e, cfg);
 
     int have = load_lists(e, cfg);
 

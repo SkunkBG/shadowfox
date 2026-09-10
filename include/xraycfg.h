@@ -30,13 +30,11 @@ int  xraycfg_build(const node_t *n, const xraycfg_opts_t *o,
 /* Собирает config.json для списка узлов. При двух и более узлах
    добавляет балансировщик по наименьшей задержке.
    Возвращает 0 при успехе, -1 если список пуст или не хватило буфера. */
-/* Конфиг из подписки Xray JSON: outbounds, routing, наблюдатель и
-   прочее берутся из конфига панели как есть, входы и журнал — свои,
-   dns панели отбрасывается (иначе имена серверов уходили бы открытым
-   UDP мимо DoT роутера), правила с geoip/geosite — тоже: файлов
-   geo на роутере нет, и ядро с ними не стартует. */
+/* Конфиг из подписки Xray JSON. Берётся только outbounds, routing и
+   наблюдатели, и только в безопасных формах (см. xraycfg.c); входы,
+   журнал и замыкающее правило — свои. Отказ — с причиной в err. */
 int  xraycfg_build_from_json(const xjson_item_t *it, const xraycfg_opts_t *o,
-                             char *buf, size_t size);
+                             char *buf, size_t size, char *err, size_t err_size);
 
 int  xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
                         char *buf, size_t size);

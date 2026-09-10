@@ -1,4 +1,5 @@
 #include "xraycfg.h"
+#include "util.h"
 #include "jsonw.h"
 
 #include <stdio.h>
@@ -393,33 +394,181 @@ int xraycfg_build(const node_t *n, const xraycfg_opts_t *o,
 
 /* ---- конфиг из подписки Xray JSON ---- */
 
+/* Панель — чужой код, а ядро на роутере работает с правами root.
+   Поэтому из её конфига берётся только то, без чего сборка серверов
+   не соберётся, и только в тех формах, которые не дают панели власти
+   над роутером:
+     outbounds — протоколы туннеля, freedom и blackhole; без sockopt
+                 (mark/interface/tproxy ломают маршрутизацию по меткам),
+                 без reverse (вход оператора в домашнюю сеть), без
+                 redirect и dialerProxy;
+     routing   — правила без geo (файлов нет) и без webhook (адреса
+                 устройств уходили бы на URL панели), плюс своё
+                 замыкающее правило: всё с нашего входа — в балансировщик
+                 панели либо в первый серверный outbound. Без него трафик
+                 без совпавшего правила шёл бы в первый outbound панели,
+                 каким бы он ни был;
+     observatory / burstObservatory — как есть, без connectivity (по
+                 нему ядро ходит наружу мимо туннеля).
+   Всё остальное (api, metrics, env, stats, policy, transport, fakedns…)
+   отбрасывается. Имена ключей ядро сравнивает без учёта регистра и при
+   дубликате берёт последний, поэтому ключи сравниваются в нижнем
+   регистре, дубликаты и комментарии — отказ. */
+
 static int span_is(const xjson_span_t *k, const char *name)
 {
-    return k->len == strlen(name) && !memcmp(k->ptr, name, k->len);
+    if (k->len != strlen(name)) return 0;
+    for (size_t i = 0; i < k->len; i++) {
+        char c = k->ptr[i];
+        if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+        if (c != name[i]) return 0;
+    }
+    return 1;
 }
 
+/* Подстрока без учёта регистра внутри куска. */
 static int span_has(const xjson_span_t *v, const char *needle)
 {
-    return memmem(v->ptr, v->len, needle, strlen(needle)) != NULL;
+    size_t n = strlen(needle);
+    if (!n || v->len < n) return 0;
+    for (size_t i = 0; i + n <= v->len; i++) {
+        size_t j = 0;
+        for (; j < n; j++) {
+            char c = v->ptr[i + j];
+            if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+            if (c != needle[j]) break;
+        }
+        if (j == n) return 1;
+    }
+    return 0;
 }
 
-/* routing панели: правила с geoip:/geosite:/ext: выбрасываются. */
-static int copy_routing(json_t *j, const xjson_span_t *routing)
+/* Комментарии (две косые или косая со звёздочкой) вне строк: ядро их
+   вырезает до разбора, наш сканер — нет, и скобки внутри комментария
+   сбили бы его. */
+static int has_comments(const xjson_span_t *v)
 {
-    json_key(j, "routing");
-    json_obj_open(j);
+    int in_str = 0;
+    for (size_t i = 0; i < v->len; i++) {
+        char c = v->ptr[i];
+        if (in_str) {
+            if (c == '\\') i++;
+            else if (c == '"') in_str = 0;
+            continue;
+        }
+        if (c == '"') in_str = 1;
+        else if (c == '/' && i + 1 < v->len && (v->ptr[i + 1] == '/' || v->ptr[i + 1] == '*'))
+            return 1;
+    }
+    return 0;
+}
+
+/* Строковое поле объекта: значение без кавычек, без раскрытия
+   экранирования (для тегов и протоколов этого достаточно). */
+static int obj_str(const xjson_span_t *obj, const char *name, char *dst, size_t size)
+{
+    const char *p = obj->ptr + 1, *end = obj->ptr + obj->len;
+    xjson_span_t k, v;
+    while (xjson_next_member(&p, end, &k, &v) == 1) {
+        if (!span_is(&k, name)) continue;
+        if (v.len < 2 || *v.ptr != '"') return 0;
+        size_t n = v.len - 2;
+        if (n >= size) n = size - 1;
+        memcpy(dst, v.ptr + 1, n);
+        dst[n] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+static int is_tunnel_protocol(const char *p)
+{
+    return !strcmp(p, "vless") || !strcmp(p, "vmess") || !strcmp(p, "trojan") ||
+           !strcmp(p, "shadowsocks");
+}
+
+static void fail(char *err, size_t err_size, const char *why)
+{
+    if (err && err_size) str_copy(err, err_size, why);
+}
+
+/* outbounds панели: проверка каждого и имя первого серверного. */
+static int check_outbounds(const xjson_span_t *arr, char *first_proxy, size_t size,
+                           char *err, size_t err_size)
+{
+    first_proxy[0] = '\0';
+    if (arr->len < 2 || *arr->ptr != '[') { fail(err, err_size, "outbounds не массив"); return -1; }
+    const char *q = xjson_ws(arr->ptr + 1, arr->ptr + arr->len), *qe = arr->ptr + arr->len;
+    int n = 0;
+    while (q < qe && *q != ']') {
+        if (*q == ',') { q = xjson_ws(q + 1, qe); continue; }
+        const char *e = xjson_skip_value(q, qe);
+        if (!e) { fail(err, err_size, "outbounds битый"); return -1; }
+        xjson_span_t ob = { q, (size_t)(e - q) };
+        if (*q != '{') { fail(err, err_size, "outbound не объект"); return -1; }
+
+        char proto[32] = "";
+        obj_str(&ob, "protocol", proto, sizeof(proto));
+        for (char *c = proto; *c; c++) if (*c >= 'A' && *c <= 'Z') *c = (char)(*c + 32);
+        if (!is_tunnel_protocol(proto) && strcmp(proto, "freedom") && strcmp(proto, "blackhole")) {
+            fail(err, err_size, "outbound с недопустимым протоколом"); return -1;
+        }
+        static const char *banned[] = { "\"reverse\"", "\"sockopt\"", "\"redirect\"",
+                                        "\"dialerproxy\"", "\"proxysettings\"", NULL };
+        for (int i = 0; banned[i]; i++)
+            if (span_has(&ob, banned[i])) { fail(err, err_size, "outbound с запрещённым полем"); return -1; }
+
+        if (!first_proxy[0] && is_tunnel_protocol(proto)) {
+            char tag[64] = "";
+            if (obj_str(&ob, "tag", tag, sizeof(tag))) str_copy(first_proxy, size, tag);
+        }
+        n++;
+        q = xjson_ws(e, qe);
+    }
+    if (!n) { fail(err, err_size, "outbounds пуст"); return -1; }
+    if (!first_proxy[0]) { fail(err, err_size, "в outbounds нет серверного с тегом"); return -1; }
+    return 0;
+}
+
+/* routing панели: правила без geo и webhook, балансировщики как есть,
+   и замыкающее правило с нашего входа. */
+static int copy_routing(json_t *j, const xjson_span_t *routing, const char *first_proxy,
+                        char *err, size_t err_size)
+{
+    char first_balancer[64] = "";
     const char *p = routing->ptr + 1, *end = routing->ptr + routing->len;
     xjson_span_t k, v;
     int rc;
+
+    /* Первый проход: тег первого балансировщика и проверки. */
     while ((rc = xjson_next_member(&p, end, &k, &v)) == 1) {
-        char key[64];
-        if (k.len >= sizeof(key)) return -1;
-        memcpy(key, k.ptr, k.len); key[k.len] = '\0';
-        if (!span_is(&k, "rules") || v.len < 2 || *v.ptr != '[') {
+        if (span_is(&k, "balancers") && v.len >= 2 && *v.ptr == '[') {
+            const char *q = xjson_ws(v.ptr + 1, v.ptr + v.len);
+            if (*q == '{') {
+                const char *e = xjson_skip_value(q, v.ptr + v.len);
+                if (e) { xjson_span_t b = { q, (size_t)(e - q) }; obj_str(&b, "tag", first_balancer, sizeof(first_balancer)); }
+            }
+        }
+        if (span_is(&k, "rules") && span_has(&v, "\"webhook\"")) {
+            fail(err, err_size, "правило с webhook"); return -1;
+        }
+    }
+    if (rc < 0) { fail(err, err_size, "routing битый"); return -1; }
+
+    json_key(j, "routing");
+    json_obj_open(j);
+    int had_rules = 0;
+    p = routing->ptr + 1;
+    while ((rc = xjson_next_member(&p, end, &k, &v)) == 1) {
+        if (span_is(&k, "domainstrategy") || span_is(&k, "domainmatcher") || span_is(&k, "balancers")) {
+            char key[32];
+            memcpy(key, k.ptr, k.len); key[k.len] = '\0';
             json_key(j, key);
             json_rawn(j, v.ptr, v.len);
             continue;
         }
+        if (!span_is(&k, "rules") || v.len < 2 || *v.ptr != '[') continue;   /* прочее не нужно */
+        had_rules = 1;
         json_key(j, "rules");
         json_arr_open(j);
         const char *q = xjson_ws(v.ptr + 1, v.ptr + v.len), *qe = v.ptr + v.len;
@@ -429,21 +578,114 @@ static int copy_routing(json_t *j, const xjson_span_t *routing)
             if (!e) return -1;
             xjson_span_t rule = { q, (size_t)(e - q) };
             if (!span_has(&rule, "geoip:") && !span_has(&rule, "geosite:") &&
-                !span_has(&rule, "ext:"))
+                !span_has(&rule, "\"ext:"))
                 json_rawn(j, rule.ptr, rule.len);
             q = xjson_ws(e, qe);
         }
+        /* Замыкающее правило — наше. */
+        json_obj_open(j);
+        json_kv_str(j, "type", "field");
+        json_key(j, "inboundTag");
+        json_arr_open(j); json_str(j, TAG_SOCKS_IN); json_arr_close(j);
+        if (first_balancer[0]) json_kv_str(j, "balancerTag", first_balancer);
+        else                   json_kv_str(j, "outboundTag", first_proxy);
+        json_obj_close(j);
         json_arr_close(j);
     }
     if (rc < 0) return -1;
+    if (!had_rules) {
+        json_key(j, "rules");
+        json_arr_open(j);
+        json_obj_open(j);
+        json_kv_str(j, "type", "field");
+        json_key(j, "inboundTag");
+        json_arr_open(j); json_str(j, TAG_SOCKS_IN); json_arr_close(j);
+        if (first_balancer[0]) json_kv_str(j, "balancerTag", first_balancer);
+        else                   json_kv_str(j, "outboundTag", first_proxy);
+        json_obj_close(j);
+        json_arr_close(j);
+    }
     json_obj_close(j);
     return 0;
 }
 
-int xraycfg_build_from_json(const xjson_item_t *it, const xraycfg_opts_t *o,
-                            char *buf, size_t size)
+/* burstObservatory панели без pingConfig.connectivity: по нему ядро при
+   неудаче пробы ходит на URL панели напрямую, минуя туннель. Остальное
+   (destination, interval, sampling, timeout) — как есть. */
+static void copy_object_without(json_t *j, const xjson_span_t *obj, const char *skip);
+
+static void copy_burst(json_t *j, const xjson_span_t *burst)
 {
-    if (!it || !o || !buf || !it->whole.ptr || it->whole.len < 2) return -1;
+    json_key(j, "burstObservatory");
+    json_obj_open(j);
+    const char *p = burst->ptr + 1, *end = burst->ptr + burst->len;
+    xjson_span_t k, v;
+    while (xjson_next_member(&p, end, &k, &v) == 1) {
+        char key[64];
+        if (k.len >= sizeof(key)) continue;
+        memcpy(key, k.ptr, k.len); key[k.len] = '\0';
+        if (span_is(&k, "pingconfig") && v.len >= 2 && *v.ptr == '{') {
+            json_key(j, "pingConfig");
+            copy_object_without(j, &v, "connectivity");
+            continue;
+        }
+        json_key(j, key);
+        json_rawn(j, v.ptr, v.len);
+    }
+    json_obj_close(j);
+}
+
+static void copy_object_without(json_t *j, const xjson_span_t *obj, const char *skip)
+{
+    json_obj_open(j);
+    const char *p = obj->ptr + 1, *end = obj->ptr + obj->len;
+    xjson_span_t k, v;
+    while (xjson_next_member(&p, end, &k, &v) == 1) {
+        char key[64];
+        if (k.len >= sizeof(key) || span_is(&k, skip)) continue;
+        memcpy(key, k.ptr, k.len); key[k.len] = '\0';
+        json_key(j, key);
+        json_rawn(j, v.ptr, v.len);
+    }
+    json_obj_close(j);
+}
+
+int xraycfg_build_from_json(const xjson_item_t *it, const xraycfg_opts_t *o,
+                            char *buf, size_t size, char *err, size_t err_size)
+{
+    if (err && err_size) err[0] = '\0';
+    if (!it || !o || !buf || !it->whole.ptr || it->whole.len < 2) { fail(err, err_size, "пустой конфиг"); return -1; }
+    if (has_comments(&it->whole)) { fail(err, err_size, "в конфиге комментарии"); return -1; }
+
+    /* Первый проход: найти куски и отсеять дубликаты. */
+    xjson_span_t outbounds = { NULL, 0 }, routing = { NULL, 0 },
+                 observ = { NULL, 0 }, burst = { NULL, 0 };
+    const char *seen[64]; size_t seen_len[64]; int nseen = 0;
+    const char *p = it->whole.ptr + 1, *end = it->whole.ptr + it->whole.len;
+    xjson_span_t k, v;
+    int rc;
+    while ((rc = xjson_next_member(&p, end, &k, &v)) == 1) {
+        for (int i = 0; i < nseen; i++) {
+            xjson_span_t prev = { seen[i], seen_len[i] };
+            char name[64];
+            if (k.len >= sizeof(name)) { fail(err, err_size, "слишком длинный ключ"); return -1; }
+            memcpy(name, k.ptr, k.len); name[k.len] = '\0';
+            for (char *c = name; *c; c++) if (*c >= 'A' && *c <= 'Z') *c = (char)(*c + 32);
+            if (span_is(&prev, name)) { fail(err, err_size, "повторяющийся ключ"); return -1; }
+        }
+        if (nseen < 64) { seen[nseen] = k.ptr; seen_len[nseen] = k.len; nseen++; }
+
+        if      (span_is(&k, "outbounds"))        outbounds = v;
+        else if (span_is(&k, "routing"))          routing = v;
+        else if (span_is(&k, "observatory"))      observ = v;
+        else if (span_is(&k, "burstobservatory")) burst = v;
+        /* всё остальное — мимо */
+    }
+    if (rc < 0) { fail(err, err_size, "конфиг битый"); return -1; }
+    if (!outbounds.ptr) { fail(err, err_size, "нет outbounds"); return -1; }
+
+    char first_proxy[64] = "";
+    if (check_outbounds(&outbounds, first_proxy, sizeof(first_proxy), err, err_size) != 0) return -1;
 
     json_t j;
     json_init(&j, buf, size);
@@ -455,25 +697,34 @@ int xraycfg_build_from_json(const xjson_item_t *it, const xraycfg_opts_t *o,
     build_inbound(&j, o);
     json_arr_close(&j);
 
-    const char *p = it->whole.ptr + 1, *end = it->whole.ptr + it->whole.len;
-    xjson_span_t k, v;
-    int rc;
-    while ((rc = xjson_next_member(&p, end, &k, &v)) == 1) {
-        if (span_is(&k, "log") || span_is(&k, "inbounds") || span_is(&k, "dns") ||
-            span_is(&k, "remarks"))
-            continue;
-        if (span_is(&k, "routing") && v.len >= 2 && *v.ptr == '{') {
-            if (copy_routing(&j, &v) != 0) return -1;
-            continue;
-        }
-        char key[64];
-        if (k.len >= sizeof(key)) return -1;
-        memcpy(key, k.ptr, k.len); key[k.len] = '\0';
-        json_key(&j, key);
-        json_rawn(&j, v.ptr, v.len);
+    json_key(&j, "outbounds");
+    json_rawn(&j, outbounds.ptr, outbounds.len);
+
+    if (routing.ptr && routing.len >= 2 && *routing.ptr == '{') {
+        if (copy_routing(&j, &routing, first_proxy, err, err_size) != 0) return -1;
+    } else {
+        json_key(&j, "routing");
+        json_obj_open(&j);
+        json_key(&j, "rules");
+        json_arr_open(&j);
+        json_obj_open(&j);
+        json_kv_str(&j, "type", "field");
+        json_key(&j, "inboundTag");
+        json_arr_open(&j); json_str(&j, TAG_SOCKS_IN); json_arr_close(&j);
+        json_kv_str(&j, "outboundTag", first_proxy);
+        json_obj_close(&j);
+        json_arr_close(&j);
+        json_obj_close(&j);
     }
-    if (rc < 0) return -1;
+
+    if (observ.ptr && observ.len >= 2 && *observ.ptr == '{') {
+        json_key(&j, "observatory");
+        json_rawn(&j, observ.ptr, observ.len);
+    }
+    if (burst.ptr && burst.len >= 2 && *burst.ptr == '{')
+        copy_burst(&j, &burst);
 
     json_obj_close(&j);
-    return json_done(&j) == 0 ? 0 : -1;
+    if (json_done(&j) != 0) { fail(err, err_size, "не поместилось"); return -1; }
+    return 0;
 }

@@ -6,6 +6,7 @@
 #include "xjson.h"
 #include "xraycfg.h"
 #include "shadowfox.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -98,7 +99,8 @@ static void test_compose(void)
     o.error_log  = "/tmp/x.log";
 
     static char out[64 * 1024];
-    CHECK(xraycfg_build_from_json(&x.items[0], &o, out, sizeof(out)) == 0, "сборка");
+    char err[128] = "";
+    CHECK(xraycfg_build_from_json(&x.items[0], &o, out, sizeof(out), err, sizeof(err)) == 0, "сборка: %s", err);
     CHECK(whole_json(out), "результат — один целый объект JSON");
 
     CHECK(strstr(out, "\"listen\":\"192.168.1.1\"") && strstr(out, "\"port\":1301"), "свой вход");
@@ -118,11 +120,82 @@ static void test_compose(void)
     CHECK(!strstr(out, "example.ru"), "правило с geosite выброшено целиком");
     CHECK(strstr(out, "bittorrent") && strstr(out, "balancerTag"), "остальные правила на месте");
     CHECK(strstr(out, "IPIfNonMatch"), "domainStrategy на месте");
+    CHECK(strstr(out, "\"inboundTag\":[\"socks-in\"],\"balancerTag\":\"Super_Balancer\""),
+          "замыкающее правило в балансировщик");
 
     /* Второй конфиг: routing без правил, один outbound. */
-    CHECK(xraycfg_build_from_json(&x.items[1], &o, out, sizeof(out)) == 0 && whole_json(out),
+    CHECK(xraycfg_build_from_json(&x.items[1], &o, out, sizeof(out), err, sizeof(err)) == 0 && whole_json(out),
           "сборка простого конфига");
     CHECK(strstr(out, "c.example.com"), "outbound на месте");
+    CHECK(strstr(out, "\"inboundTag\":[\"socks-in\"],\"outboundTag\":\"proxy\""),
+          "без балансировщика — замыкающее в первый серверный outbound");
+}
+
+/* Белый список: что панель не может подсунуть. */
+static int build_one(const char *text, char *out, size_t size, char *err, size_t err_size)
+{
+    static xjson_t x;
+    xraycfg_opts_t o;
+    xraycfg_defaults(&o);
+    o.listen = "192.168.1.1"; o.socks_port = 1301;
+    if (xjson_parse(text, &x) != 1) { str_copy(err, err_size, "разбор"); return -2; }
+    return xraycfg_build_from_json(&x.items[0], &o, out, size, err, err_size);
+}
+
+static void test_whitelist(void)
+{
+    static char out[64 * 1024];
+    char err[128];
+    const char *ok_out = "\"outbounds\":[{\"tag\":\"proxy\",\"protocol\":\"vless\",\"settings\":{\"vnext\":[{\"address\":\"a.example\",\"port\":443}]}},{\"tag\":\"direct\",\"protocol\":\"freedom\"}]";
+    char cfg[4096];
+
+    /* Лишние ключи верхнего уровня отбрасываются, а не уходят ядру. */
+    snprintf(cfg, sizeof(cfg), "{\"remarks\":\"A\",\"api\":{\"tag\":\"api\",\"listen\":\"0.0.0.0:10085\"},\"metrics\":{\"listen\":\"0.0.0.0:11111\"},\"env\":{\"xray.browser.dialer\":\"1\"},\"stats\":{},%s}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) == 0, "лишние ключи не мешают: %s", err);
+    CHECK(!strstr(out, "10085") && !strstr(out, "11111") && !strstr(out, "browser.dialer") && !strstr(out, "\"stats\""),
+          "api/metrics/env/stats выброшены");
+    CHECK(strstr(out, "\"listen\":\"192.168.1.1\""), "свой вход на месте");
+
+    /* Ключ в другом регистре перекрыл бы наш вход — отказ. */
+    snprintf(cfg, sizeof(cfg), "{\"Inbounds\":[{\"listen\":\"0.0.0.0\",\"port\":1,\"protocol\":\"socks\"}],%s}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) == 0 && !strstr(out, "0.0.0.0"),
+          "Inbounds панели не попадает в конфиг: %s", err);
+    snprintf(cfg, sizeof(cfg), "{%s,\"Outbounds\":[{\"tag\":\"x\",\"protocol\":\"freedom\",\"settings\":{\"redirect\":\"127.0.0.1:79\"}}]}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "дубликат ключа в другом регистре — отказ");
+
+    /* Опасные поля в outbounds. */
+    snprintf(cfg, sizeof(cfg), "{\"outbounds\":[{\"tag\":\"proxy\",\"protocol\":\"vless\",\"settings\":{\"vnext\":[]},\"streamSettings\":{\"sockopt\":{\"mark\":255}}}]}");
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "sockopt — отказ");
+    snprintf(cfg, sizeof(cfg), "{\"outbounds\":[{\"tag\":\"proxy\",\"protocol\":\"vless\",\"settings\":{\"vnext\":[],\"reverse\":{\"tag\":\"r\"}}}]}");
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "reverse — отказ");
+    snprintf(cfg, sizeof(cfg), "{\"outbounds\":[{\"tag\":\"d\",\"protocol\":\"freedom\",\"settings\":{\"redirect\":\"127.0.0.1:79\"}},{\"tag\":\"proxy\",\"protocol\":\"vless\"}]}");
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "redirect — отказ");
+    snprintf(cfg, sizeof(cfg), "{\"outbounds\":[{\"tag\":\"w\",\"protocol\":\"wireguard\"},{\"tag\":\"proxy\",\"protocol\":\"vless\"}]}");
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "чужой протокол — отказ");
+    snprintf(cfg, sizeof(cfg), "{\"outbounds\":[{\"tag\":\"d\",\"protocol\":\"freedom\"}]}");
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "без серверного outbound — отказ");
+
+    /* Первый outbound не серверный — замыкающее правило всё равно в серверный. */
+    snprintf(cfg, sizeof(cfg), "{\"outbounds\":[{\"tag\":\"direct\",\"protocol\":\"freedom\"},{\"tag\":\"proxy-2\",\"protocol\":\"vless\"}],\"routing\":{\"rules\":[]}}");
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) == 0 && strstr(out, "\"outboundTag\":\"proxy-2\""),
+          "замыкающее в первый серверный, а не в первый по порядку: %s", err);
+
+    /* webhook в правиле, комментарии. */
+    snprintf(cfg, sizeof(cfg), "{%s,\"routing\":{\"rules\":[{\"type\":\"field\",\"webhook\":{\"url\":\"https://x/\"},\"outboundTag\":\"proxy\"}]}}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "webhook — отказ");
+    snprintf(cfg, sizeof(cfg), "{%s, // hidden\n\"routing\":{}}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) < 0, "комментарий — отказ");
+    snprintf(cfg, sizeof(cfg), "{\"remarks\":\"http://x // not a comment\",%s}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) == 0, "// внутри строки — не комментарий: %s", err);
+
+    /* Наблюдатель с connectivity не берётся, без него — берётся. */
+    snprintf(cfg, sizeof(cfg), "{%s,\"burstObservatory\":{\"subjectSelector\":[\"proxy\"],\"pingConfig\":{\"connectivity\":\"http://a/\",\"interval\":\"1m\"}}}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) == 0 && strstr(out, "burstObservatory") &&
+          !strstr(out, "connectivity") && strstr(out, "\"interval\":\"1m\""),
+          "у наблюдателя вырезан только connectivity: %s", err);
+    snprintf(cfg, sizeof(cfg), "{%s,\"burstObservatory\":{\"subjectSelector\":[\"proxy\"],\"pingConfig\":{\"interval\":\"1m\"}}}", ok_out);
+    CHECK(build_one(cfg, out, sizeof(out), err, sizeof(err)) == 0 && strstr(out, "burstObservatory"),
+          "наблюдатель без connectivity на месте");
 }
 
 int main(void)
@@ -130,6 +203,7 @@ int main(void)
     printf("check_xjson %s\n", VERSION);
     test_parse();
     test_compose();
+    test_whitelist();
     if (failures) { printf("  провалов: %d\n", failures); return 1; }
     printf("все проверки пройдены\n");
     return 0;
