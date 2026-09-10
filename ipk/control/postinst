@@ -32,7 +32,9 @@ if [ -n "$ndmc" ] && ! "$ndmc" -c "show running-config" 2>/dev/null | grep -q "^
 fi
 
 mkdir -p /opt/etc/shadowfox
-chmod 0700 /opt/etc/shadowfox 2>/dev/null || true
+# 0711, а не 0700: ядро Xray работает от своего uid и должно пройти в
+# каталог к своему конфигу; читать чужие файлы оно не может, они 0600.
+chmod 0711 /opt/etc/shadowfox 2>/dev/null || true
 
 # Файл настроек не лежит в пакете, а пишется демоном при первой
 # установке — из тех же значений по умолчанию, что вшиты в него. Иначе
