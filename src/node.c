@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 /* Читает параметр запроса в поле фиксированного размера.
    Отсутствие параметра — не ошибка: поле остаётся пустым. Усечение —
@@ -117,9 +118,22 @@ int node_from_link(const char *link, node_t *n, char *err, unsigned err_size)
     /* Vision работает только поверх голого tcp. С ws/grpc/xhttp -test
        проходил, а каждое соединение падало с «XTLS only supports TLS
        and REALITY directly». Панели такое генерируют. */
-    if (n->flow[0] && strcmp(n->network, "tcp") != 0) {
+    if (n->flow[0] && (strcmp(n->network, "tcp") != 0 ||
+                       !strcmp(n->header_type, "http") ||
+                       (strcmp(n->security, "tls") && strcmp(n->security, "reality")))) {
         n->flow[0]      = '\0';
         n->flow_dropped = 1;
+    }
+
+    /* Незнакомый отпечаток uTLS ядро отвергает на -test, и одна ссылка
+       валила бы весь конфиг. Заменяем на умолчание ядра и помечаем. */
+    if (n->fingerprint[0]) {
+        static const char *known[] = { "chrome", "firefox", "safari", "ios", "android",
+                                       "edge", "360", "qq", "random", "randomized",
+                                       "randomizednoalpn", NULL };
+        int ok = 0;
+        for (int i = 0; known[i]; i++) if (!strcasecmp(n->fingerprint, known[i])) ok = 1;
+        if (!ok) { str_copy(n->fingerprint, sizeof(n->fingerprint), "chrome"); n->fp_fixed = 1; }
     }
     if (!n->security[0])   str_copy(n->security, sizeof(n->security), "none");
     if (!n->encryption[0]) str_copy(n->encryption, sizeof(n->encryption), "none");

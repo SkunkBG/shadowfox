@@ -62,12 +62,16 @@ typedef struct {
     char ip6tables_restore[RT_BIN_MAX];
     char ip[RT_BIN_MAX];
     int  ipv6;       /* обслуживать ли IPv6 */
+    int  v6_reject;  /* цель REJECT есть в ip6tables; иначе DROP */
     int  timeout;
     int  guard_port; /* порт SOCKS ядра, который закрываем от сети; 0 — нет */
 } rt_t;
 
 void rt_init(rt_t *r);
 int  rt_find_bins(rt_t *r);   /* 1, если нашлись iptables и ip */
+/* Есть ли в ip6tables цель REJECT: без модуля остаётся DROP, а с ним
+   устройство получает отказ сразу и уходит на IPv4 без ожидания. */
+void rt_probe_v6_reject(rt_t *r);
 
 /* Строят план установки и снятия правил. */
 void rt_plan_apply(rt_plan_t *p, const rt_t *r, const wl_t *w);

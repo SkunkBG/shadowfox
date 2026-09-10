@@ -121,9 +121,7 @@ static void unescape(const xjson_span_t *s, char *dst, size_t size)
         char c = p[1];
         p += 2;
         switch (c) {
-        case 'n': dst[used++] = '\n'; break;
-        case 't': dst[used++] = '\t'; break;
-        case 'r': dst[used++] = '\r'; break;
+        case 'n': case 't': case 'r': dst[used++] = ' '; break;   /* имя — одна строка */
         case 'b': case 'f': break;
         case 'u': {
             if (p + 4 > end) { p = end; break; }
@@ -144,6 +142,7 @@ static void unescape(const xjson_span_t *s, char *dst, size_t size)
         }
     }
     dst[used] = '\0';
+    for (char *c = dst; *c; c++) if ((unsigned char)*c < 0x20) *c = ' ';
     str_trim(dst);
 }
 

@@ -35,7 +35,7 @@ static void put(const char *name, const char *text)
 static void test_url(void)
 {
     CHECK(subs_is_url("https://panel.example.com/api/abc"), "https");
-    CHECK(subs_is_url("http://panel.example.com/x"), "http");
+    CHECK(!subs_is_url("http://panel.example.com/x"), "http — открытым текстом нельзя");
     CHECK(!subs_is_url("vless://uuid@host:443?x=1#tag"), "vless не подписка");
     CHECK(!subs_is_url("# https://comment"), "комментарий");
 

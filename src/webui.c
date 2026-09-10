@@ -1311,6 +1311,7 @@ typedef struct {
     int   streak;    /* сколько серий подряд */
     long  until;
     long  last;
+    long last_auth;   /* когда последний раз выдавали nonce */
 } login_peer_t;
 
 static login_peer_t g_peers[LOGIN_PEERS];
@@ -1368,6 +1369,26 @@ static void auth_begin(const http_req_t *req, int fd, const config_t *cfg)
         json_kv_bool(&j, "ok", 0);
         json_kv_str(&j, "why", "слишком много неудачных попыток, подожди минуту");
         goto out;
+    }
+
+    /* Каждый /auth — обращение к роутеру с ожиданием до пяти секунд, а
+       демон один: пока ждёт, не читает перехват. Поэтому не чаще раза в
+       две секунды с одного адреса и не чаще раза в секунду вообще —
+       для человека незаметно, для потока запросов достаточно. */
+    {
+        static long last_any = 0;
+        if (lp->last_auth && now - lp->last_auth < 2) {
+            json_kv_bool(&j, "ok", 0);
+            json_kv_str(&j, "why", "слишком часто, повтори через секунду");
+            goto out;
+        }
+        if (last_any && now - last_any < 1) {
+            json_kv_bool(&j, "ok", 0);
+            json_kv_str(&j, "why", "служба занята, повтори через секунду");
+            goto out;
+        }
+        lp->last_auth = now;
+        last_any      = now;
     }
 
     char host[64] = "";

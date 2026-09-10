@@ -26,8 +26,11 @@ void mask_link(const char *in, char *out, size_t size)
     const char *at   = strchr(rest, '@');
     const char *hash = strchr(rest, '#');
 
-    /* Подписка целиком секрет: у неё вся ссылка — это доступ. */
-    if (!at || (hash && at > hash)) {
+    /* Подписка целиком секрет: у неё вся ссылка — это доступ. Решает
+       схема, а не наличие @: в адресе подписки @ тоже бывает. */
+    int web = (scheme - in == 5 && !strncmp(in, "https", 5)) ||
+              (scheme - in == 4 && !strncmp(in, "http", 4));
+    if (web || !at || (hash && at > hash)) {
         size_t head = (size_t)(rest - in);
         const char *slash = strchr(rest, '/');
         size_t host = slash ? (size_t)(slash - rest) : strlen(rest);

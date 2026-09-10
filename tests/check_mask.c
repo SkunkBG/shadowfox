@@ -19,6 +19,14 @@ static int failures = 0;
         }                                                    \
     } while (0)
 
+static void test_subscription_at(void)
+{
+    char out[256];
+    mask_link("https://panel.example.com/sub/abc@def?x=1", out, sizeof(out));
+    CHECK(!strstr(out, "abc") && !strstr(out, "def") && strstr(out, "panel.example.com"),
+          "подписка с @ в пути маскируется целиком: %s", out);
+}
+
 static void test_node_link(void)
 {
     char out[1024];
@@ -111,6 +119,7 @@ int main(void)
     printf("check_mask %s\n", VERSION);
 
     test_node_link();
+    test_subscription_at();
     test_empty_sid_long();
     test_subscription_url();
     test_base64_body();

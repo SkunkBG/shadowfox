@@ -643,7 +643,7 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
                 log_warn("не создать %s — подписка без x-hwid", hpath);
             /* Модель и прошивку спрашиваем у роутера один раз: панель
                покажет их в списке устройств пользователя. */
-            if (!e->dev_asked) {
+            if (!e->dev_model[0]) {
                 e->dev_asked = 1;
                 if (rci_device_info(&e->rci, e->dev_model, sizeof(e->dev_model),
                                     e->dev_osver, sizeof(e->dev_osver)) != 0)
@@ -702,6 +702,10 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     for (int i = 0; i < list.count; i++)
         if (list.items[i].flow_dropped)
             log_warn("ссылка «%s»: flow снят — Vision работает только поверх tcp",
+                     list.items[i].tag[0] ? list.items[i].tag : "без имени");
+    for (int i = 0; i < list.count; i++)
+        if (list.items[i].fp_fixed)
+            log_warn("ссылка «%s»: незнакомый отпечаток uTLS заменён на chrome",
                      list.items[i].tag[0] ? list.items[i].tag : "без имени");
     for (int i = 0; i < list.count; i++)
         if (list.items[i].allow_insecure)
@@ -931,8 +935,9 @@ static void tunnel_sample(engine_t *e, time_t now)
     /* Второй способ, для ядер без sock_diag: адреса серверов и порты —
        наблюдению за SYN, а замер — медиана свежих рукопожатий. */
     rttcap_set_ports(&e->rttcap, e->node_ports, e->node_port_count);
-    rttcap_set_targets(&e->rttcap, (const unsigned char (*)[16])st.remotes,
-                       st.remote_fam, st.remote_count);
+    if (st.remote_count > 0)
+        rttcap_set_targets(&e->rttcap, (const unsigned char (*)[16])st.remotes,
+                           st.remote_fam, st.remote_count);
     if (e->tunnel_rtt_ms < 0) e->tunnel_rtt_ms = rttcap_ms(&e->rttcap, now);
     e->tunnel_retrans_grow = st.established > 0 && st.retrans > e->tunnel_retrans_prev;
     e->tunnel_retrans_prev = st.retrans;
@@ -987,6 +992,11 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
         return -1;
     }
     adopt_config(e, cfg);
+    if (e->rt.ipv6) {
+        rt_probe_v6_reject(&e->rt);
+        log_info("IPv6 к доменам из списков: %s, устройства уходят на IPv4 в туннель",
+                 e->rt.v6_reject ? "отказ REJECT" : "DROP (цели REJECT в ядре нет)");
+    }
 
     /* Задержка до сервера по SYN/SYN-ACK его же соединений: своих
        пакетов нет, только наблюдение. Не открылось — просто без числа. */

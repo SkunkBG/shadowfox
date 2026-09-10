@@ -152,15 +152,16 @@ static void rule_text(char *dst, size_t size, int kind, const char *set,
 
 /* Строку правила — в план: «tables -t mangle <действие> PREROUTING …».
    Для установки действие -C с ensure: поставить только если нет. */
-static void add_rule(rt_plan_t *p, const char *tables, const char *action,
-                     const char *rule, int ensure, int may_fail)
+static void add_rule_in(rt_plan_t *p, const char *tables, const char *table,
+                        const char *chain, const char *action,
+                        const char *rule, int ensure, int may_fail)
 {
     const char *args[RT_ARGS_MAX + 1];
     char        copy[RT_ARG_LEN * 8];
     int         n = 0;
 
-    args[n++] = tables; args[n++] = "-t"; args[n++] = "mangle";
-    args[n++] = action; args[n++] = "PREROUTING";
+    args[n++] = tables; args[n++] = "-t"; args[n++] = table;
+    args[n++] = action; args[n++] = chain;
 
     str_copy(copy, sizeof(copy), rule);
     char *save = NULL;
@@ -170,7 +171,13 @@ static void add_rule(rt_plan_t *p, const char *tables, const char *action,
 
     int before = p->count;
     add(p, may_fail, args);
-    if (ensure && p->count > before) p->cmds[p->count - 1].ensure = 1;
+    if (ensure && p->count > before) p->cmds[p->count - 1].ensure = ensure;
+}
+
+static void add_rule(rt_plan_t *p, const char *tables, const char *action,
+                     const char *rule, int ensure, int may_fail)
+{
+    add_rule_in(p, tables, "mangle", "PREROUTING", action, rule, ensure ? 1 : 0, may_fail);
 }
 
 /* Правила стоят прямо в PREROUTING, как у HydraRoute: по два на набор
@@ -179,7 +186,8 @@ static void add_rule(rt_plan_t *p, const char *tables, const char *action,
    сброса, ни зазора. Своей цепочки больше нет; от прежней остаётся
    только снятие, чтобы обновление не оставило её висеть. */
 static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
-                        const char *ipflag, const wl_t *w, int v6, int remove)
+                        const char *ipflag, const wl_t *w, int v6, int remove,
+                        int v6_reject)
 {
     const char *table_arg = "mangle";
 
@@ -202,6 +210,20 @@ static void plan_family(rt_plan_t *p, const char *tables, const char *ipbin,
 
         if (g->target == WL_TARGET_POLICY) {
             if (!g->policy_mark) continue;   /* метку ещё не узнали */
+            /* IPv6 к политике не метим: прокси-подключение Keenetic
+               IPv6 не носит, и помеченное соединение уходило бы в никуда
+               (iPhone предпочитает IPv6 и висел бы на speedtest.net и
+               любом сайте за Cloudflare). Вместо этого — отказ: устройство
+               получает его сразу и открывает то же по IPv4, а IPv4 идёт в
+               туннель. Правило в FORWARD первым, до правил роутера. */
+            if (v6) {
+                snprintf(rule, sizeof(rule),
+                         "-m set --match-set %s dst -j %s", set,
+                         v6_reject ? "REJECT --reject-with icmp6-adm-prohibited" : "DROP");
+                add_rule_in(p, tables, "filter", "FORWARD", remove ? "-D" : "-C",
+                            rule, remove ? 0 : 2, 1);
+                continue;
+            }
             rule_text(rule, sizeof(rule), 0, set, g->policy_mark, 0);
             add_rule(p, tables, remove ? "-D" : "-C", rule, !remove, 1);
             rule_text(rule, sizeof(rule), 1, set, g->policy_mark, 0);
@@ -455,9 +477,9 @@ static void plan_both(rt_plan_t *p, const rt_t *r, const wl_t *w, int remove)
 
     char *b4 = (!remove && r->iptables_restore[0]) ? p->batch4 : NULL;
 
-    plan_family(p, ipt, ipb, "-4", w, 0, remove);
+    plan_family(p, ipt, ipb, "-4", w, 0, remove, 0);
     if (r->ipv6 && r->ip6tables[0])
-        plan_family(p, r->ip6tables, ipb, "-6", w, 1, remove);
+        plan_family(p, r->ip6tables, ipb, "-6", w, 1, remove, r->v6_reject);
 
     /* Ядро слушает на адресе IPv4, поэтому и закрываем только его. */
     plan_guard(p, ipt, r->guard_port, remove, b4);
@@ -634,4 +656,26 @@ int rt_counters(const rt_t *r, const wl_t *w, unsigned long *marked, unsigned lo
     }
 
     return found ? 0 : -1;
+}
+
+void rt_probe_v6_reject(rt_t *r)
+{
+    if (!r) return;
+    r->v6_reject = 0;
+    if (!r->ip6tables[0]) return;
+    /* -C на заведомо отсутствующее правило: с целью всё в порядке —
+       «Bad rule», без модуля — «No chain/target/match». */
+    char bin[RT_BIN_MAX];
+    str_copy(bin, sizeof(bin), r->ip6tables);
+    char a1[] = "-t", a2[] = "filter", a3[] = "-C", a4[] = "FORWARD", a5[] = "-j",
+         a6[] = "REJECT", a7[] = "--reject-with", a8[] = "icmp6-adm-prohibited";
+    char *argv[] = { bin, a1, a2, a3, a4, a5, a6, a7, a8, NULL };
+    char  out[512] = "";
+    int   rc = proc_run(argv, out, sizeof(out), r->timeout ? r->timeout : 10);
+    if (rc == 0) { r->v6_reject = 1; return; }
+    if (strstr(out, "No chain/target/match") || strstr(out, "Couldn't load target") ||
+        strstr(out, "unknown option"))
+        r->v6_reject = 0;
+    else
+        r->v6_reject = 1;
 }

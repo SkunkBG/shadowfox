@@ -57,7 +57,7 @@ static int add_lines(nodelist_t *l, const char *text)
         const char *nl  = strchr(p, '\n');
         size_t      len = nl ? (size_t)(nl - p) : strlen(p);
 
-        char line[1024];
+        char line[8192];   /* VLESS Encryption даёт ссылки за 1,5 КБ */
         if (len < sizeof(line)) {
             memcpy(line, p, len);
             line[len] = '\0';

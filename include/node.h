@@ -20,6 +20,7 @@ typedef struct {
     char flow[64];
     char encryption[2048];         /* VLESS Encryption — строка длинная */
     int  flow_dropped;             /* flow был, но транспорт его не умеет */
+    int  fp_fixed;                 /* незнакомый uTLS-отпечаток заменён на chrome */
 
     char network[16];              /* tcp, ws, grpc, xhttp, httpupgrade */
     char security[16];             /* none, tls, reality */

@@ -14,7 +14,7 @@
    короткий, а тащить зависимость на роутер ради одного GET незачем. */
 
 #define RCI_HOST_MAX  64
-#define RCI_BODY_MAX  8192
+#define RCI_BODY_MAX  16384   /* show version с components не влезал в 8 КБ */
 
 typedef struct {
     char host[RCI_HOST_MAX];

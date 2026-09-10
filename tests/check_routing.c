@@ -219,13 +219,26 @@ static void test_atomic_plan(void)
           "правило политики проверкой:\n%s", text);
     CHECK(strstr(text, "-t mangle -C PREROUTING -m set --match-set Proxy0 dst -j CONNMARK --restore-mark") != NULL,
           "возврат метки проверкой");
-    CHECK(strstr(text, "ip6tables -t mangle -C PREROUTING -m set --match-set Proxy0v6 dst") != NULL,
-          "v6 тем же путём");
+    /* IPv6 к политике не метится — прокси-подключение IPv6 не носит.
+       Вместо метки отказ в FORWARD первым правилом; без модуля — DROP. */
+    CHECK(strstr(text, "ip6tables -t mangle -C PREROUTING -m set --match-set Proxy0v6 dst") == NULL,
+          "v6 к политике не метится");
+    CHECK(strstr(text, "ip6tables -t filter -C FORWARD -m set --match-set Proxy0v6 dst -j DROP") != NULL,
+          "v6 к политике — DROP без REJECT:\n%s", text);
+    CHECK(strstr(text, "ip6tables -t mangle -C PREROUTING -m set --match-set Proxy1v6 dst -j MARK") != NULL,
+          "v6 к устройству метится как раньше");
     CHECK(strstr(text, "-t filter -C INPUT -j SHADOWFOX_IN") != NULL, "врезка защиты проверяется");
 
     int inserts = 0;
     for (int i = 0; i < p.count; i++) if (p.cmds[i].ensure == 2) inserts++;
-    CHECK(inserts == 1, "одна вставка в начало INPUT");
+    CHECK(inserts == 2, "две вставки в начало: защита в INPUT и отказ v6 в FORWARD: %d", inserts);
+
+    r.v6_reject = 1;
+    rt_plan_apply(&p, &r, &w);
+    plan_text(&p, text, sizeof(text));
+    CHECK(strstr(text, "-t filter -C FORWARD -m set --match-set Proxy0v6 dst -j REJECT --reject-with icmp6-adm-prohibited") != NULL,
+          "с модулем — REJECT");
+    r.v6_reject = 0;
 
     rt_plan_t rm;
     rt_plan_remove(&rm, &r, &w);
@@ -233,6 +246,8 @@ static void test_atomic_plan(void)
     plan_text(&rm, text, sizeof(text));
     CHECK(strstr(text, "-t mangle -D PREROUTING -m set --match-set Proxy0 dst -j CONNMARK --restore-mark") != NULL,
           "снятие правил командами");
+    CHECK(strstr(text, "ip6tables -t filter -D FORWARD -m set --match-set Proxy0v6 dst -j DROP") != NULL,
+          "снятие отказа v6");
 }
 
 static void test_ipv6_added_only_when_asked(void)

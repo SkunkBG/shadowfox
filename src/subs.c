@@ -14,10 +14,10 @@
 int subs_is_url(const char *line)
 {
     if (!line) return 0;
-    /* file:// — для проверок без сети; в бою файл ссылок читает root,
-       и чтение по такому адресу ничего нового не открывает. */
-    return !strncmp(line, "https://", 8) || !strncmp(line, "http://", 7) ||
-           !strncmp(line, "file://", 7);
+    /* Только https: по http адрес подписки и ключи серверов ушли бы
+       провайдеру открытым текстом. file:// — для проверок без сети; в
+       бою файл ссылок читает root, и такое чтение ничего не открывает. */
+    return !strncmp(line, "https://", 8) || !strncmp(line, "file://", 7);
 }
 
 void subs_host(const char *url, char *dst, size_t size)
@@ -163,7 +163,7 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
        заглушку. Остальные три — как панель покажет роутер в списке
        устройств пользователя. */
     char h_hwid[160] = "", h_os[] = "x-device-os: KeeneticOS", h_ver[96], h_model[160];
-    if (hwid && hwid[0]) snprintf(h_hwid, sizeof(h_hwid), "x-hwid: %s", hwid);
+    if (hwid && hwid[0]) header_value("x-hwid", hwid, "", h_hwid, sizeof(h_hwid));
     header_value("x-ver-os",       dev ? dev->osver : NULL, "unknown",  h_ver,   sizeof(h_ver));
     header_value("x-device-model", dev ? dev->model : NULL, "Keenetic", h_model, sizeof(h_model));
 
@@ -171,12 +171,14 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
     int   n = 0;
     char a_q[] = "-q", a_T[] = "-T", a_25[] = "25", a_U[] = "-U", a_O[] = "-O",
          a_dash[] = "-", a_sS[] = "-sS", a_L[] = "-L", a_m[] = "-m", a_A[] = "-A",
-         a_H[] = "-H", a_hdr[] = "--header", a_f[] = "-f";
+         a_H[] = "-H", a_hdr[] = "--header", a_f[] = "-f",
+         a_https[] = "--https-only", a_proto[] = "--proto", a_pv[] = "=https",
+         a_predir[] = "--proto-redir";
     char *bin = find_bin("wget");
     /* Штатный wget прошивки без TLS; нужен именно из Entware. */
     if (bin && strncmp(bin, "/opt/", 5)) bin = NULL;
     if (bin) {
-        char *v[] = { bin, a_q, a_T, a_25, a_U, agent, a_O, a_dash };
+        char *v[] = { bin, a_q, a_https, a_T, a_25, a_U, agent, a_O, a_dash };
         memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
         if (h_hwid[0]) { argv[n++] = a_hdr; argv[n++] = h_hwid; }
         argv[n++] = a_hdr; argv[n++] = h_os;
@@ -184,7 +186,7 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
         argv[n++] = a_hdr; argv[n++] = h_model;
         argv[n++] = u; argv[n] = NULL;
     } else if ((bin = find_bin("curl")) != NULL) {
-        char *v[] = { bin, a_sS, a_f, a_L, a_m, a_25, a_A, agent };
+        char *v[] = { bin, a_sS, a_f, a_L, a_proto, a_pv, a_predir, a_pv, a_m, a_25, a_A, agent };
         memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
         if (h_hwid[0]) { argv[n++] = a_H; argv[n++] = h_hwid; }
         argv[n++] = a_H; argv[n++] = h_os;
