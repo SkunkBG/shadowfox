@@ -65,6 +65,25 @@ make xray-ipk   # упаковать в .ipk
 Пакет ставится в `/opt/sbin/shadowfox-xray`, а не в `/opt/sbin/xray`, чтобы
 не конфликтовать со штатным `xray-core` из Entware.
 
+## Требования
+
+- **KeeneticOS 4.1 и новее.** Компонент «Прокси-клиент» появился в
+  [3.9](https://support.keenetic.com/titan/kn-1810/en/27239-keeneticos-3-9.html),
+  а UDP через SOCKS5 (`interface … proxy socks5-udp`) — в
+  [4.1](https://support.keenetic.com/titan/kn-1811/en/32140-keeneticos-4-1.html).
+  На 3.9 и 4.0 кнопка «Создать» в панели завершится сбоем на этой команде,
+  а звонки Telegram и WhatsApp пойдут мимо туннеля. Проверено на
+  Keenetic KN-1811 (aarch64) и Viva KN-1910 (mipsel).
+- **Компоненты роутера** «OPKG» и «Прокси-клиент» установлены
+  («Общие настройки» → «Изменить набор компонентов»).
+- **Entware** на USB-накопителе с ext4 либо во внутренней памяти — её
+  предлагают модели со 128 МБ флеш начиная с KeeneticOS 3.7. В `/opt`
+  нужно около 35 МБ: ядро Xray занимает 30 МБ на диске, сам пакет меньше
+  мегабайта, плюс зависимости `ipset`, `iptables`, `ip-full`, `conntrack`,
+  `openssl-util`.
+- **Архитектуры** aarch64, mipsel и mips — все, на которые ставится
+  Entware; фид собирается под каждую.
+
 ## Установка на роутер
 
 Сначала научить `opkg` ходить по https. Он качает через `wget`, а
