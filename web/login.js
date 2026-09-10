@@ -98,10 +98,16 @@ document.addEventListener('DOMContentLoaded', function(){
                '&nonce='+encodeURIComponent(a.nonce);
       return fetch('/login',{method:'POST',
         headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:body, redirect:'follow'});
+        body:body});
     }).then(function(r){
-      if(r.redirected || r.ok){ location.href='/'; return; }
-      return r.text().then(function(t){ throw new Error(t.trim()||'вход отклонён'); });
+      if(!r.ok) return r.text().then(function(t){ throw new Error(t.trim()||'вход отклонён'); });
+      /* Метка сессии — в хранилище нашего origin, не в cookie: cookie
+         браузер отдаёт всем службам на адресе роутера без разбора порта. */
+      return r.json().then(function(j){
+        if(!j || !j.session) throw new Error('служба не выдала сессию');
+        try{ localStorage.setItem('sf-session', j.session); }catch(e){}
+        location.href='/';
+      });
     }).catch(function(e){
       say(e.message); if(btn) btn.disabled=false;
     });

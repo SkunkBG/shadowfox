@@ -34,6 +34,8 @@ typedef struct {
     char        nodes_file[CFG_PATH_MAX];     /* ссылки или подписка */
     char        xray_config[CFG_PATH_MAX];    /* куда писать конфиг */
     char        xray_bin[CFG_PATH_MAX];       /* пусто — искать самим */
+    int         xray_uid;                     /* от кого запускать ядро; 0 — root */
+    int         xray_gid;
 
     /* Веб-интерфейс. */
     int         web_enabled;

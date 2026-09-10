@@ -473,7 +473,7 @@ textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(
     <a class="srow" href="https://web.tribute.tg/d/OHz"
        target="_blank" rel="noopener" id="donate"></a>
     <div class="sep"></div>
-    <a class="core" href="/logout" id="exit"></a>
+    <a class="core" href="#" id="exit"></a>
   </aside>
 
   <div class="side2">
@@ -502,8 +502,19 @@ textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(
 <script>
 const PRESETS=[{"name":"YouTube","icon":"yt","lines":["youtube.com","youtu.be","yt.be","youtube-nocookie.com","youtubekids.com","googlevideo.com","ytimg.com","ggpht.com","youtubei.googleapis.com","youtube.googleapis.com","lh3.googleusercontent.com"]},{"name":"Telegram","icon":"tg","lines":["telegram.org","telegram.me","telegram.dog","telegram.space","t.me","tx.me","telesco.pe","tdesktop.com","cdn-telegram.org","telegram-cdn.org","telegra.ph","tg.dev","comments.app","contest.com","fragment.com","graph.org","quiz.directory","telega.one","usercontent.dev","wallet.tg","walletbot.me","wallettg.com","wallettg.net","toncenter.com","ston.fi","mercuryo.io","crypt.bot","send.tg","91.108.4.0/22","91.108.8.0/22","91.108.12.0/22","91.108.16.0/22","91.108.20.0/22","91.108.56.0/22","91.105.192.0/23","149.154.160.0/20","185.76.151.0/24","95.161.64.0/20","2001:b28:f23c::/48","2001:b28:f23d::/48","2001:b28:f23f::/48","2001:67c:4e8::/48","2a0a:f280::/32","45.196.29.0/24","138.249.21.0/24"]},{"name":"WhatsApp","icon":"wa","lines":["whatsapp.com","whatsapp.net","wa.me","wl.co","whatsappbrand.com","whatsapp.biz","whatsapp.cc","whatsapp.info","whatsapp.org","whatsapp.tv","facebook.com","fbcdn.net","fbsbx.com","31.13.24.0/21","31.13.64.0/18","45.64.40.0/22","66.220.144.0/20","69.63.176.0/20","69.171.224.0/19","74.119.76.0/22","102.132.96.0/20","103.4.96.0/22","129.134.0.0/16","157.240.0.0/16","163.70.128.0/17","173.252.64.0/18","179.60.192.0/22","185.60.216.0/22","185.89.216.0/22","204.15.20.0/22","2620:0:1c00::/40","2a03:2880::/32","2401:db00::/32"]},{"name":"Instagram","icon":"ig","lines":["instagram.com","cdninstagram.com","ig.me","facebook.com","facebook.net","fbcdn.net","fbcdn.com"]},{"name":"Facebook","icon":"fb","lines":["facebook.com","facebook.net","fbcdn.net","fbcdn.com","fbsbx.com","fb.com","fb.me","messenger.com","tfbnw.net","thefacebook.com"]},{"name":"X","icon":"x","lines":["x.com","twitter.com","twimg.com","t.co","tweetdeck.com"]},{"name":"Discord","icon":"dc","lines":["discord.com","discord.gg","discordapp.com","discordapp.net","discord.media","discordcdn.com","discordsays.com","discord-activities.com","discordactivities.com","discordapp.io","dis.gd","discord.new","discord.gift","discord.gifts","discordstatus.com","discord.dev","discord.co","discord.design","discord.store","discord.tools"]},{"name":"TikTok","icon":"tt","lines":["tiktok.com","tiktokv.com","tiktokv.eu","tiktokw.eu","tiktokd.org","account-tiktok.com","tiktokglobalshop.com","tiktokcdn.com","tiktokcdn-eu.com","tiktokcdn-us.com","tiktokcdn-in.com","byteimg.com","ibyteimg.com","ibytedtos.com","bytetcdn.com","ttwstatic.com","worldfcdn.com","worldfcdn2.com","pstatp.com","ipstatp.com","muscdn.com","rocket-cdn.com","tlivecdn.com","ttlivecdn.com","byteoversea.com","byteoversea.net","ttoversea.net","ttoverseaus.net","isnssdk.com","sgsnssdk.com","musical.ly","musemuse.cn"]},{"name":"CapCut","icon":"cc","lines":["capcut.com","capcutapi.com","capcutapi.us","capcutcdn-us.com","capcutstatic.com","byteoversea.com","byteoversea.net","ibytedtos.com","isnssdk.com","sgsnssdk.com"]},{"name":"Нейросети","icon":"ai","lines":["anthropic.com","claude.ai","claude.com","claude.app","claude.new","claude.site","clau.de","claudeusercontent.com","claudemcpclient.com","claudemcpcontent.com","openai.com","chatgpt.com","oaistatic.com","oaiusercontent.com","openai.org","openai.fund","gemini.google.com","aistudio.google.com","generativelanguage.googleapis.com","notebooklm.google","notebook.google","perplexity.ai","perplexity.com","pplx.ai","x.ai","grok.com","meta.ai","deepseek.com","mistral.ai","huggingface.co","elevenlabs.io","kilo.ai","pollo.ai","githubcopilot.com","copilot.microsoft.com"]},{"name":"Spotify","icon":"sp","lines":["spotify.com","spotifycdn.com","spotifycdn.net","scdn.co","pscdn.co","spoti.fi","byspotify.com","spotifycodes.com","spotifycharts.com"]},{"name":"Netflix","icon":"nf","lines":["netflix.com","nflxvideo.net","nflximg.net","nflxext.com","nflxso.net"]},{"name":"Canva","icon":"cv","lines":["canva.com","canva-apps.com","canvausercontent.com"]},{"name":"Figma","icon":"fg","lines":["figma.com","figma-alpha-api.s3.us-west-2.amazonaws.com"]},{"name":"Roblox","icon":"rb","lines":["roblox.com","rbxcdn.com"]},{"name":"Steam","icon":"st","lines":["steampowered.com","steamcommunity.com","steamstatic.com","steamcontent.com","steamusercontent.com","valvesoftware.com"]}];
 const $=s=>document.querySelector(s);
-const tok=new URLSearchParams(location.search).get('token');
-const api=p=>tok?p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(tok):p;
+/* Метка сессии живёт в хранилище нашего origin (адрес и порт) и уходит
+   заголовком с каждым запросом. Cookie не используется: браузер отдавал
+   бы её всем службам на адресе роутера. Запасной токен из ссылки тоже
+   переезжает в хранилище, а из адресной строки убирается. */
+let sess='';
+try{ sess=localStorage.getItem('sf-session')||''; }catch(e){}
+{ const t=new URLSearchParams(location.search).get('token');
+  if(t){ sess=t; try{ localStorage.setItem('sf-session',t); }catch(e){} history.replaceState(null,'',location.pathname); } }
+if(!sess) location.replace('/login');
+const api=p=>p;
+const fetch0=window.fetch.bind(window);
+window.fetch=(u,o)=>{ o=Object.assign({},o||{}); o.headers=Object.assign({},o.headers||{},{'Authorization':'Bearer '+sess}); return fetch0(u,o); };
+function relogin(){ try{ localStorage.removeItem('sf-session'); }catch(e){} location.replace('/login'); }
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const plural=(n,a,b,c)=>{const m=n%100,k=n%10;
   return n+' '+(m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c);};
@@ -1424,7 +1435,7 @@ async function load(probed,quiet){
     /* Сессия живёт в памяти службы и не переживает её перезапуск —
        например, при обновлении. Тогда надо показать форму входа, а не
        невнятную ошибку: страницу отдаёт сама служба. */
-    if(r.status===401){ location.reload(); return; }
+    if(r.status===401){ relogin(); return; }
 
     if(!r.ok) throw new Error('код '+r.status);
     const was = D ? sig() : null;
@@ -1635,6 +1646,7 @@ document.addEventListener('input',ev=>{
 });
 
 document.addEventListener('click',async ev=>{
+  if(ev.target.closest('#exit')){ ev.preventDefault(); try{ await fetch('/logout',{method:'POST'}); }catch(e){} relogin(); return; }
   if(ev.target.closest('.srv')){ setTimeout(()=>document.querySelectorAll('.srv').forEach(l=>l.classList.toggle('on',!!l.querySelector('input:checked'))),0); }
   if(ev.target.closest('#terms')){ gate(1); return; }
 
@@ -1745,7 +1757,7 @@ document.addEventListener('click',async ev=>{
           const rr=await fetch(api('/data'));
           /* 401 значит, что служба уже вернулась, но сессия старая —
              это тоже признак, что обновление прошло. */
-          if(rr.status===401){ location.reload(); return; }
+          if(rr.status===401){ relogin(); return; }
           if(rr.ok){ const d=await rr.json();
             if(d.version!==was){ updInfo=null; location.reload(); return; } }
         }catch(e){}
@@ -1771,7 +1783,7 @@ document.addEventListener('click',async ev=>{
           const rr=await fetch(api('/data'));
           /* 401 — сессия истекла или служба перезапустилась; ядро при
              этом могло встать. Та же починка, что у обновления демона. */
-          if(rr.status===401){ location.reload(); return; }
+          if(rr.status===401){ relogin(); return; }
           if(rr.ok){ const d=await rr.json();
             if(d.xray_bin){ busy(); await load(); return; } }
         }catch(e){}

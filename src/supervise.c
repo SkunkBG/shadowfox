@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <grp.h>
 #include <unistd.h>
 
 void sv_init(sv_t *sv, const char *bin, const char *config)
@@ -46,6 +47,15 @@ int sv_start(sv_t *sv)
         int lfd = open(XRAY_ERROR_LOG, O_WRONLY | O_TRUNC | O_NOFOLLOW);
         if (lfd >= 0) close(lfd);
     }
+    /* Журнал заводим сами и отдаём ядру: оно пишет туда уже не от root. */
+    {
+        int lfd = open(XRAY_ERROR_LOG, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW, 0600);
+        if (lfd >= 0) {
+            if (sv->uid && fchown(lfd, (uid_t)sv->uid, (gid_t)sv->gid) != 0)
+                log_warn("не сменить владельца %s: %s", XRAY_ERROR_LOG, strerror(errno));
+            close(lfd);
+        }
+    }
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -71,6 +81,15 @@ int sv_start(sv_t *sv)
         memcpy(bin, sv->bin, sizeof(bin));
         memcpy(cfg, sv->config, sizeof(cfg));
 
+        /* Прав root ядру не нужно: порт выше 1024, соединения исходящие.
+           А конфиг — чужой код из подписки. Сброс необратим: setuid
+           после setgid, иначе группу уже не сменить. */
+        if (sv->uid) {
+            if (setgroups(0, NULL) != 0 || setgid((gid_t)sv->gid) != 0 ||
+                setuid((uid_t)sv->uid) != 0)
+                _exit(126);
+        }
+
         char *argv[] = { bin, "run", "-c", cfg, NULL };
         execv(bin, argv);
         _exit(127);
@@ -79,8 +98,16 @@ int sv_start(sv_t *sv)
     sv->pid           = pid;
     sv->started_at    = time(NULL);
     sv->restart_after = 0;
-    log_info("ядро запущено, pid %ld", (long)pid);
+    if (sv->uid) log_info("ядро запущено, pid %ld, uid %d", (long)pid, sv->uid);
+    else         log_info("ядро запущено, pid %ld, от root", (long)pid);
     return 0;
+}
+
+void sv_set_ids(sv_t *sv, int uid, int gid)
+{
+    if (!sv) return;
+    sv->uid = uid;
+    sv->gid = gid;
 }
 
 void sv_stop(sv_t *sv)

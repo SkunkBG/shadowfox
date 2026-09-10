@@ -7,6 +7,7 @@ typedef struct {
     char xray_bin[APPLY_PATH_MAX];      /* чем проверять и что запускать */
     char config_path[APPLY_PATH_MAX];   /* куда класть готовый конфиг */
     int  test_timeout;                  /* секунд на проверку конфига */
+    int  uid, gid;                      /* владелец готового конфига; 0 — root */
 } apply_opts_t;
 
 void apply_defaults(apply_opts_t *o);

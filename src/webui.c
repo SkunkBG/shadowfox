@@ -1130,49 +1130,26 @@ static void session_new(char *out, unsigned out_size)
     g_sessions[slot].until = now + SESSION_HOURS * 3600;
 }
 
-static int cookie_value(const http_req_t *req, const char *name,
-                        char *out, unsigned out_size)
-{
-    out[0] = '\0';
-    if (!req->cookie || !req->cookie_len) return 0;
-
-    const char *c    = req->cookie;
-    const char *end  = c + req->cookie_len;
-    size_t      nlen = strlen(name);
-
-    for (const char *p = c; p + nlen < end; p++) {
-        if (p != c && !(p[-1] == ' ' || p[-1] == ';')) continue;
-        if (strncmp(p, name, nlen) != 0 || p[nlen] != '=') continue;
-
-        const char *v = p + nlen + 1;
-        unsigned    i = 0;
-        while (v < end && *v != ';' && i + 1 < out_size) { out[i++] = *v++; }
-        out[i] = '\0';
-        return i > 0;
-    }
-    return 0;
-}
-
+/* Метка сессии приходит заголовком Authorization, а не cookie: cookie
+   браузер отдаёт всем службам на адресе роутера без разбора порта —
+   веб-интерфейсу Keenetic, любому пакету Entware со своей страницей.
+   Заголовок ставит только наша страница, и только своим запросам. */
 static int session_valid(const http_req_t *req)
 {
-    char tok[64] = "";
-    if (!cookie_value(req, "sfsession", tok, sizeof(tok))) return 0;
-
+    if (!req->token[0]) return 0;
     long now = (long)time(NULL);
     for (int i = 0; i < SESSIONS_MAX; i++) {
         if (g_sessions[i].until <= now) continue;
-        if (!strcmp(g_sessions[i].token, tok)) return 1;
+        if (!strcmp(g_sessions[i].token, req->token)) return 1;
     }
     return 0;
 }
 
 static void session_drop(const http_req_t *req)
 {
-    char tok[64] = "";
-    if (!cookie_value(req, "sfsession", tok, sizeof(tok))) return;
-
+    if (!req->token[0]) return;
     for (int i = 0; i < SESSIONS_MAX; i++)
-        if (!strcmp(g_sessions[i].token, tok)) g_sessions[i].until = 0;
+        if (!strcmp(g_sessions[i].token, req->token)) g_sessions[i].until = 0;
 }
 
 /* Значение поля из тела формы. Тело короткое и своё, поэтому разбор
@@ -1525,11 +1502,11 @@ static void do_login(const http_req_t *req, int fd, const config_t *cfg)
 
     log_info("веб: вход выполнен, запрос с %s", req->peer);
 
-    char head[256];
-    snprintf(head, sizeof(head),
-             "Set-Cookie: sfsession=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d",
-             tok, SESSION_HOURS * 3600);
-    http_send_with(fd, 303, "text/plain; charset=utf-8", head, "Location: /", "", 0);
+    /* Метку отдаём телом: страница входа кладёт её в хранилище своего
+       origin (адрес и порт), и другим службам роутера она не видна. */
+    char body[128];
+    snprintf(body, sizeof(body), "{\"session\":\"%s\"}\n", tok);
+    http_send_text(fd, 200, "application/json; charset=utf-8", body);
 }
 
 /* Запрос с чужой страницы. SameSite у cookie не различает порт: панель
@@ -1596,35 +1573,32 @@ static void handle(const http_req_t *req, int fd, void *ctx)
     /* Запасной токен принимаем и заголовком, и в строке запроса: по
        ссылке им пользоваться проще, а именно ради простоты он и нужен —
        это путь на случай, если проверка пароля почему-то не работает. */
-    int allowed = session_valid(req);
-
-    if (!allowed && c->cfg->web_token[0]) {
-        char q[64] = "";
-        http_query_get(req, "token", q, sizeof(q));
-        allowed = !strcmp(c->cfg->web_token, req->token) ||
-                  (q[0] && !strcmp(c->cfg->web_token, q));
+    /* Сама страница — без проверки: секретов в ней нет, все данные она
+       берёт с /data уже с меткой. Без метки /data ответит 401, и страница
+       уведёт на форму входа. Форма входа — на /login. */
+    if (!strcmp(req->path, "/") || !strcmp(req->path, "/index.html")) {
+        http_send_gzip(fd, "text/html; charset=utf-8", web_page, web_page_len);
+        return;
     }
+    if (!strcmp(req->path, "/login") && !strcmp(req->method, "GET")) {
+        send_login(fd, "");
+        return;
+    }
+
+    /* Запасной токен тоже только заголовком: в строке запроса он оседал
+       бы в истории браузера и журналах прокси перед демоном. */
+    int allowed = session_valid(req);
+    if (!allowed && c->cfg->web_token[0])
+        allowed = !strcmp(c->cfg->web_token, req->token);
 
     if (!strcmp(req->path, "/logout")) {
         session_drop(req);
-        http_send_with(fd, 303, "text/plain; charset=utf-8",
-                       "Set-Cookie: sfsession=; Path=/; Max-Age=0",
-                       "Location: /", "", 0);
+        http_send_text(fd, 200, "text/plain; charset=utf-8", "вышли\n");
         return;
     }
 
     if (!allowed) {
-        /* Страницу подменяем формой входа, а данным отвечаем отказом:
-           иначе страница показала бы форму внутри себя. */
-        if (!strcmp(req->path, "/") || !strcmp(req->path, "/index.html"))
-            send_login(fd, "");
-        else
-            http_send_text(fd, 401, "text/plain; charset=utf-8", "нужен вход\n");
-        return;
-    }
-
-    if (!strcmp(req->path, "/") || !strcmp(req->path, "/index.html")) {
-        http_send_gzip(fd, "text/html; charset=utf-8", web_page, web_page_len);
+        http_send_text(fd, 401, "text/plain; charset=utf-8", "нужен вход\n");
         return;
     }
 

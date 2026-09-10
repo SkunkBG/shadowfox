@@ -857,6 +857,8 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
 
     apply_opts_t ao;
     apply_defaults(&ao);
+    ao.uid = cfg->xray_uid;
+    ao.gid = cfg->xray_gid;
     str_copy(ao.config_path, sizeof(ao.config_path), cfg->xray_config);
     if (cfg->xray_bin[0]) str_copy(ao.xray_bin, sizeof(ao.xray_bin), cfg->xray_bin);
 
@@ -882,6 +884,7 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     }
 
     sv_init(&e->xray, ao.xray_bin, cfg->xray_config);
+    sv_set_ids(&e->xray, cfg->xray_uid, cfg->xray_gid);
     if (sv_start(&e->xray) == 0) {
         e->xray_managed = 1;
         str_copy(e->xray_listen, sizeof(e->xray_listen), lan);

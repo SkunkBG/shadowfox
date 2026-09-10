@@ -15,6 +15,7 @@ typedef struct {
     time_t restart_after;    /* когда пробовать снова, 0 — сразу */
     int    backoff;          /* текущая пауза перед перезапуском, секунд */
     int    restarts;         /* сколько раз перезапускали за всё время */
+    int    uid, gid;         /* от кого запускать; 0 — не менять */
 } sv_t;
 
 /* Минимальная и максимальная пауза между попытками. Ядро, падающее из-за
@@ -27,6 +28,9 @@ typedef struct {
 #define SV_HEALTHY_AFTER 30
 
 void sv_init(sv_t *sv, const char *bin, const char *config);
+/* Запускать ядро от этого пользователя: сброс прав в потомке до execv,
+   журнал ядра создаётся с этим владельцем. */
+void sv_set_ids(sv_t *sv, int uid, int gid);
 
 /* Запускает ядро. Возвращает 0 при успехе. */
 int  sv_start(sv_t *sv);

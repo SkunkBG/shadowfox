@@ -120,6 +120,13 @@ int apply_config(const apply_opts_t *o, const char *json,
 
     /* Переименование в пределах одной файловой системы атомарно:
        либо старый конфиг, либо новый, промежуточного состояния нет. */
+    /* Ядро читает конфиг уже не от root: файл его, и только его. */
+    if (o->uid && chown(tmp, (uid_t)o->uid, (gid_t)o->gid) != 0) {
+        unlink(tmp);
+        fail(err, err_size, "не сменить владельца %s: %s", tmp, strerror(errno));
+        return -1;
+    }
+
     if (rename(tmp, o->config_path) != 0) {
         unlink(tmp);
         fail(err, err_size, "не заменить %s: %s", o->config_path, strerror(errno));

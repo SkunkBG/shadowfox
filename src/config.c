@@ -23,6 +23,8 @@ void config_defaults(config_t *cfg)
     /* Как у HydraRoute на живом роутере: набор и правила v6 стоят
        всегда, даже без IPv6 у провайдера. */
     cfg->ipv6       = 1;
+    cfg->xray_uid   = 6425;   /* свой uid, ни с кем не делится */
+    cfg->xray_gid   = 6425;
     /* Заводить политики на роутере и сохранять его конфигурацию — это
        изменение настроек устройства, а не наша внутренняя кухня.
        Молча так делать нельзя, поэтому по умолчанию выключено. */
@@ -134,6 +136,12 @@ int config_set(config_t *cfg, const char *key, const char *value)
 
     if (!strcasecmp(key, "xrayBin")) {
         str_copy(cfg->xray_bin, sizeof(cfg->xray_bin), value);
+        return 0;
+    }
+
+    if (!strcasecmp(key, "xrayUid")) {
+        cfg->xray_uid = atoi(value);
+        cfg->xray_gid = cfg->xray_uid;
         return 0;
     }
 
@@ -382,6 +390,11 @@ int config_write_default(const char *path)
         "# Путь к ядру. Пусто — искать самим: сначала свою сборку\n"
         "# /opt/sbin/shadowfox-xray, потом штатный xray в PATH.\n"
         "xrayBin=%s\n"
+        "\n"
+        "# От кого запускать ядро. Ему не нужны права root: порт 1301 и\n"
+        "# исходящие соединения открывает любой пользователь, а конфиг из\n"
+        "# подписки — чужой код. 0 — оставить root (только для отладки).\n"
+        "xrayUid=%d\n"
         "socksPort=%d\n"
         "# Файл с паролем к своему SOCKS: создаётся сам при первом запуске\n"
         "# и подставляется и в ядро, и в подключение роутера. Пусто — без\n"
@@ -411,7 +424,7 @@ int config_write_default(const char *path)
         "balancer=no\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.web_proxy,
-        cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.socks_port, cfg.socks_secret,
+        cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.xray_uid, cfg.socks_port, cfg.socks_secret,
         cfg.proxy_iface, cfg.policy, cfg.sni_capture ? "yes" : "no",
         cfg.fragment ? "yes" : "no", cfg.fingerprint);
 
