@@ -317,41 +317,41 @@ code{background:var(--soft);padding:2px 7px;border-radius:6px;font-size:13px}
 
 /* ================= Ночь и лиса: стекло и свечение =================
    Слой поверх прежних правил: те же классы, новые материалы. Ночь —
-   не чёрная, а индиго после заката; свечение рубиновое; логотип остаётся своим бирюзовым пятном. */
+   не чёрная, а индиго после заката; свечение золотисто-охристое, как на медали; логотип остаётся своим бирюзовым пятном. */
 :root{
   --bg:#0a0d1e;--side:rgba(13,17,40,.62);--panel:rgba(18,23,52,.58);
   --card:rgba(22,28,62,.52);--soft:rgba(7,10,26,.58);--line:rgba(168,178,255,.13);
   --edge:rgba(255,255,255,.07);--fg:#eef1ff;--dim:#98a3cc;
-  --acc:#ef6b87;--acc-soft:rgba(196,48,79,.16);--acc2:#ef6b87;--amber:#f0b84a;
+  --acc:#e0a83a;--acc-soft:rgba(201,142,27,.16);--acc2:#e0a83a;--ruby:#ef6b87;
   --ok:#5eeab2;--bad:#ff8a5c;--warn:#ffc46b;
-  --glow:rgba(196,48,79,.45);--glow-ok:rgba(94,234,178,.55);--glow-bad:rgba(255,138,92,.55);--glow-amber:rgba(217,154,43,.45);
-  --ink:#fff0f3;
+  --glow:rgba(201,142,27,.45);--glow-ok:rgba(94,234,178,.55);--glow-bad:rgba(255,138,92,.55);--glow-ruby:rgba(196,48,79,.45);
+  --ink:#2a1a00;
 }
 :root[data-theme=light]{
   --bg:#eceef8;--side:rgba(255,255,255,.62);--panel:rgba(255,255,255,.66);
   --card:rgba(255,255,255,.6);--soft:rgba(235,238,250,.75);--line:rgba(40,50,110,.13);
   --edge:rgba(255,255,255,.9);--fg:#171b30;--dim:#606a8e;
-  --acc:#b0284a;--acc-soft:rgba(176,40,74,.13);--acc2:#b0284a;--amber:#c2841c;
+  --acc:#a8701a;--acc-soft:rgba(168,112,26,.14);--acc2:#a8701a;--ruby:#b0284a;
   --ok:#12996a;--bad:#d9562a;--warn:#c07a12;
-  --glow:rgba(176,40,74,.3);--glow-ok:rgba(18,153,106,.35);--glow-bad:rgba(217,86,42,.35);--glow-amber:rgba(194,132,28,.35);
-  --ink:#fff5f7;
+  --glow:rgba(168,112,26,.3);--glow-ok:rgba(18,153,106,.35);--glow-bad:rgba(217,86,42,.35);--glow-ruby:rgba(176,40,74,.3);
+  --ink:#fff7e6;
 }
 @media (prefers-color-scheme:light){
   :root:not([data-theme=dark]){
     --bg:#eceef8;--side:rgba(255,255,255,.62);--panel:rgba(255,255,255,.66);
     --card:rgba(255,255,255,.6);--soft:rgba(235,238,250,.75);--line:rgba(40,50,110,.13);
     --edge:rgba(255,255,255,.9);--fg:#171b30;--dim:#606a8e;
-    --acc:#b0284a;--acc-soft:rgba(176,40,74,.13);--acc2:#b0284a;--amber:#c2841c;
+    --acc:#a8701a;--acc-soft:rgba(168,112,26,.14);--acc2:#a8701a;--ruby:#b0284a;
     --ok:#12996a;--bad:#d9562a;--warn:#c07a12;
-    --glow:rgba(176,40,74,.3);--glow-ok:rgba(18,153,106,.35);--glow-bad:rgba(217,86,42,.35);--glow-amber:rgba(194,132,28,.35);
-    --ink:#fff5f7;
+    --glow:rgba(168,112,26,.3);--glow-ok:rgba(18,153,106,.35);--glow-bad:rgba(217,86,42,.35);--glow-ruby:rgba(176,40,74,.3);
+    --ink:#fff7e6;
   }
 }
-/* Аврора: рубиновое пятно у логотипа, фиолетовое в глубине, редкие звёзды. */
+/* Аврора: золотое пятно у логотипа, фиолетовое в глубине, редкие звёзды. */
 body{background:var(--bg)}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(900px 520px at 6% -6%, rgba(196,48,79,.20), transparent 62%),
+    radial-gradient(900px 520px at 6% -6%, rgba(201,142,27,.18), transparent 62%),
     radial-gradient(760px 620px at 98% 100%, rgba(99,80,255,.30), transparent 60%),
     radial-gradient(520px 420px at 60% 40%, rgba(120,90,255,.10), transparent 60%),
     radial-gradient(1.2px 1.2px at 12% 32%, rgba(255,255,255,.55) 50%, transparent 51%),
@@ -363,13 +363,13 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 }
 :root[data-theme=light] body::before{
   background:
-    radial-gradient(900px 520px at 6% -6%, rgba(196,48,79,.14), transparent 62%),
+    radial-gradient(900px 520px at 6% -6%, rgba(201,142,27,.16), transparent 62%),
     radial-gradient(760px 620px at 98% 100%, rgba(120,110,255,.22), transparent 60%),
     radial-gradient(520px 420px at 60% 40%, rgba(80,190,255,.12), transparent 60%);
 }
 @media (prefers-color-scheme:light){ :root:not([data-theme=dark]) body::before{
     background:
-    radial-gradient(900px 520px at 6% -6%, rgba(196,48,79,.14), transparent 62%),
+    radial-gradient(900px 520px at 6% -6%, rgba(201,142,27,.16), transparent 62%),
     radial-gradient(760px 620px at 98% 100%, rgba(120,110,255,.22), transparent 60%),
     radial-gradient(520px 420px at 60% 40%, rgba(80,190,255,.12), transparent 60%);
 }}
@@ -393,21 +393,21 @@ aside{background:var(--side);border-right:1px solid var(--line);box-shadow:none}
 .dot.warn{box-shadow:0 0 10px 1px rgba(255,196,107,.5)}
 .pill:has(.dot.ok){border-color:rgba(94,234,178,.35)}
 .pill:has(.dot.bad){border-color:rgba(255,107,138,.4);box-shadow:inset 0 1px 0 var(--edge),0 0 24px var(--glow-bad)}
-.b{background:linear-gradient(180deg,#d94a68,#a52140);color:var(--ink);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 0 0 1px rgba(196,48,79,.35),0 8px 24px var(--glow)}
+.b{background:linear-gradient(180deg,#e6b44a,#b8821c);color:var(--ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 0 1px rgba(201,142,27,.35),0 8px 24px var(--glow)}
 .b:hover{filter:brightness(1.06)}
 .b.ghost,.b.out{background:var(--soft);color:var(--fg);box-shadow:inset 0 1px 0 var(--edge)}
-.b.out{color:var(--acc);border-color:rgba(196,48,79,.5)}
+.b.out{color:var(--acc);border-color:rgba(201,142,27,.5)}
 .b.ghost:hover,.b.out:hover{border-color:var(--acc);box-shadow:inset 0 1px 0 var(--edge),0 0 18px var(--glow)}
 aside nav button.on{background:var(--acc-soft);color:var(--acc);
-  box-shadow:inset 0 0 0 1px rgba(196,48,79,.3),0 0 18px var(--glow)}
-.sw.on{background:linear-gradient(180deg,#d94a68,#a52140);box-shadow:0 0 14px var(--glow)}
-.g textarea{border-color:rgba(196,48,79,.6);box-shadow:0 0 0 3px var(--acc-soft)}
+  box-shadow:inset 0 0 0 1px rgba(201,142,27,.3),0 0 18px var(--glow)}
+.sw.on{background:linear-gradient(180deg,#e6b44a,#b8821c);box-shadow:0 0 14px var(--glow)}
+.g textarea{border-color:rgba(201,142,27,.6);box-shadow:0 0 0 3px var(--acc-soft)}
 textarea.wide:focus,.search:focus-within,input:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
 .card h4{color:var(--acc)}
-/* Выход — янтарный: единственная тёплая кнопка, её не спутать ни с действием, ни с бедой. */
-.core{color:var(--amber);border-color:rgba(217,154,43,.5)}
-.core:hover{background:rgba(217,154,43,.1);box-shadow:0 0 18px var(--glow-amber)}
+/* Выход — рубиновый: единственная холодно-красная кнопка, её не спутать ни с золотым действием, ни с коралловой бедой. */
+.core{color:var(--ruby);border-color:rgba(196,48,79,.5)}
+.core:hover{background:rgba(196,48,79,.1);box-shadow:0 0 18px var(--glow-ruby)}
 .save{box-shadow:inset 0 1px 0 var(--edge),0 16px 40px rgba(0,0,0,.45),0 0 30px var(--glow)}
 
 /* Блик по силуэту, как в исходном логотипе: белая полоса пробегает раз
