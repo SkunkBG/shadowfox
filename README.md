@@ -71,7 +71,7 @@ make xray-ipk   # упаковать в .ipk
   [3.9](https://support.keenetic.com/titan/kn-1810/en/27239-keeneticos-3-9.html),
   а UDP через SOCKS5 (`interface … proxy socks5-udp`) — в
   [4.1](https://support.keenetic.com/titan/kn-1811/en/32140-keeneticos-4-1.html).
-  На 3.9 и 4.0 кнопка «Создать» в панели завершится сбоем на этой команде,
+  На прошивках ниже 4.1 (3.9, 4.0) кнопка «Создать» в панели завершится сбоем на этой команде,
   а звонки Telegram и WhatsApp пойдут мимо туннеля. Проверено на
   Keenetic KN-1811 (aarch64) и Viva KN-1910 (mipsel).
 - **Компоненты роутера** «OPKG» и «Прокси-клиент» установлены
