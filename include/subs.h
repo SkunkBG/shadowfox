@@ -33,13 +33,20 @@ void subs_host(const char *url, char *dst, size_t size);
    ответил, берётся кеш, чтобы ядро поднималось и без сети.
    Возвращает число адресов в тексте; *from_cache = 1, если пришлось
    взять кеш; err — почему. Без адресов текст копируется как есть. */
-int subs_expand(const char *text, const char *cache_path,
+int subs_expand(const char *text, const char *cache_path, const char *hwid,
                 char *out, size_t size, int *from_cache,
                 char *err, size_t err_size);
 
 /* Одна загрузка. Для проверок принимает file://. Возвращает длину тела
    либо -1 и причину в err. Тело уже раскрыто из base64, если было. */
-long subs_fetch(const char *url, char *out, size_t size,
+long subs_fetch(const char *url, const char *hwid, char *out, size_t size,
                 char *err, size_t err_size);
+
+/* Файл с постоянным идентификатором устройства для панели, в conf_dir.
+   Панели с лимитом устройств (Remnawave) без заголовка x-hwid отдают
+   заглушку «App not supported» вместо списка. Идентификатор случайный,
+   создаётся один раз и хранится 0600: для панели роутер — одно из
+   устройств пользователя. */
+#define SUBS_HWID_FILE "hwid"
 
 #endif

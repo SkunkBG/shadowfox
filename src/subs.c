@@ -111,7 +111,7 @@ static char *find_bin(const char *name)
     return NULL;
 }
 
-long subs_fetch(const char *url, char *out, size_t size,
+long subs_fetch(const char *url, const char *hwid, char *out, size_t size,
                 char *err, size_t err_size)
 {
     if (!url || !out || size < 2) return -1;
@@ -134,18 +134,37 @@ long subs_fetch(const char *url, char *out, size_t size,
     char u[2048];
     str_copy(u, sizeof(u), url);
 
-    char *argv[10];
+    /* Заголовки устройства: без x-hwid панель с лимитом устройств отдаёт
+       заглушку. Остальные три — как панель покажет роутер в списке
+       устройств пользователя. */
+    char h_hwid[160] = "", h_os[] = "x-device-os: Linux",
+         h_ver[]  = "x-ver-os: KeeneticOS", h_model[] = "x-device-model: Keenetic";
+    if (hwid && hwid[0]) snprintf(h_hwid, sizeof(h_hwid), "x-hwid: %s", hwid);
+
+    char *argv[24];
+    int   n = 0;
     char a_q[] = "-q", a_T[] = "-T", a_25[] = "25", a_U[] = "-U", a_O[] = "-O",
-         a_dash[] = "-", a_sS[] = "-sS", a_L[] = "-L", a_m[] = "-m", a_A[] = "-A";
+         a_dash[] = "-", a_sS[] = "-sS", a_L[] = "-L", a_m[] = "-m", a_A[] = "-A",
+         a_H[] = "-H", a_hdr[] = "--header";
     char *bin = find_bin("wget");
     /* Штатный wget прошивки без TLS; нужен именно из Entware. */
     if (bin && strncmp(bin, "/opt/", 5)) bin = NULL;
     if (bin) {
-        char *v[] = { bin, a_q, a_T, a_25, a_U, agent, a_O, a_dash, u, NULL };
-        memcpy(argv, v, sizeof(v));
+        char *v[] = { bin, a_q, a_T, a_25, a_U, agent, a_O, a_dash };
+        memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
+        if (h_hwid[0]) { argv[n++] = a_hdr; argv[n++] = h_hwid; }
+        argv[n++] = a_hdr; argv[n++] = h_os;
+        argv[n++] = a_hdr; argv[n++] = h_ver;
+        argv[n++] = a_hdr; argv[n++] = h_model;
+        argv[n++] = u; argv[n] = NULL;
     } else if ((bin = find_bin("curl")) != NULL) {
-        char *v[] = { bin, a_sS, a_L, a_m, a_25, a_A, agent, u, NULL };
-        memcpy(argv, v, sizeof(v));
+        char *v[] = { bin, a_sS, a_L, a_m, a_25, a_A, agent };
+        memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
+        if (h_hwid[0]) { argv[n++] = a_H; argv[n++] = h_hwid; }
+        argv[n++] = a_H; argv[n++] = h_os;
+        argv[n++] = a_H; argv[n++] = h_ver;
+        argv[n++] = a_H; argv[n++] = h_model;
+        argv[n++] = u; argv[n] = NULL;
     } else {
         if (err) str_copy(err, err_size, "нет wget-ssl и curl: opkg install wget-ssl ca-bundle");
         return -1;
@@ -205,7 +224,7 @@ static int append(char *out, size_t size, size_t *used, const char *s, size_t n)
     return 0;
 }
 
-int subs_expand(const char *text, const char *cache_path,
+int subs_expand(const char *text, const char *cache_path, const char *hwid,
                 char *out, size_t size, int *from_cache,
                 char *err, size_t err_size)
 {
@@ -233,7 +252,7 @@ int subs_expand(const char *text, const char *cache_path,
             if (subs_is_url(s)) {
                 urls++;
                 char why[160] = "";
-                long n = failed ? -1 : subs_fetch(s, body, sizeof(body), why, sizeof(why));
+                long n = failed ? -1 : subs_fetch(s, hwid, body, sizeof(body), why, sizeof(why));
                 if (n > 0) {
                     if (append(fetched, sizeof(fetched), &fused, body, (size_t)n) ||
                         append(fetched, sizeof(fetched), &fused, "\n", 1)) {

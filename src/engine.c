@@ -615,7 +615,12 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
             char cache[CFG_PATH_MAX + 40], why[160] = "";
             int  cached = 0;
             snprintf(cache, sizeof(cache), "%s/" SUBS_CACHE, cfg->conf_dir);
-            int rc = subs_expand(body, cache, expanded, sizeof(expanded),
+            /* Постоянный идентификатор устройства для панели. */
+            char hpath[CFG_PATH_MAX + 40], hwid[64] = "";
+            snprintf(hpath, sizeof(hpath), "%s/" SUBS_HWID_FILE, cfg->conf_dir);
+            if (!secret_load_or_create(hpath, hwid, sizeof(hwid)))
+                log_warn("не создать %s — подписка без x-hwid", hpath);
+            int rc = subs_expand(body, cache, hwid, expanded, sizeof(expanded),
                                  &cached, why, sizeof(why));
             subs_first_host(body, e->subs_host, sizeof(e->subs_host));
             str_copy(raw, sizeof(raw), body);
