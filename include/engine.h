@@ -74,6 +74,7 @@ typedef struct engine {
     time_t subs_at;            /* когда загружали */
     char   subs_host[SUBS_HOST_MAX];
     char   subs_error[160];
+    subs_info_t subs_info;     /* имя провайдера, трафик, срок — из заголовков ответа */
     int    server_count;       /* серверов в списке до выбора */
     char   server_tags[NODELIST_MAX][NODE_TAG_MAX];
     char   server_active[NODE_TAG_MAX];

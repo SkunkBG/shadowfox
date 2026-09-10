@@ -89,6 +89,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "subs_cached=%d\n"
         "subs_at=%ld\n"
         "subs_host=%s\n"
+        "subs_title=%s\n"
+        "subs_expire=%ld\n"
         "subs_error=%s\n"
         "server_count=%d\n"
         "server_active=%s\n"
@@ -106,7 +108,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_sampled,
         e->tunnel_established, e->tunnel_pending, e->tunnel_why,
         e->tunnel_rtt_ms, e->subs_urls, e->subs_ok, e->subs_cached, (long)e->subs_at,
-        e->subs_host, e->subs_error, e->server_count, e->server_active,
+        e->subs_host, e->subs_info.title, e->subs_info.expire, e->subs_error,
+        e->server_count, e->server_active,
         e->server_filter);
 
     fclose(f);
@@ -319,9 +322,15 @@ int status_print(const config_t *cfg)
             time_t t = (time_t)at;
             strftime(when, sizeof(when), "%d.%m %H:%M", localtime(&t));
         }
+        char title[96] = "";
+        status_get(spath, "subs_title", title, sizeof(title));
+        long exp = status_num(spath, "subs_expire");
+        char until[32] = "";
+        if (exp > 0) { time_t t = (time_t)exp; strftime(until, sizeof(until), ", до %d.%m.%Y", localtime(&t)); }
         if (status_num(spath, "subs_ok") > 0)
-            printf("  подписка:   %s, серверов %ld, загружена %s%s\n", host,
-                   status_num(spath, "server_count"), when,
+            printf("  подписка:   %s%s%s, серверов %ld, загружена %s%s%s\n",
+                   title[0] ? title : host, title[0] ? " · " : "", title[0] ? host : "",
+                   status_num(spath, "server_count"), when, until,
                    status_num(spath, "subs_cached") > 0 ? " (из кеша, сервер не ответил)" : "");
         else
             printf("  подписка:   %s НЕ ЗАГРУЖЕНА: %s\n", host, serr);

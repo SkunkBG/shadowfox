@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 int subs_is_url(const char *line)
@@ -135,10 +136,91 @@ static void header_value(const char *name, const char *val, const char *def,
     while (n > 0 && dst[n - 1] == ' ') dst[--n] = '\0';
 }
 
+/* Заголовок ответа, без учёта регистра имени; значение — до конца строки. */
+static int header_get(const char *hdr, size_t len, const char *name, char *dst, size_t size)
+{
+    size_t n = strlen(name);
+    const char *p = hdr, *end = hdr + len;
+    while (p < end) {
+        const char *nl = memchr(p, '\n', (size_t)(end - p));
+        size_t ll = nl ? (size_t)(nl - p) : (size_t)(end - p);
+        if (ll > n && !strncasecmp(p, name, n) && p[n] == ':') {
+            const char *v = p + n + 1;
+            while (v < p + ll && (*v == ' ' || *v == '\t')) v++;
+            size_t vl = (size_t)(p + ll - v);
+            while (vl && (v[vl - 1] == '\r' || v[vl - 1] == ' ')) vl--;
+            if (vl >= size) vl = size - 1;
+            memcpy(dst, v, vl); dst[vl] = '\0';
+            return 1;
+        }
+        if (!nl) break;
+        p = nl + 1;
+    }
+    return 0;
+}
+
+static long long field_ll(const char *s, const char *key)
+{
+    const char *p = strstr(s, key);
+    if (!p) return 0;
+    p += strlen(key);
+    while (*p == ' ') p++;
+    if (*p != '=') return 0;
+    return atoll(p + 1);
+}
+
+void subs_parse_headers(const char *hdr, size_t len, subs_info_t *info)
+{
+    if (!info) return;
+    memset(info, 0, sizeof(*info));
+    if (!hdr || !len) return;
+
+    char v[256];
+    if (header_get(hdr, len, "profile-title", v, sizeof(v))) {
+        if (!strncasecmp(v, "base64:", 7)) {
+            char dec[256];
+            long n = base64_decode(v + 7, dec, sizeof(dec));
+            if (n > 0) { dec[n] = '\0'; str_copy(info->title, sizeof(info->title), dec); }
+        } else {
+            str_copy(info->title, sizeof(info->title), v);
+        }
+        /* Имя — одна строка печатного текста. */
+        for (char *c = info->title; *c; c++) if ((unsigned char)*c < 0x20) *c = ' ';
+        str_trim(info->title);
+    }
+    if (header_get(hdr, len, "subscription-userinfo", v, sizeof(v))) {
+        info->upload   = field_ll(v, "upload");
+        info->download = field_ll(v, "download");
+        info->total    = field_ll(v, "total");
+        info->expire   = (long)field_ll(v, "expire");
+    }
+    if (header_get(hdr, len, "profile-update-interval", v, sizeof(v)))
+        info->update_hours = atoi(v);
+}
+
+/* Ответ с заголовками (--save-headers у wget, -i у curl): отделяем блок
+   заголовков от тела. При редиректах блоков несколько — снимаем все. */
+static long strip_headers(char *buf, long len, subs_info_t *info)
+{
+    while (len > 5 && !strncmp(buf, "HTTP/", 5)) {
+        char *sep = strstr(buf, "\r\n\r\n");
+        size_t skip = 4;
+        if (!sep) { sep = strstr(buf, "\n\n"); skip = 2; }
+        if (!sep) break;
+        size_t hl = (size_t)(sep - buf);
+        if (info) subs_parse_headers(buf, hl, info);   /* последний блок побеждает */
+        size_t off = hl + skip;
+        memmove(buf, buf + off, (size_t)len - off + 1);
+        len -= (long)off;
+    }
+    return len;
+}
+
 long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
-                char *err, size_t err_size)
+                subs_info_t *info, char *err, size_t err_size)
 {
     const char *hwid = dev ? dev->hwid : NULL;
+    if (info) memset(info, 0, sizeof(*info));
     if (!url || !out || size < 2) return -1;
     out[0] = '\0';
 
@@ -148,7 +230,8 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
         size_t got = fread(out, 1, size - 1, f);
         fclose(f);
         out[got] = '\0';
-        return unwrap(out, size, (long)got, err, err_size);
+        long len = strip_headers(out, (long)got, info);
+        return unwrap(out, size, len, err, err_size);
     }
 
     /* Свой User-Agent: панели по нему выбирают формат ответа, а
@@ -173,12 +256,12 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
          a_dash[] = "-", a_sS[] = "-sS", a_L[] = "-L", a_m[] = "-m", a_A[] = "-A",
          a_H[] = "-H", a_hdr[] = "--header", a_f[] = "-f",
          a_https[] = "--https-only", a_proto[] = "--proto", a_pv[] = "=https",
-         a_predir[] = "--proto-redir";
+         a_predir[] = "--proto-redir", a_sh[] = "--save-headers", a_i[] = "-i";
     char *bin = find_bin("wget");
     /* Штатный wget прошивки без TLS; нужен именно из Entware. */
     if (bin && strncmp(bin, "/opt/", 5)) bin = NULL;
     if (bin) {
-        char *v[] = { bin, a_q, a_https, a_T, a_25, a_U, agent, a_O, a_dash };
+        char *v[] = { bin, a_q, a_https, a_sh, a_T, a_25, a_U, agent, a_O, a_dash };
         memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
         if (h_hwid[0]) { argv[n++] = a_hdr; argv[n++] = h_hwid; }
         argv[n++] = a_hdr; argv[n++] = h_os;
@@ -186,7 +269,7 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
         argv[n++] = a_hdr; argv[n++] = h_model;
         argv[n++] = u; argv[n] = NULL;
     } else if ((bin = find_bin("curl")) != NULL) {
-        char *v[] = { bin, a_sS, a_f, a_L, a_proto, a_pv, a_predir, a_pv, a_m, a_25, a_A, agent };
+        char *v[] = { bin, a_sS, a_f, a_i, a_L, a_proto, a_pv, a_predir, a_pv, a_m, a_25, a_A, agent };
         memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
         if (h_hwid[0]) { argv[n++] = a_H; argv[n++] = h_hwid; }
         argv[n++] = a_H; argv[n++] = h_os;
@@ -211,7 +294,8 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
         out[0] = '\0';
         return -1;
     }
-    return unwrap(out, size, (long)strlen(out), err, err_size);
+    long len = strip_headers(out, (long)strlen(out), info);
+    return unwrap(out, size, len, err, err_size);
 }
 
 static int read_cache(const char *path, char *out, size_t size)
@@ -253,10 +337,11 @@ static int append(char *out, size_t size, size_t *used, const char *s, size_t n)
 }
 
 int subs_expand(const char *text, const char *cache_path, const subs_dev_t *dev,
-                char *out, size_t size, int *from_cache,
+                char *out, size_t size, int *from_cache, subs_info_t *info,
                 char *err, size_t err_size)
 {
     if (!text || !out || !size) return -1;
+    if (info) memset(info, 0, sizeof(*info));
     out[0] = '\0';
     if (from_cache) *from_cache = 0;
     if (err && err_size) err[0] = '\0';
@@ -280,7 +365,9 @@ int subs_expand(const char *text, const char *cache_path, const subs_dev_t *dev,
             if (subs_is_url(s)) {
                 urls++;
                 char why[160] = "";
-                long n = failed ? -1 : subs_fetch(s, dev, body, sizeof(body), why, sizeof(why));
+                subs_info_t one;
+                long n = failed ? -1 : subs_fetch(s, dev, body, sizeof(body), &one, why, sizeof(why));
+                if (n > 0 && info && !info->title[0] && !info->expire && !info->total) *info = one;
                 if (n > 0) {
                     if (append(fetched, sizeof(fetched), &fused, body, (size_t)n) ||
                         append(fetched, sizeof(fetched), &fused, "\n", 1)) {

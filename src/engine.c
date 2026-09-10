@@ -626,8 +626,13 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     e->subs_urls = subs_count_urls(body);
     if (e->subs_urls) {
         time_t now   = time(NULL);
+        /* Период обновления: как просит панель (profile-update-interval,
+           часы), но не чаще раза в час; без заголовка — шесть часов. */
+        time_t period = e->subs_info.update_hours > 0
+                      ? (time_t)e->subs_info.update_hours * 3600 : ENGINE_SUBS_REFRESH;
+        if (period < 3600) period = 3600;
         int    fresh = e->subs_ok && strcmp(raw, body) == 0 &&
-                       now - e->subs_at < ENGINE_SUBS_REFRESH;
+                       now - e->subs_at < period;
         if (force || !fresh) {
             char cache[CFG_PATH_MAX + 40], why[160] = "";
             int  cached = 0;
@@ -650,8 +655,10 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
                     log_info("модель роутера не узнать, панели уйдёт «Keenetic»");
             }
             subs_dev_t dev = { hwid, e->dev_model, e->dev_osver };
+            subs_info_t info;
             int rc = subs_expand(body, cache, &dev, expanded, sizeof(expanded),
-                                 &cached, why, sizeof(why));
+                                 &cached, &info, why, sizeof(why));
+            if (rc > 0 && !cached) e->subs_info = info;
             subs_first_host(body, e->subs_host, sizeof(e->subs_host));
             str_copy(raw, sizeof(raw), body);
             e->subs_at     = now;
@@ -1138,7 +1145,10 @@ void engine_tick(engine_t *e, time_t now)
 
     /* Подписка по расписанию: список серверов у панели меняется. */
     if (e->subs_urls && e->cfg) {
-        time_t due = e->subs_at + ((e->subs_ok && !e->subs_cached) ? ENGINE_SUBS_REFRESH
+        time_t period = e->subs_info.update_hours > 0
+                      ? (time_t)e->subs_info.update_hours * 3600 : ENGINE_SUBS_REFRESH;
+        if (period < 3600) period = 3600;
+        time_t due = e->subs_at + ((e->subs_ok && !e->subs_cached) ? period
                                                                   : ENGINE_SUBS_RETRY);
         if (now >= due) start_own_xray_ex(e, e->cfg, 1);
     }

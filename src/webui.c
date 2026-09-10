@@ -199,6 +199,11 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_bool(&j, "subs_cached", e->subs_cached);
     json_kv_int(&j, "subs_at", (long)e->subs_at);
     json_kv_str(&j, "subs_host", e->subs_host);
+    json_kv_str(&j, "subs_title", e->subs_info.title);
+    json_kv_int(&j, "subs_download", (long)(e->subs_info.download / (1024 * 1024)));   /* МБ */
+    json_kv_int(&j, "subs_upload", (long)(e->subs_info.upload / (1024 * 1024)));
+    json_kv_int(&j, "subs_total", (long)(e->subs_info.total / (1024 * 1024)));
+    json_kv_int(&j, "subs_expire", e->subs_info.expire);
     json_kv_str(&j, "subs_error", e->subs_error);
     json_kv_str(&j, "server_active", e->server_active);
     json_kv_str(&j, "server_filter", e->server_filter);

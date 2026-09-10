@@ -42,14 +42,28 @@ typedef struct {
     const char *osver;    /* «4.3.6» */
 } subs_dev_t;
 
+/* Что панель сообщает о подписке в заголовках ответа: имя провайдера
+   (profile-title, часто base64:), трафик и срок (subscription-userinfo),
+   желаемый период обновления в часах (profile-update-interval). Нули и
+   пустые строки — заголовка не было. */
+typedef struct {
+    char      title[96];
+    long long upload, download, total;   /* байты; total 0 — без лимита */
+    long      expire;                    /* unix time, 0 — бессрочно */
+    int       update_hours;
+} subs_info_t;
+
+/* Разбор блока заголовков HTTP (до пустой строки). Отдельно — ради тестов. */
+void subs_parse_headers(const char *hdr, size_t len, subs_info_t *info);
+
 int subs_expand(const char *text, const char *cache_path, const subs_dev_t *dev,
-                char *out, size_t size, int *from_cache,
+                char *out, size_t size, int *from_cache, subs_info_t *info,
                 char *err, size_t err_size);
 
 /* Одна загрузка. Для проверок принимает file://. Возвращает длину тела
    либо -1 и причину в err. Тело уже раскрыто из base64, если было. */
 long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
-                char *err, size_t err_size);
+                subs_info_t *info, char *err, size_t err_size);
 
 /* Файл с постоянным идентификатором устройства для панели, в conf_dir.
    Панели с лимитом устройств (Remnawave) без заголовка x-hwid отдают
