@@ -18,6 +18,49 @@ static int has_port(const int *ports, int n, int v)
     return 0;
 }
 
+/* Адрес из /proc/net/tcp: hex-образ слов __be32 в памяти. На little-
+   endian байты каждого слова напечатаны задом наперёд, на big-endian —
+   как есть. */
+static int hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static int decode_addr(const char *hex, size_t hexlen, unsigned char *dst, unsigned char *fam)
+{
+    if (hexlen != 8 && hexlen != 32) return 0;
+    int words = (int)(hexlen / 8);
+    for (int w = 0; w < words; w++) {
+        for (int b = 0; b < 4; b++) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            int src = b;
+#else
+            int src = 3 - b;
+#endif
+            int hi = hexval(hex[w * 8 + src * 2]), lo = hexval(hex[w * 8 + src * 2 + 1]);
+            if (hi < 0 || lo < 0) return 0;
+            dst[w * 4 + b] = (unsigned char)(hi * 16 + lo);
+        }
+    }
+    if (words == 1) memset(dst + 4, 0, 12);
+    *fam = words == 1 ? 4 : 6;
+    return 1;
+}
+
+static void note_remote(tcpstat_t *out, const char *rem, size_t hexlen)
+{
+    unsigned char addr[16], fam;
+    if (!decode_addr(rem, hexlen, addr, &fam)) return;
+    for (int i = 0; i < out->remote_count; i++)
+        if (out->remote_fam[i] == fam && !memcmp(out->remotes[i], addr, 16)) return;
+    if (out->remote_count >= TCPSTAT_REMOTES_MAX) return;
+    memcpy(out->remotes[out->remote_count], addr, 16);
+    out->remote_fam[out->remote_count++] = fam;
+}
+
 int tcpstat_parse(const char *text, const unsigned long *inodes, int n_inodes,
                   const int *ports, int n_ports, tcpstat_t *out)
 {
@@ -61,6 +104,7 @@ int tcpstat_parse(const char *text, const unsigned long *inodes, int n_inodes,
                 has_port(ports, n_ports, (int)strtoul(colon + 1, NULL, 16))) {
                 if (st == 0x01) { out->established++; out->retrans += rt; counted++; }
                 else if (st == 0x02) { out->syn_sent++; counted++; }
+                if (st == 0x01 || st == 0x02) note_remote(out, rem, (size_t)(colon - rem));
             }
         }
 
@@ -119,17 +163,22 @@ int tcpstat_collect(pid_t pid, const int *ports, int n_ports, tcpstat_t *out)
     if (n < 0) return -1;
 
     tcpstat_t part;
-    if (read_file("/proc/net/tcp", text, sizeof(text)) > 0) {
+    const char *files[] = { "/proc/net/tcp", "/proc/net/tcp6" };
+    for (int f = 0; f < 2; f++) {
+        if (read_file(files[f], text, sizeof(text)) <= 0) continue;
         tcpstat_parse(text, inodes, n, ports, n_ports, &part);
         out->established += part.established;
         out->syn_sent    += part.syn_sent;
         out->retrans     += part.retrans;
-    }
-    if (read_file("/proc/net/tcp6", text, sizeof(text)) > 0) {
-        tcpstat_parse(text, inodes, n, ports, n_ports, &part);
-        out->established += part.established;
-        out->syn_sent    += part.syn_sent;
-        out->retrans     += part.retrans;
+        for (int i = 0; i < part.remote_count && out->remote_count < TCPSTAT_REMOTES_MAX; i++) {
+            int dup = 0;
+            for (int k = 0; k < out->remote_count; k++)
+                if (out->remote_fam[k] == part.remote_fam[i] &&
+                    !memcmp(out->remotes[k], part.remotes[i], 16)) dup = 1;
+            if (dup) continue;
+            memcpy(out->remotes[out->remote_count], part.remotes[i], 16);
+            out->remote_fam[out->remote_count++] = part.remote_fam[i];
+        }
     }
     return 0;
 }

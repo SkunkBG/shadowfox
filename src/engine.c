@@ -48,6 +48,7 @@ void engine_init(engine_t *e)
     scap_init(&e->sni);
     rci_init(&e->rci);
     sv_init(&e->xray, "", "");
+    rttcap_init(&e->rttcap);
     e->tunnel_rtt_ms = -1;
 }
 
@@ -58,6 +59,7 @@ int engine_fds(const engine_t *e, int *out, int max)
     int n = 0;
     if (e->capturing && n < max) out[n++] = e->cap.fd;
     if (e->sniffing  && n < max) out[n++] = e->sni.fd;
+    if (e->rttcap.fd >= 0 && n < max) out[n++] = e->rttcap.fd;
     return n;
 }
 
@@ -915,6 +917,12 @@ static void tunnel_sample(engine_t *e, time_t now)
         if (n > 0 && sockrtt_collect(inodes, n, e->node_ports, e->node_port_count, &rtt) == 0)
             e->tunnel_rtt_ms = sockrtt_ms(&rtt);
     }
+    /* Второй способ, для ядер без sock_diag: адреса серверов и порты —
+       наблюдению за SYN, а замер — медиана свежих рукопожатий. */
+    rttcap_set_ports(&e->rttcap, e->node_ports, e->node_port_count);
+    rttcap_set_targets(&e->rttcap, (const unsigned char (*)[16])st.remotes,
+                       st.remote_fam, st.remote_count);
+    if (e->tunnel_rtt_ms < 0) e->tunnel_rtt_ms = rttcap_ms(&e->rttcap, now);
     e->tunnel_retrans_grow = st.established > 0 && st.retrans > e->tunnel_retrans_prev;
     e->tunnel_retrans_prev = st.retrans;
     e->tunnel_retrans      = st.retrans;
@@ -969,6 +977,14 @@ int engine_start(engine_t *e, const config_t *cfg, char *err, unsigned err_size)
     }
     adopt_config(e, cfg);
 
+    /* Задержка до сервера по SYN/SYN-ACK его же соединений: своих
+       пакетов нет, только наблюдение. Не открылось — просто без числа. */
+    {
+        char rerr[128] = "";
+        if (rttcap_open(&e->rttcap, rerr, sizeof(rerr)) != 0)
+            log_info("наблюдение задержки недоступно: %s", rerr);
+    }
+
     /* Своё ядро поднимаем до правил: пока оно не слушает, заворачивать
        туда трафик бессмысленно. */
     start_own_xray(e, cfg);
@@ -1001,6 +1017,7 @@ void engine_stop(engine_t *e)
         dcap_close(&e->cap);
         e->capturing = 0;
     }
+    rttcap_close(&e->rttcap);
 
     if (e->rules_applied) {
         rt_plan_t plan;
@@ -1085,6 +1102,7 @@ void engine_tick(engine_t *e, time_t now)
     note_xray_version(e, now);
 
     if (e->capturing) dcap_poll(&e->cap, on_reply, e);
+    rttcap_poll(&e->rttcap, now);
     if (e->sniffing) {
         scap_poll(&e->sni, on_sni, e);
         flush_pending_breaks(e);

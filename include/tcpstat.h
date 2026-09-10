@@ -22,10 +22,17 @@
 #define TCPSTAT_INODES_MAX 1024
 #define TCPSTAT_PORTS_MAX  32
 
+#define TCPSTAT_REMOTES_MAX 16
+
 typedef struct {
     int           established;   /* соединений с сервером */
     int           syn_sent;      /* ждут ответа на SYN */
     unsigned long retrans;       /* повторов на установленных, сумма */
+    /* Адреса серверов, к которым у ядра есть сокеты: по ним наблюдение
+       за SYN/SYN-ACK отличает соединения ядра от чужих на тот же порт. */
+    unsigned char remotes[TCPSTAT_REMOTES_MAX][16];
+    unsigned char remote_fam[TCPSTAT_REMOTES_MAX];   /* 4 или 6 */
+    int           remote_count;
 } tcpstat_t;
 
 /* Разбирает текст /proc/net/tcp или tcp6. Учитывает только сокеты с
