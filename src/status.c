@@ -83,6 +83,7 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "tunnel_est=%d\n"
         "tunnel_pending=%d\n"
         "tunnel_why=%s\n"
+        "tunnel_rtt=%d\n"
         "subs_urls=%d\n"
         "subs_ok=%d\n"
         "subs_cached=%d\n"
@@ -104,7 +105,7 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->sni.partial_kept, e->sni.reassembled, e->sni.partial_lost,
         e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_sampled,
         e->tunnel_established, e->tunnel_pending, e->tunnel_why,
-        e->subs_urls, e->subs_ok, e->subs_cached, (long)e->subs_at,
+        e->tunnel_rtt_ms, e->subs_urls, e->subs_ok, e->subs_cached, (long)e->subs_at,
         e->subs_host, e->subs_error, e->server_count, e->server_active,
         e->server_filter);
 
@@ -347,9 +348,12 @@ int status_print(const config_t *cfg)
         char why[192] = "";
         status_get(spath, "tunnel_why", why, sizeof(why));
         if (tunnel > 0) {
+            long rtt = status_num(spath, "tunnel_rtt");
             printf("  туннель:    соединений с сервером %ld, срез %ld с назад%s%s\n",
                    status_num(spath, "tunnel_est"), at > 0 ? tnow - at : 0,
                    why[0] ? "\n              " : "", why);
+            if (rtt >= 0)
+                printf("              задержка до сервера %ld мс, по живым соединениям ядра\n", rtt);
         } else if (tunnel < 0) {
             char when[32] = "";
             if (since > 0) {

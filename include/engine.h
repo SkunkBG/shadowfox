@@ -7,6 +7,7 @@
 #include "subs.h"
 #include "ipsets.h"
 #include "tcpstat.h"
+#include "sockrtt.h"
 #include "rci.h"
 #include "snicap.h"
 #include "supervise.h"
@@ -59,6 +60,7 @@ typedef struct engine {
     unsigned long tunnel_retrans_prev;
     int     tunnel_retrans_grow;       /* повторы растут между срезами */
     char    tunnel_why[160];
+    int     tunnel_rtt_ms;     /* RTT до сервера по живым соединениям ядра, -1 — нет данных */
 
     /* Подписка и выбор сервера. Из списка ядру отдаётся один сервер:
        балансировщик со своим наблюдателем каждые пять минут ходил бы

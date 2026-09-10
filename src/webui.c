@@ -170,6 +170,7 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_int(&j, "tunnel_est", e->tunnel_established);
     json_kv_int(&j, "tunnel_pending", e->tunnel_pending);
     json_kv_str(&j, "tunnel_why", e->tunnel_why);
+    json_kv_int(&j, "tunnel_rtt", e->tunnel_rtt_ms);
     json_kv_bool(&j, "capture", e->capturing);
     json_kv_str(&j, "iface", cfg->capture_iface);
     json_kv_int(&j, "seen", (long)e->cap.seen);

@@ -48,6 +48,7 @@ void engine_init(engine_t *e)
     scap_init(&e->sni);
     rci_init(&e->rci);
     sv_init(&e->xray, "", "");
+    e->tunnel_rtt_ms = -1;
 }
 
 int engine_fds(const engine_t *e, int *out, int max)
@@ -903,6 +904,17 @@ static void tunnel_sample(engine_t *e, time_t now)
 
     e->tunnel_established  = st.established;
     e->tunnel_pending      = st.syn_sent;
+
+    /* Задержка до сервера — из tcp_info живых соединений ядра. Наружу
+       ничего не шлём; нет соединений или sock_diag — просто нет числа. */
+    e->tunnel_rtt_ms = -1;
+    if (st.established > 0) {
+        static unsigned long inodes[TCPSTAT_INODES_MAX];
+        int n = tcpstat_inodes(e->xray.pid, inodes, TCPSTAT_INODES_MAX);
+        sockrtt_t rtt;
+        if (n > 0 && sockrtt_collect(inodes, n, e->node_ports, e->node_port_count, &rtt) == 0)
+            e->tunnel_rtt_ms = sockrtt_ms(&rtt);
+    }
     e->tunnel_retrans_grow = st.established > 0 && st.retrans > e->tunnel_retrans_prev;
     e->tunnel_retrans_prev = st.retrans;
     e->tunnel_retrans      = st.retrans;
