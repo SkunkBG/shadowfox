@@ -588,6 +588,7 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     FILE *f = fopen(cfg->nodes_file, "r");
     if (!f) {
         log_info("файла %s нет, свой Xray не запускается", cfg->nodes_file);
+        e->subs_urls = 0;   /* иначе расписание подписки дёргало бы нас каждую секунду */
         stop_own_xray(e, "файла ссылок нет");
         return;
     }
@@ -610,6 +611,7 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
 
     if (truncated) {
         log_error("%s больше %zu байт", cfg->nodes_file, sizeof(body) - 1);
+        e->subs_urls = 0;
         stop_own_xray(e, "файл ссылок не прочитан");
         return;
     }
@@ -630,6 +632,10 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
             char cache[CFG_PATH_MAX + 40], why[160] = "";
             int  cached = 0;
             snprintf(cache, sizeof(cache), "%s/" SUBS_CACHE, cfg->conf_dir);
+            /* Адрес сменился — прежний кеш от другой панели, ему не место
+               в запасе: при недоступной новой панели поднялись бы чужие
+               серверы. */
+            if (raw[0] && strcmp(raw, body) != 0) unlink(cache);
             /* Постоянный идентификатор устройства для панели. */
             char hpath[CFG_PATH_MAX + 40], hwid[64] = "";
             snprintf(hpath, sizeof(hpath), "%s/" SUBS_HWID_FILE, cfg->conf_dir);
@@ -1119,7 +1125,8 @@ void engine_tick(engine_t *e, time_t now)
 
     /* Подписка по расписанию: список серверов у панели меняется. */
     if (e->subs_urls && e->cfg) {
-        time_t due = e->subs_at + (e->subs_ok ? ENGINE_SUBS_REFRESH : ENGINE_SUBS_RETRY);
+        time_t due = e->subs_at + ((e->subs_ok && !e->subs_cached) ? ENGINE_SUBS_REFRESH
+                                                                  : ENGINE_SUBS_RETRY);
         if (now >= due) start_own_xray_ex(e, e->cfg, 1);
     }
 

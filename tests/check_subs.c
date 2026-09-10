@@ -80,6 +80,16 @@ static void test_fetch(void)
     n = subs_fetch(url, NULL, out, sizeof(out), err, sizeof(err));
     CHECK(n < 0, "пустой ответ");
 
+    put("error.json", "{\"statusCode\":404,\"message\":\"Not Found\"}");
+    snprintf(url, sizeof(url), "file://%s/error.json", dir);
+    n = subs_fetch(url, NULL, out, sizeof(out), err, sizeof(err));
+    CHECK(n < 0 && strstr(err, "ошибк"), "JSON без outbounds — не подписка: %s", err);
+
+    put("cfg.json", "[{\"remarks\":\"A\",\"outbounds\":[{\"tag\":\"proxy\",\"protocol\":\"vless\"}]}]");
+    snprintf(url, sizeof(url), "file://%s/cfg.json", dir);
+    n = subs_fetch(url, NULL, out, sizeof(out), err, sizeof(err));
+    CHECK(n > 0 && out[0] == '[', "JSON с outbounds принимается: %s", err);
+
     put("junk.txt", "aGVsbG8gd29ybGQ=");
     snprintf(url, sizeof(url), "file://%s/junk.txt", dir);
     n = subs_fetch(url, NULL, out, sizeof(out), err, sizeof(err));

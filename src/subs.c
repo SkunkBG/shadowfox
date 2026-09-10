@@ -86,8 +86,14 @@ static long unwrap(char *body, size_t size, long len, char *err, size_t err_size
         return -1;
     }
     if (strstr(s, "://")) return len;
-    /* Xray JSON: массив конфигов. Разбирается отдельно, см. xjson.h. */
-    if (*s == '[' || *s == '{') return len;
+    /* Xray JSON: массив конфигов, разбирается отдельно (xjson.h). Ответ
+       вида {"statusCode":404} тоже начинается со скобки — без outbounds
+       это не подписка, а ошибка панели, и затирать ею кеш нельзя. */
+    if (*s == '[' || *s == '{') {
+        if (memmem(s, strlen(s), "\"outbounds\"", 11)) return len;
+        if (err) str_copy(err, err_size, "панель ответила ошибкой, а не списком серверов");
+        return -1;
+    }
 
     /* Раскрытое всегда короче base64, в тот же буфер помещается. */
     static char decoded[256 * 1024];
@@ -165,7 +171,7 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
     int   n = 0;
     char a_q[] = "-q", a_T[] = "-T", a_25[] = "25", a_U[] = "-U", a_O[] = "-O",
          a_dash[] = "-", a_sS[] = "-sS", a_L[] = "-L", a_m[] = "-m", a_A[] = "-A",
-         a_H[] = "-H", a_hdr[] = "--header";
+         a_H[] = "-H", a_hdr[] = "--header", a_f[] = "-f";
     char *bin = find_bin("wget");
     /* Штатный wget прошивки без TLS; нужен именно из Entware. */
     if (bin && strncmp(bin, "/opt/", 5)) bin = NULL;
@@ -178,7 +184,7 @@ long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
         argv[n++] = a_hdr; argv[n++] = h_model;
         argv[n++] = u; argv[n] = NULL;
     } else if ((bin = find_bin("curl")) != NULL) {
-        char *v[] = { bin, a_sS, a_L, a_m, a_25, a_A, agent };
+        char *v[] = { bin, a_sS, a_f, a_L, a_m, a_25, a_A, agent };
         memcpy(argv, v, sizeof(v)); n = (int)(sizeof(v) / sizeof(v[0]));
         if (h_hwid[0]) { argv[n++] = a_H; argv[n++] = h_hwid; }
         argv[n++] = a_H; argv[n++] = h_os;
