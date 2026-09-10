@@ -113,9 +113,26 @@ static char *find_bin(const char *name)
     return NULL;
 }
 
-long subs_fetch(const char *url, const char *hwid, char *out, size_t size,
+/* Значение заголовка: только печатная латиница, без кавычек и переводов
+   строки — что бы ни пришло от роутера, в HTTP оно должно быть безопасно. */
+static void header_value(const char *name, const char *val, const char *def,
+                         char *dst, size_t size)
+{
+    size_t n = (size_t)snprintf(dst, size, "%s: ", name);
+    const char *s = val && val[0] ? val : def;
+    for (; *s && n + 1 < size; s++) {
+        unsigned char c = (unsigned char)*s;
+        if (c >= 0x20 && c < 0x7f && c != '"' && c != '\\') dst[n++] = (char)c;
+    }
+    dst[n] = '\0';
+    /* пробелы в конце ни к чему */
+    while (n > 0 && dst[n - 1] == ' ') dst[--n] = '\0';
+}
+
+long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
                 char *err, size_t err_size)
 {
+    const char *hwid = dev ? dev->hwid : NULL;
     if (!url || !out || size < 2) return -1;
     out[0] = '\0';
 
@@ -139,9 +156,10 @@ long subs_fetch(const char *url, const char *hwid, char *out, size_t size,
     /* Заголовки устройства: без x-hwid панель с лимитом устройств отдаёт
        заглушку. Остальные три — как панель покажет роутер в списке
        устройств пользователя. */
-    char h_hwid[160] = "", h_os[] = "x-device-os: Linux",
-         h_ver[]  = "x-ver-os: KeeneticOS", h_model[] = "x-device-model: Keenetic";
+    char h_hwid[160] = "", h_os[] = "x-device-os: KeeneticOS", h_ver[96], h_model[160];
     if (hwid && hwid[0]) snprintf(h_hwid, sizeof(h_hwid), "x-hwid: %s", hwid);
+    header_value("x-ver-os",       dev ? dev->osver : NULL, "unknown",  h_ver,   sizeof(h_ver));
+    header_value("x-device-model", dev ? dev->model : NULL, "Keenetic", h_model, sizeof(h_model));
 
     char *argv[24];
     int   n = 0;
@@ -226,7 +244,7 @@ static int append(char *out, size_t size, size_t *used, const char *s, size_t n)
     return 0;
 }
 
-int subs_expand(const char *text, const char *cache_path, const char *hwid,
+int subs_expand(const char *text, const char *cache_path, const subs_dev_t *dev,
                 char *out, size_t size, int *from_cache,
                 char *err, size_t err_size)
 {
@@ -254,7 +272,7 @@ int subs_expand(const char *text, const char *cache_path, const char *hwid,
             if (subs_is_url(s)) {
                 urls++;
                 char why[160] = "";
-                long n = failed ? -1 : subs_fetch(s, hwid, body, sizeof(body), why, sizeof(why));
+                long n = failed ? -1 : subs_fetch(s, dev, body, sizeof(body), why, sizeof(why));
                 if (n > 0) {
                     if (append(fetched, sizeof(fetched), &fused, body, (size_t)n) ||
                         append(fetched, sizeof(fetched), &fused, "\n", 1)) {

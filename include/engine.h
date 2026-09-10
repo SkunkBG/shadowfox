@@ -75,6 +75,9 @@ typedef struct engine {
     char   server_active[NODE_TAG_MAX];
     char   server_filter[64];  /* метка в имени: остальные серверы отбрасываются */
     int    subs_force;         /* страница попросила перекачать подписку */
+    char   dev_model[96];      /* модель и прошивка для заголовков подписки */
+    char   dev_osver[48];
+    int    dev_asked;          /* у роутера уже спрашивали */
     time_t nodes_mtime;        /* файл ссылок менялся — качать заново */
 
     int    rules_applied;

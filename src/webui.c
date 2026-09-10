@@ -140,28 +140,6 @@ static int file_for(const config_t *cfg, const char *what,
     return 0;
 }
 
-/* Строковое поле верхнего уровня из ответа RCI. Разбор нарочно грубый:
-   ответ короткий и свой, а тащить разборщик JSON ради трёх полей в
-   подвале несоразмерно. */
-static int json_field(const char *text, const char *name,
-                      char *out, unsigned out_size)
-{
-    char pat[64];
-    int  n = snprintf(pat, sizeof(pat), "\"%s\":\"", name);
-    if (n < 0 || (size_t)n >= sizeof(pat)) return 0;
-
-    const char *p = strstr(text, pat);
-    if (!p) return 0;
-    p += n;
-
-    unsigned i = 0;
-    while (*p && *p != '"' && i + 1 < out_size) {
-        if (*p == '\\' && p[1]) p++;      /* экранированное — как есть */
-        out[i++] = *p++;
-    }
-    out[i] = '\0';
-    return i > 0;
-}
 
 /* Кеш ответов роутера для /data; сбрасывается кнопками, которые меняют
    политику или подключение, — иначе карточка не позеленела бы до минуты. */
@@ -267,17 +245,9 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
         int icode = rci_request(&rci, "GET", ipath, NULL, iout, sizeof(iout));
         g_rci_proxy = icode == 200 && !strstr(iout, "\"code\"");
 
-        if (!g_rci_model[0]) {
-            char out[2048] = "";
-            if (rci_request(&rci, "GET", "/rci/show/version", NULL, out, sizeof(out)) == 200) {
-                static const char *models[]   = { "description", "device", "model", NULL };
-                static const char *versions[] = { "title", "release", "version", NULL };
-                for (int i = 0; models[i] && !g_rci_model[0]; i++)
-                    json_field(out, models[i], g_rci_model, sizeof(g_rci_model));
-                for (int i = 0; versions[i] && !g_rci_osver[0]; i++)
-                    json_field(out, versions[i], g_rci_osver, sizeof(g_rci_osver));
-            }
-        }
+        if (!g_rci_model[0])
+            rci_device_info(&rci, g_rci_model, sizeof(g_rci_model),
+                            g_rci_osver, sizeof(g_rci_osver));
     }
 
     json_kv_bool(&j, "policy_ready", g_rci_policy);

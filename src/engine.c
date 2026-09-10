@@ -632,7 +632,16 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
             snprintf(hpath, sizeof(hpath), "%s/" SUBS_HWID_FILE, cfg->conf_dir);
             if (!secret_load_or_create(hpath, hwid, sizeof(hwid)))
                 log_warn("не создать %s — подписка без x-hwid", hpath);
-            int rc = subs_expand(body, cache, hwid, expanded, sizeof(expanded),
+            /* Модель и прошивку спрашиваем у роутера один раз: панель
+               покажет их в списке устройств пользователя. */
+            if (!e->dev_asked) {
+                e->dev_asked = 1;
+                if (rci_device_info(&e->rci, e->dev_model, sizeof(e->dev_model),
+                                    e->dev_osver, sizeof(e->dev_osver)) != 0)
+                    log_info("модель роутера не узнать, панели уйдёт «Keenetic»");
+            }
+            subs_dev_t dev = { hwid, e->dev_model, e->dev_osver };
+            int rc = subs_expand(body, cache, &dev, expanded, sizeof(expanded),
                                  &cached, why, sizeof(why));
             subs_first_host(body, e->subs_host, sizeof(e->subs_host));
             str_copy(raw, sizeof(raw), body);

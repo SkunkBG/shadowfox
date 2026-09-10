@@ -33,13 +33,22 @@ void subs_host(const char *url, char *dst, size_t size);
    ответил, берётся кеш, чтобы ядро поднималось и без сети.
    Возвращает число адресов в тексте; *from_cache = 1, если пришлось
    взять кеш; err — почему. Без адресов текст копируется как есть. */
-int subs_expand(const char *text, const char *cache_path, const char *hwid,
+/* Что панель узнаёт об устройстве: постоянный идентификатор и модель с
+   прошивкой, как они показаны в списке устройств пользователя. Любое
+   поле может быть NULL или пустым. */
+typedef struct {
+    const char *hwid;
+    const char *model;    /* «Keenetic Viva (KN-1910)» */
+    const char *osver;    /* «4.3.6» */
+} subs_dev_t;
+
+int subs_expand(const char *text, const char *cache_path, const subs_dev_t *dev,
                 char *out, size_t size, int *from_cache,
                 char *err, size_t err_size);
 
 /* Одна загрузка. Для проверок принимает file://. Возвращает длину тела
    либо -1 и причину в err. Тело уже раскрыто из base64, если было. */
-long subs_fetch(const char *url, const char *hwid, char *out, size_t size,
+long subs_fetch(const char *url, const subs_dev_t *dev, char *out, size_t size,
                 char *err, size_t err_size);
 
 /* Файл с постоянным идентификатором устройства для панели, в conf_dir.

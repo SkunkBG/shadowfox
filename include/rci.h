@@ -1,6 +1,8 @@
 #ifndef SHADOWFOX_RCI_H
 #define SHADOWFOX_RCI_H
 
+#include <stddef.h>
+
 /* Клиент RCI — локального интерфейса управления Keenetic.
 
    Через него берётся метка политики доступа: штатный прокси-клиент
@@ -31,6 +33,11 @@ int  rci_request(const rci_t *r, const char *method, const char *path,
 /* Читает метку политики. Возвращает 0 и кладёт значение в *mark.
    Метка приходит в кавычках и без префикса 0x — снимаем и то, и другое. */
 int  rci_policy_mark(const rci_t *r, const char *policy, unsigned *mark);
+
+/* Модель и прошивка из show version: «Keenetic Viva (KN-1910)», «4.3.6».
+   Пустые строки, если роутер не ответил. 0 — успех. */
+int  rci_device_info(const rci_t *r, char *model, size_t model_size,
+                     char *osver, size_t osver_size);
 
 /* Создаёт политику, если её ещё нет, и сохраняет конфигурацию роутера.
    Существующую не трогает. */

@@ -95,15 +95,16 @@ static void test_expand(void)
 
     snprintf(cache, sizeof(cache), "%s/cache", dir);
     unlink(cache);
+    subs_dev_t dev = { "hwid-test", "Keenetic Viva (KN-1910)", "4.3.6" };
 
     /* Без подписок текст копируется как есть. */
-    int rc = subs_expand("vless://a@b:1#x\n", cache, "hwid-test", out, sizeof(out), &cached, err, sizeof(err));
+    int rc = subs_expand("vless://a@b:1#x\n", cache, &dev, out, sizeof(out), &cached, err, sizeof(err));
     CHECK(rc == 0 && !strcmp(out, "vless://a@b:1#x\n"), "без подписок: %d [%s]", rc, out);
     CHECK(access(cache, F_OK) != 0, "кеш без подписок не пишется");
 
     put("sub.txt", "dmxlc3M6Ly9hQGI6NDQzI29uZQp2bGVzczovL2NAZDo0NDMjdHdvCg");
     snprintf(text, sizeof(text), "# мои\nvless://own@h:443#mine\nfile://%s/sub.txt\n", dir);
-    rc = subs_expand(text, cache, "hwid-test", out, sizeof(out), &cached, err, sizeof(err));
+    rc = subs_expand(text, cache, &dev, out, sizeof(out), &cached, err, sizeof(err));
     CHECK(rc == 1 && cached == 0, "одна подписка: %d %d %s", rc, cached, err);
     CHECK(strstr(out, "#mine") && strstr(out, "#one") && strstr(out, "#two"),
           "свои ссылки и подписка вместе");
@@ -112,14 +113,14 @@ static void test_expand(void)
 
     /* Сервер недоступен — берётся кеш. */
     snprintf(text, sizeof(text), "vless://own@h:443#mine\nfile://%s/missing.txt\n", dir);
-    rc = subs_expand(text, cache, "hwid-test", out, sizeof(out), &cached, err, sizeof(err));
+    rc = subs_expand(text, cache, &dev, out, sizeof(out), &cached, err, sizeof(err));
     CHECK(rc == 1 && cached == 1, "из кеша: %d %d %s", rc, cached, err);
     CHECK(strstr(out, "#mine") && strstr(out, "#two"), "кеш содержит прежний список");
     CHECK(err[0], "причина сохранена: %s", err);
 
     /* Ни сервера, ни кеша — отказ. */
     unlink(cache);
-    rc = subs_expand(text, cache, "hwid-test", out, sizeof(out), &cached, err, sizeof(err));
+    rc = subs_expand(text, cache, &dev, out, sizeof(out), &cached, err, sizeof(err));
     CHECK(rc < 0, "без кеша отказ");
 }
 

@@ -168,3 +168,39 @@ int rci_policy_create(const rci_t *r, const char *policy)
 
     return (code == 200) ? 0 : -1;
 }
+
+/* Строковое поле верхнего уровня из ответа RCI. Разбор грубый: ответ
+   короткий и свой, тащить разборщик JSON ради двух полей незачем. */
+static int rci_field(const char *text, const char *name, char *out, size_t out_size)
+{
+    char pat[64];
+    int  n = snprintf(pat, sizeof(pat), "\"%s\":\"", name);
+    if (n < 0 || (size_t)n >= sizeof(pat)) return 0;
+    const char *p = strstr(text, pat);
+    if (!p) return 0;
+    p += n;
+    size_t i = 0;
+    while (*p && *p != '"' && i + 1 < out_size) {
+        if (*p == '\\' && p[1]) p++;
+        out[i++] = *p++;
+    }
+    out[i] = '\0';
+    return i > 0;
+}
+
+int rci_device_info(const rci_t *r, char *model, size_t model_size,
+                    char *osver, size_t osver_size)
+{
+    if (model && model_size) model[0] = '\0';
+    if (osver && osver_size) osver[0] = '\0';
+    char out[2048] = "";
+    if (rci_request(r, "GET", "/rci/show/version", NULL, out, sizeof(out)) != 200)
+        return -1;
+    static const char *models[]   = { "description", "device", "model", NULL };
+    static const char *versions[] = { "title", "release", "version", NULL };
+    if (model)
+        for (int i = 0; models[i] && !model[0]; i++) rci_field(out, models[i], model, model_size);
+    if (osver)
+        for (int i = 0; versions[i] && !osver[0]; i++) rci_field(out, versions[i], osver, osver_size);
+    return 0;
+}
