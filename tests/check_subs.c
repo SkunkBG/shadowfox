@@ -148,12 +148,14 @@ static void test_headers(void)
         "Profile-Title: base64:QmFkZ2VyIFByb3h5IOKYle+4jw==\r\n"
         "profile-update-interval: 1\r\n"
         "subscription-userinfo: upload=10; download=3705019832264; total=0; expire=1806710400\r\n"
+        "announce: base64:0J/RgNC40LLQtdGCLCDQvNC40YAh\r\n"
         "\r\n";
     subs_parse_headers(hdr, strlen(hdr), &info);
     CHECK(!strcmp(info.title, "Badger Proxy \xe2\x98\x95\xef\xb8\x8f"), "имя из base64 с селектором эмодзи: [%s]", info.title);
     CHECK(info.download == 3705019832264LL && info.upload == 10 && info.total == 0,
           "трафик: %lld %lld %lld", info.download, info.upload, info.total);
     CHECK(info.expire == 1806710400L && info.update_hours == 1, "срок и период: %ld %d", info.expire, info.update_hours);
+    CHECK(!strcmp(info.announce, "Привет, мир!"), "объявление из base64: [%s]", info.announce);
 
     subs_parse_headers("profile-title: Plain Name\r\n", 27, &info);
     CHECK(!strcmp(info.title, "Plain Name"), "имя как есть: [%s]", info.title);

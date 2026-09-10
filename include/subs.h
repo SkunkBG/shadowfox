@@ -51,6 +51,7 @@ typedef struct {
     long long upload, download, total;   /* байты; total 0 — без лимита */
     long      expire;                    /* unix time, 0 — бессрочно */
     int       update_hours;
+    char      announce[256];             /* объявление панели пользователям */
 } subs_info_t;
 
 /* Разбор блока заголовков HTTP (до пустой строки). Отдельно — ради тестов. */

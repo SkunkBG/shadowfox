@@ -837,12 +837,13 @@ function viewConn(){
   let subsBlock='';
   if(D.subs_urls){
     subsBlock+=`<div class="bar" style="margin-top:10px"><button class="b ghost sm" id="subs-refresh">${UI.back}Обновить список</button><span class="msg" id="m-subs"></span></div>`;
-    if(D.subs_total>0||D.subs_expire>0||D.subs_download>0){
+    if(D.subs_ok){
       const gb=m=>(m/1024).toFixed(m>=10240?0:1);
       const used=D.subs_download+D.subs_upload;
-      const traffic=`трафик ${gb(used)} ГБ${D.subs_total>0?' из '+gb(D.subs_total)+' ГБ':''}`;
-      const till=D.subs_expire>0?`, до ${new Date(D.subs_expire*1000).toLocaleDateString('ru-RU')}`:'';
+      const traffic=`трафик ${gb(used)} ГБ из ${D.subs_total>0?gb(D.subs_total)+' ГБ':'∞'}`;
+      const till=D.subs_expire>0?`, до ${new Date(D.subs_expire*1000).toLocaleDateString('ru-RU')}`:', бессрочно';
       subsBlock+=`<p style="margin:6px 0 0;font-size:13px;color:var(--dim)">${traffic}${till}</p>`;
+      if(D.subs_announce) subsBlock+=`<div class="note" style="margin-top:8px">${UI.i}${esc(D.subs_announce)}</div>`;
     }
     if(!D.subs_ok) subsBlock+=`<div class="note" style="margin-top:10px;color:var(--bad)">${UI.i}Подписка не загружена: ${esc(D.subs_error||'')}</div>`;
     else if(D.subs_cached) subsBlock+=`<div class="note" style="margin-top:10px">${UI.i}Сервер подписки не ответил, список серверов взят из кеша: ${esc(D.subs_error||'')}</div>`;
@@ -1223,7 +1224,7 @@ const EN={"<span class=\"emo\">🔌</span>Подключения":"<span class=\
 /* Причина отказа подписки: словарная фраза плюс хвост вроде «(код 8)». */
 function trErr(t){ const m=t.match(/^(.*?)( \(код (\d+)\))?$/); const b=EN[m[1]]||m[1]; return m[2]?b+' (code '+m[3]+')':b; }
 const EN_RULES=[
-  [/^трафик ([\d.,]+) ГБ( из ([\d.,]+) ГБ)?(, до (.+))?$/, (m)=>'traffic '+m[1]+' GB'+(m[3]?' of '+m[3]+' GB':'')+(m[5]?', until '+m[5]:'')],
+  [/^трафик ([\d.,]+) ГБ из (∞|[\d.,]+ ГБ)(, до (.+)|, бессрочно)$/, (m)=>'traffic '+m[1]+' GB of '+(m[2]==='∞'?'∞':m[2].replace(' ГБ',' GB'))+(m[4]?', until '+m[4]:', no expiry')],
   [/^Ядро работает через один сервер из списка\. Переключение занимает несколько секунд, соединения через туннель при этом рвутся\. Если в подписке есть серверы со знаком «(.+)» в имени, показаны только они\.$/, (m)=>'The core runs through one server from the list. Switching takes a few seconds, and tunnel connections are dropped meanwhile. If the subscription has servers with a “'+m[1]+'” sign in the name, only those are shown.'],
   [/^работает · (\d+) мс$/, (m)=>'active · '+m[1]+' ms'],
   [/^соединений с сервером (\d+), задержка (\d+) мс(.*)$/, (m)=>'connections to the server '+m[1]+', latency '+m[2]+' ms'+(EN[m[3]]||m[3])],
@@ -1426,7 +1427,7 @@ async function loadDns(){
    только числа. */
 function sig(){
   return JSON.stringify([D.domains,D.nodes,D.nodes_shown,D.xray_bin,D.proxy_ready,
-    D.fragment,D.fingerprint,(D.servers||[]).join('|'),D.server_active,D.server_filter,D.subs_title,D.subs_download,D.subs_expire,D.subs_ok,D.subs_cached,D.subs_error,D.subs_host,
+    D.fragment,D.fingerprint,(D.servers||[]).join('|'),D.server_active,D.server_filter,D.subs_title,D.subs_download,D.subs_expire,D.subs_announce,D.subs_ok,D.subs_cached,D.subs_error,D.subs_host,
     D.policy_ready,D.have_link,D.model,D.osver,D.version,D.xray_version,D.dns,D.capture,D.iface,
     D.sni_on,(D.groups||[]).map(g=>g.name+':'+g.addrs4+':'+g.addrs6).join(','),
     D.rules,D.socks_port,D.policy_name,D.proxy_name,D.xray_pid>0,D.tunnel_rtt]);

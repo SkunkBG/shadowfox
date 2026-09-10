@@ -196,6 +196,18 @@ void subs_parse_headers(const char *hdr, size_t len, subs_info_t *info)
     }
     if (header_get(hdr, len, "profile-update-interval", v, sizeof(v)))
         info->update_hours = atoi(v);
+    char a[1024];
+    if (header_get(hdr, len, "announce", a, sizeof(a))) {
+        if (!strncasecmp(a, "base64:", 7)) {
+            char dec[1024];
+            long n = base64_decode(a + 7, dec, sizeof(dec));
+            if (n > 0) { dec[n] = '\0'; str_copy(info->announce, sizeof(info->announce), dec); }
+        } else {
+            str_copy(info->announce, sizeof(info->announce), a);
+        }
+        for (char *c = info->announce; *c; c++) if ((unsigned char)*c < 0x20) *c = ' ';
+        str_trim(info->announce);
+    }
 }
 
 /* Ответ с заголовками (--save-headers у wget, -i у curl): отделяем блок

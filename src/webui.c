@@ -204,6 +204,7 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_int(&j, "subs_upload", (long)(e->subs_info.upload / (1024 * 1024)));
     json_kv_int(&j, "subs_total", (long)(e->subs_info.total / (1024 * 1024)));
     json_kv_int(&j, "subs_expire", e->subs_info.expire);
+    json_kv_str(&j, "subs_announce", e->subs_info.announce);
     json_kv_str(&j, "subs_error", e->subs_error);
     json_kv_str(&j, "server_active", e->server_active);
     json_kv_str(&j, "server_filter", e->server_filter);
