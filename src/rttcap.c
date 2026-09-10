@@ -141,6 +141,7 @@ int rttcap_ms(const rttcap_t *c, time_t now)
 
 #ifdef __linux__
 
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <linux/filter.h>
 #include <linux/if_ether.h>
