@@ -1699,6 +1699,15 @@ static void handle(const http_req_t *req, int fd, void *ctx)
         return;
     }
 
+    /* Перекачать подписку сейчас, не дожидаясь расписания. */
+    if (!strcmp(req->path, "/subs") && !strcmp(req->method, "POST")) {
+        engine_refresh_subscription(c->engine);
+        log_info("веб: запрошено обновление подписки, запрос с %s", req->peer);
+        kill(getpid(), SIGHUP);
+        http_send_text(fd, 200, "text/plain; charset=utf-8", "обновляю список\n");
+        return;
+    }
+
     http_send_text(fd, 404, "text/plain; charset=utf-8", "нет такой страницы\n");
 }
 

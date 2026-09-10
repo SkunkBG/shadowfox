@@ -74,6 +74,8 @@ typedef struct engine {
     char   server_tags[NODELIST_MAX][NODE_TAG_MAX];
     char   server_active[NODE_TAG_MAX];
     char   server_filter[64];  /* метка в имени: остальные серверы отбрасываются */
+    int    subs_force;         /* страница попросила перекачать подписку */
+    time_t nodes_mtime;        /* файл ссылок менялся — качать заново */
 
     int    rules_applied;
     int    capturing;
@@ -165,6 +167,8 @@ void engine_request_restore(engine_t *e, time_t now);
 
 /* Один проход главного цикла: забрать пойманное, отдать накопленное. */
 void engine_tick(engine_t *e, time_t now);
+/* Со страницы: перекачать подписку при ближайшем перечитывании. */
+void engine_refresh_subscription(engine_t *e);
 
 /* Дескриптор перехвата для ожидания в главном цикле, либо -1. */
 /* Дескрипторы, которые главный цикл обязан держать в select.

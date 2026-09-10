@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <errno.h>
 
 /* Как часто отдавать накопленные адреса в ipset. Раз в секунду: адреса
@@ -590,8 +591,18 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     static char body[256 * 1024];
     size_t got       = fread(body, 1, sizeof(body) - 1, f);
     int    truncated = !feof(f);
+
+    /* Файл ссылок сохранили заново — подписку качаем заново, даже если
+       адрес тот же: так «Заменить подключение» подтягивает свежий
+       список. Сохранение правил файл не трогает, и оно в панель не ходит. */
+    struct stat st;
+    if (fstat(fileno(f), &st) == 0 && st.st_mtime != e->nodes_mtime) {
+        if (e->nodes_mtime) force = 1;
+        e->nodes_mtime = st.st_mtime;
+    }
     fclose(f);
     body[got] = '\0';
+    if (e->subs_force) { force = 1; e->subs_force = 0; }
 
     if (truncated) {
         log_error("%s больше %zu байт", cfg->nodes_file, sizeof(body) - 1);
@@ -819,6 +830,11 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
 static void start_own_xray(engine_t *e, const config_t *cfg)
 {
     start_own_xray_ex(e, cfg, 0);
+}
+
+void engine_refresh_subscription(engine_t *e)
+{
+    if (e) e->subs_force = 1;
 }
 
 /* Пассивная проверка: сокеты ядра к серверу. Установленные есть —
