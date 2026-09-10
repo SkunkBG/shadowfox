@@ -136,6 +136,7 @@ static int file_for(const config_t *cfg, const char *what,
     if (!strcmp(what, "cidrs"))   { path_in_conf(cfg, "ip.list",     dst, size); return 1; }
     if (!strcmp(what, "nodes"))   { str_copy(dst, size, cfg->nodes_file);        return 1; }
     if (!strcmp(what, "server"))  { path_in_conf(cfg, SERVER_FILE,    dst, size); return 1; }
+    if (!strcmp(what, "filter"))  { path_in_conf(cfg, SERVER_FILTER_FILE, dst, size); return 1; }
     return 0;
 }
 
@@ -221,6 +222,7 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     json_kv_str(&j, "subs_host", e->subs_host);
     json_kv_str(&j, "subs_error", e->subs_error);
     json_kv_str(&j, "server_active", e->server_active);
+    json_kv_str(&j, "server_filter", e->server_filter);
     json_key(&j, "servers");
     json_arr_open(&j);
     for (int i = 0; i < e->server_count; i++) json_str(&j, e->server_tags[i]);

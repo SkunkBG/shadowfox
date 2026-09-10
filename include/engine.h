@@ -73,6 +73,7 @@ typedef struct engine {
     int    server_count;       /* серверов в списке до выбора */
     char   server_tags[NODELIST_MAX][NODE_TAG_MAX];
     char   server_active[NODE_TAG_MAX];
+    char   server_filter[64];  /* метка в имени: остальные серверы отбрасываются */
 
     int    rules_applied;
     int    capturing;

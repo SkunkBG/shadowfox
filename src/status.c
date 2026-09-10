@@ -90,7 +90,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "subs_host=%s\n"
         "subs_error=%s\n"
         "server_count=%d\n"
-        "server_active=%s\n",
+        "server_active=%s\n"
+        "server_filter=%s\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
@@ -104,7 +105,8 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_sampled,
         e->tunnel_established, e->tunnel_pending, e->tunnel_why,
         e->subs_urls, e->subs_ok, e->subs_cached, (long)e->subs_at,
-        e->subs_host, e->subs_error, e->server_count, e->server_active);
+        e->subs_host, e->subs_error, e->server_count, e->server_active,
+        e->server_filter);
 
     fclose(f);
     rename(tmp, path);
@@ -324,9 +326,11 @@ int status_print(const config_t *cfg)
             printf("  подписка:   %s НЕ ЗАГРУЖЕНА: %s\n", host, serr);
     }
     if (status_num(spath, "server_count") > 0) {
-        char tag[128] = "";
+        char tag[128] = "", filt[64] = "";
         status_get(spath, "server_active", tag, sizeof(tag));
-        printf("  сервер:     %s (в списке %ld)\n", tag, status_num(spath, "server_count"));
+        status_get(spath, "server_filter", filt, sizeof(filt));
+        printf("  сервер:     %s (в списке %ld%s%s)\n", tag, status_num(spath, "server_count"),
+               filt[0] ? ", метка " : "", filt);
     }
 
     long xpid = status_num(spath, "xray_pid");

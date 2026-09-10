@@ -671,6 +671,37 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     if (list.skipped)
         log_warn("в %s пропущено строк: %d", cfg->nodes_file, list.skipped);
 
+    /* Метка в имени: панель отдаёт одну подписку и телефону, и роутеру,
+       а серверы для роутера в ней помечены словом в имени. Тег хоста
+       Remnawave в подписку не попадает, так что метка — единственное,
+       по чему их отличить. Не совпало ничего — берём всех и говорим. */
+    {
+        char fpath[CFG_PATH_MAX + 40];
+        snprintf(fpath, sizeof(fpath), "%s/" SERVER_FILTER_FILE, cfg->conf_dir);
+        e->server_filter[0] = '\0';
+        FILE *ff = fopen(fpath, "r");
+        if (ff) {
+            if (!fgets(e->server_filter, sizeof(e->server_filter), ff))
+                e->server_filter[0] = '\0';
+            fclose(ff);
+            e->server_filter[strcspn(e->server_filter, "\r\n")] = '\0';
+            str_copy(e->server_filter, sizeof(e->server_filter), str_trim(e->server_filter));
+        }
+        if (e->server_filter[0] && list.count > 1) {
+            int kept = 0;
+            for (int i = 0; i < list.count; i++)
+                if (strcasestr(list.items[i].tag, e->server_filter))
+                    list.items[kept++] = list.items[i];
+            if (kept > 0) {
+                log_info("метка «%s»: серверов %d из %d", e->server_filter, kept, list.count);
+                list.count = kept;
+            } else {
+                log_warn("метка «%s» не найдена ни в одном из %d серверов, берутся все",
+                         e->server_filter, list.count);
+            }
+        }
+    }
+
     /* Список серверов — на страницу; ядру один, выбранный там же.
        Балансировщик со всеми сразу — только по balancer=yes. */
     e->server_count = list.count;
