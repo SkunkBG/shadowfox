@@ -705,9 +705,11 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
         names[i] = json_mode ? xj.items[i].remarks : list.items[i].tag;
 
     /* Метка в имени: панель отдаёт одну подписку и телефону, и роутеру,
-       а серверы для роутера в ней помечены словом в имени. Тег хоста
-       Remnawave в подписку не попадает, так что метка — единственное,
-       по чему их отличить. Не совпало ничего — берём всех и говорим. */
+       а серверы для роутера в ней помечены знаком в имени, по умолчанию
+       «=». Тег хоста Remnawave в подписку не попадает, так что метка —
+       единственное, по чему их отличить. Нет ни одного совпадения —
+       берутся все: без метки подписка работает как обычно. Свою метку
+       можно задать файлом server.filter. */
     int keep[XJSON_MAX > NODELIST_MAX ? XJSON_MAX : NODELIST_MAX], kept = 0;
     {
         char fpath[CFG_PATH_MAX + 40];
@@ -721,13 +723,15 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
             e->server_filter[strcspn(e->server_filter, "\r\n")] = '\0';
             str_copy(e->server_filter, sizeof(e->server_filter), str_trim(e->server_filter));
         }
-        if (e->server_filter[0] && total > 1) {
+        if (!e->server_filter[0])
+            str_copy(e->server_filter, sizeof(e->server_filter), SERVER_FILTER_DEFAULT);
+        if (total > 1) {
             for (int i = 0; i < total; i++)
                 if (strcasestr(names[i], e->server_filter)) keep[kept++] = i;
-            if (kept > 0)
+            if (kept > 0 && kept < total)
                 log_info("метка «%s»: серверов %d из %d", e->server_filter, kept, total);
-            else
-                log_warn("метка «%s» не найдена ни в одном из %d серверов, берутся все",
+            else if (!kept)
+                log_info("метки «%s» нет ни у одного из %d серверов, показаны все",
                          e->server_filter, total);
         }
         if (!kept) for (int i = 0; i < total; i++) keep[kept++] = i;

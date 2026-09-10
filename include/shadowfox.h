@@ -21,6 +21,7 @@
    это ожидаемо, нам нужны последние ошибки, а не история. */
 #define SERVER_FILE         "server.active"     /* в conf_dir: имя выбранного сервера */
 #define SERVER_FILTER_FILE  "server.filter"     /* в conf_dir: метка в имени серверов для роутера */
+#define SERVER_FILTER_DEFAULT "="                /* если файла нет: серверы для роутера помечены знаком = */
 #define XRAY_ERROR_LOG      "/tmp/shadowfox-xray.log"
 #define XRAY_ERROR_LOG_CAP  (256 * 1024)   /* сверх этого — обрезаем */
 
