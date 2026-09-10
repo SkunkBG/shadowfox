@@ -86,6 +86,8 @@ static long unwrap(char *body, size_t size, long len, char *err, size_t err_size
         return -1;
     }
     if (strstr(s, "://")) return len;
+    /* Xray JSON: массив конфигов. Разбирается отдельно, см. xjson.h. */
+    if (*s == '[' || *s == '{') return len;
 
     /* Раскрытое всегда короче base64, в тот же буфер помещается. */
     static char decoded[256 * 1024];

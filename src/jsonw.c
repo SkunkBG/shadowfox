@@ -114,6 +114,13 @@ void json_raw(json_t *j, const char *raw)
     put_s(j, raw ? raw : "null");
 }
 
+void json_rawn(json_t *j, const char *raw, size_t len)
+{
+    sep(j);
+    if (raw && len) put(j, raw, len);
+    else put_s(j, "null");
+}
+
 void json_kv_str(json_t *j, const char *key, const char *value)
 {
     json_key(j, key);

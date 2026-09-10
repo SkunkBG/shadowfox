@@ -56,7 +56,7 @@ src/webpage.c: web/index.html tools/embed.sh tools/build-page.sh $(wildcard web/
 	sh tools/build-page.sh web/index.html web/logo.png > $(BUILD)/page.html
 	sh tools/embed.sh $(BUILD)/page.html web_page > $@
 
-SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/subs.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/snicap.c src/tcpstat.c src/engine.c src/rci.c src/status.c src/http.c src/mask.c src/webui.c src/digest.c src/ndmauth.c src/routercfg.c src/logopng.c src/fontwoff.c src/loginjs.c src/webpage.c
+SRCS = src/main.c src/log.c src/util.c src/config.c src/signals.c src/url.c src/jsonw.c src/node.c src/xraycfg.c src/nodelist.c src/subs.c src/xjson.c src/base64.c src/proc.c src/apply.c src/supervise.c src/watchlist.c src/ipsets.c src/routing.c src/dnsmsg.c src/dnscap.c src/snicap.c src/tcpstat.c src/engine.c src/rci.c src/status.c src/http.c src/mask.c src/webui.c src/digest.c src/ndmauth.c src/routercfg.c src/logopng.c src/fontwoff.c src/loginjs.c src/webpage.c
 
 BUILD = build
 
@@ -116,14 +116,18 @@ check: native
 		src/jsonw.c -o $(BUILD)/check_jsonw
 	./$(BUILD)/check_jsonw
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_node.c \
-		src/node.c src/xraycfg.c src/nodelist.c src/base64.c \
+		src/node.c src/xraycfg.c src/xjson.c src/nodelist.c src/base64.c \
 		src/jsonw.c src/url.c src/util.c \
 		-o $(BUILD)/check_node
 	./$(BUILD)/check_node
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_nodelist.c \
-		src/nodelist.c src/base64.c src/node.c src/xraycfg.c src/jsonw.c \
+		src/nodelist.c src/base64.c src/node.c src/xraycfg.c src/xjson.c src/jsonw.c \
 		src/url.c src/util.c -o $(BUILD)/check_nodelist
 	./$(BUILD)/check_nodelist
+	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_xjson.c \
+		src/xjson.c src/xraycfg.c src/nodelist.c src/node.c src/base64.c src/url.c \
+		src/jsonw.c src/util.c -o $(BUILD)/check_xjson
+	./$(BUILD)/check_xjson
 	$(CC_NATIVE) $(CFLAGS_NATIVE) tests/check_subs.c \
 		src/subs.c src/base64.c src/proc.c src/util.c src/log.c -o $(BUILD)/check_subs
 	./$(BUILD)/check_subs

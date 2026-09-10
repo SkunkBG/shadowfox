@@ -5,6 +5,7 @@
 #include "status.h"
 #include "nodelist.h"
 #include "xraycfg.h"
+#include "xjson.h"
 #include "proc.h"
 #include "util.h"
 
@@ -658,9 +659,24 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
         e->subs_host[0] = '\0';
     }
 
+    /* Подписка в формате Xray JSON: панель отдаёт готовые конфиги ядра,
+       в них бывает сборка из нескольких серверов с балансировщиком.
+       Такой конфиг уходит ядру как есть, см. xraycfg_build_from_json. */
+    static xjson_t xj;
+    int json_mode = xjson_looks_like(text);
+    if (json_mode) {
+        int n = xjson_parse(text, &xj);
+        if (n <= 0) {
+            log_error("в %s нет ни одного конфига Xray", cfg->nodes_file);
+            stop_own_xray(e, "конфигов нет");
+            return;
+        }
+        if (xj.skipped) log_warn("конфигов без outbounds пропущено: %d", xj.skipped);
+    }
+
     static nodelist_t list;
     nodelist_init(&list);
-    int added = nodelist_from_subscription(&list, text);
+    int added = json_mode ? xj.count : nodelist_from_subscription(&list, text);
 
     /* allowInsecure из ссылки в конфиг не переносится — см. xraycfg.c.
        Но молчать о том, что ссылка его просила, нельзя: человек будет
@@ -682,10 +698,17 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     if (list.skipped)
         log_warn("в %s пропущено строк: %d", cfg->nodes_file, list.skipped);
 
+    /* Имена серверов: из ссылок либо из remarks конфигов. */
+    int total = json_mode ? xj.count : list.count;
+    const char *names[XJSON_MAX > NODELIST_MAX ? XJSON_MAX : NODELIST_MAX];
+    for (int i = 0; i < total; i++)
+        names[i] = json_mode ? xj.items[i].remarks : list.items[i].tag;
+
     /* Метка в имени: панель отдаёт одну подписку и телефону, и роутеру,
        а серверы для роутера в ней помечены словом в имени. Тег хоста
        Remnawave в подписку не попадает, так что метка — единственное,
        по чему их отличить. Не совпало ничего — берём всех и говорим. */
+    int keep[XJSON_MAX > NODELIST_MAX ? XJSON_MAX : NODELIST_MAX], kept = 0;
     {
         char fpath[CFG_PATH_MAX + 40];
         snprintf(fpath, sizeof(fpath), "%s/" SERVER_FILTER_FILE, cfg->conf_dir);
@@ -698,27 +721,27 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
             e->server_filter[strcspn(e->server_filter, "\r\n")] = '\0';
             str_copy(e->server_filter, sizeof(e->server_filter), str_trim(e->server_filter));
         }
-        if (e->server_filter[0] && list.count > 1) {
-            int kept = 0;
-            for (int i = 0; i < list.count; i++)
-                if (strcasestr(list.items[i].tag, e->server_filter))
-                    list.items[kept++] = list.items[i];
-            if (kept > 0) {
-                log_info("метка «%s»: серверов %d из %d", e->server_filter, kept, list.count);
-                list.count = kept;
-            } else {
+        if (e->server_filter[0] && total > 1) {
+            for (int i = 0; i < total; i++)
+                if (strcasestr(names[i], e->server_filter)) keep[kept++] = i;
+            if (kept > 0)
+                log_info("метка «%s»: серверов %d из %d", e->server_filter, kept, total);
+            else
                 log_warn("метка «%s» не найдена ни в одном из %d серверов, берутся все",
-                         e->server_filter, list.count);
-            }
+                         e->server_filter, total);
         }
+        if (!kept) for (int i = 0; i < total; i++) keep[kept++] = i;
     }
 
     /* Список серверов — на страницу; ядру один, выбранный там же.
-       Балансировщик со всеми сразу — только по balancer=yes. */
-    e->server_count = list.count;
-    for (int i = 0; i < list.count; i++)
-        str_copy(e->server_tags[i], sizeof(e->server_tags[i]), list.items[i].tag);
-    if (list.count > 1 && !cfg->balancer) {
+       Балансировщик со всеми ссылками сразу — только по balancer=yes;
+       у конфига из JSON балансировщик свой, внутри. */
+    e->server_count = kept;
+    for (int k = 0; k < kept; k++)
+        str_copy(e->server_tags[k], sizeof(e->server_tags[k]), names[keep[k]]);
+
+    int pick = keep[0];
+    if (kept > 1) {
         char want[NODE_TAG_MAX] = "";
         char spath[CFG_PATH_MAX + 40];
         snprintf(spath, sizeof(spath), "%s/" SERVER_FILE, cfg->conf_dir);
@@ -728,19 +751,30 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
             fclose(sf);
             want[strcspn(want, "\r\n")] = '\0';
         }
-        int pick = 0;
-        for (int i = 0; i < list.count; i++)
-            if (want[0] && !strcmp(list.items[i].tag, want)) pick = i;
-        if (want[0] && strcmp(list.items[pick].tag, want))
-            log_warn("сервера «%s» в списке нет, взят первый: «%s»",
-                     want, list.items[0].tag);
+        int found = 0;
+        for (int k = 0; k < kept; k++)
+            if (want[0] && !strcmp(names[keep[k]], want)) { pick = keep[k]; found = 1; }
+        if (want[0] && !found)
+            log_warn("сервера «%s» в списке нет, взят первый: «%s»", want, names[pick]);
+    }
+
+    const xjson_item_t *chosen = NULL;
+    int one = json_mode || !cfg->balancer;
+    if (json_mode) {
+        chosen = &xj.items[pick];
+        if (kept > 1) log_info("конфигов в списке %d, ядру отдан «%s»", kept, names[pick]);
+    } else if (one) {
         if (pick) list.items[0] = list.items[pick];
         list.count = 1;
-        log_info("серверов в списке %d, ядру отдан «%s»",
-                 e->server_count, list.items[0].tag);
+        if (total > 1) log_info("серверов в списке %d, ядру отдан «%s»", kept, names[pick]);
+    } else if (kept < total) {
+        static nodelist_t tmp;
+        nodelist_init(&tmp);
+        for (int k = 0; k < kept; k++) tmp.items[tmp.count++] = list.items[keep[k]];
+        list = tmp;
     }
     str_copy(e->server_active, sizeof(e->server_active),
-             list.count == 1 ? list.items[0].tag : "все сразу (balancer)");
+             one ? names[pick] : "все сразу (balancer)");
 
     /* Прокси-клиент Keenetic приходит на LAN-адрес роутера, а не на
        петлю, поэтому и слушать надо там. */
@@ -772,7 +806,9 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
     }
 
     static char json[256 * 1024];
-    if (xraycfg_build_list(&list, &o, json, sizeof(json)) != 0) {
+    int built = json_mode ? xraycfg_build_from_json(chosen, &o, json, sizeof(json))
+                          : xraycfg_build_list(&list, &o, json, sizeof(json));
+    if (built != 0) {
         log_error("не удалось собрать конфиг Xray");
         return;
     }
@@ -808,13 +844,14 @@ static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
         return;
     }
 
-    log_info("конфиг Xray записан: узлов %d, socks %s:%d",
-             list.count, lan, cfg->socks_port);
+    log_info("конфиг Xray записан: %s, socks %s:%d",
+             json_mode ? "конфиг из подписки JSON" : "из ссылок", lan, cfg->socks_port);
 
     /* Порты серверов — по ним пассивная проверка отличает соединения
        ядра с сервером от его же соединений с клиентами. */
     e->node_port_count = 0;
-    for (int i = 0; i < list.count && e->node_port_count < TCPSTAT_PORTS_MAX; i++) {
+    if (json_mode) e->node_port_count = xjson_ports(chosen, e->node_ports, TCPSTAT_PORTS_MAX);
+    for (int i = 0; !json_mode && i < list.count && e->node_port_count < TCPSTAT_PORTS_MAX; i++) {
         int port = list.items[i].port, dup = 0;
         for (int k = 0; k < e->node_port_count; k++) if (e->node_ports[k] == port) dup = 1;
         if (!dup) e->node_ports[e->node_port_count++] = port;

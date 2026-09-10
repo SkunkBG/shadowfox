@@ -66,6 +66,23 @@ static int wants_fragment(const node_t *n, const xraycfg_opts_t *o)
     return o->fragment && strcmp(n->security, "tls") == 0;
 }
 
+static void build_log(json_t *j, const xraycfg_opts_t *o)
+{
+    json_key(j, "log");
+    json_obj_open(j);
+    json_kv_str(j, "loglevel", o->log_level ? o->log_level : "warning");
+    /* Без этого ядро форматирует строку с адресом назначения на каждое
+       соединение — впустую, вывод всё равно уходит в /dev/null. */
+    json_kv_str(j, "access", "none");
+    if (o->error_log && o->error_log[0]) {
+        json_kv_str(j, "error", o->error_log);
+        /* В ошибках ядро печатает адреса клиентов и назначения. Нам для
+           диагноза хватает половины: видно сеть, не видно устройство. */
+        json_kv_str(j, "maskAddress", "half");
+    }
+    json_obj_close(j);
+}
+
 static void build_inbound(json_t *j, const xraycfg_opts_t *o)
 {
     json_obj_open(j);
@@ -273,20 +290,7 @@ int xraycfg_build_list(const nodelist_t *l, const xraycfg_opts_t *o,
     json_init(&j, buf, size);
 
     json_obj_open(&j);
-
-    json_key(&j, "log");
-    json_obj_open(&j);
-    json_kv_str(&j, "loglevel", o->log_level ? o->log_level : "warning");
-    /* Без этого ядро форматирует строку с адресом назначения на каждое
-       соединение — впустую, вывод всё равно уходит в /dev/null. */
-    json_kv_str(&j, "access", "none");
-    if (o->error_log && o->error_log[0]) {
-        json_kv_str(&j, "error", o->error_log);
-        /* В ошибках ядро печатает адреса клиентов и назначения. Нам для
-           диагноза хватает половины: видно сеть, не видно устройство. */
-        json_kv_str(&j, "maskAddress", "half");
-    }
-    json_obj_close(&j);
+    build_log(&j, o);
 
     if (balanced) {
         /* Наблюдатель периодически измеряет узлы, а балансировщик
@@ -385,4 +389,91 @@ int xraycfg_build(const node_t *n, const xraycfg_opts_t *o,
     l.count    = 1;
 
     return xraycfg_build_list(&l, o, buf, size);
+}
+
+/* ---- конфиг из подписки Xray JSON ---- */
+
+static int span_is(const xjson_span_t *k, const char *name)
+{
+    return k->len == strlen(name) && !memcmp(k->ptr, name, k->len);
+}
+
+static int span_has(const xjson_span_t *v, const char *needle)
+{
+    return memmem(v->ptr, v->len, needle, strlen(needle)) != NULL;
+}
+
+/* routing панели: правила с geoip:/geosite:/ext: выбрасываются. */
+static int copy_routing(json_t *j, const xjson_span_t *routing)
+{
+    json_key(j, "routing");
+    json_obj_open(j);
+    const char *p = routing->ptr + 1, *end = routing->ptr + routing->len;
+    xjson_span_t k, v;
+    int rc;
+    while ((rc = xjson_next_member(&p, end, &k, &v)) == 1) {
+        char key[64];
+        if (k.len >= sizeof(key)) return -1;
+        memcpy(key, k.ptr, k.len); key[k.len] = '\0';
+        if (!span_is(&k, "rules") || v.len < 2 || *v.ptr != '[') {
+            json_key(j, key);
+            json_rawn(j, v.ptr, v.len);
+            continue;
+        }
+        json_key(j, "rules");
+        json_arr_open(j);
+        const char *q = xjson_ws(v.ptr + 1, v.ptr + v.len), *qe = v.ptr + v.len;
+        while (q < qe && *q != ']') {
+            if (*q == ',') { q = xjson_ws(q + 1, qe); continue; }
+            const char *e = xjson_skip_value(q, qe);
+            if (!e) return -1;
+            xjson_span_t rule = { q, (size_t)(e - q) };
+            if (!span_has(&rule, "geoip:") && !span_has(&rule, "geosite:") &&
+                !span_has(&rule, "ext:"))
+                json_rawn(j, rule.ptr, rule.len);
+            q = xjson_ws(e, qe);
+        }
+        json_arr_close(j);
+    }
+    if (rc < 0) return -1;
+    json_obj_close(j);
+    return 0;
+}
+
+int xraycfg_build_from_json(const xjson_item_t *it, const xraycfg_opts_t *o,
+                            char *buf, size_t size)
+{
+    if (!it || !o || !buf || !it->whole.ptr || it->whole.len < 2) return -1;
+
+    json_t j;
+    json_init(&j, buf, size);
+    json_obj_open(&j);
+    build_log(&j, o);
+
+    json_key(&j, "inbounds");
+    json_arr_open(&j);
+    build_inbound(&j, o);
+    json_arr_close(&j);
+
+    const char *p = it->whole.ptr + 1, *end = it->whole.ptr + it->whole.len;
+    xjson_span_t k, v;
+    int rc;
+    while ((rc = xjson_next_member(&p, end, &k, &v)) == 1) {
+        if (span_is(&k, "log") || span_is(&k, "inbounds") || span_is(&k, "dns") ||
+            span_is(&k, "remarks"))
+            continue;
+        if (span_is(&k, "routing") && v.len >= 2 && *v.ptr == '{') {
+            if (copy_routing(&j, &v) != 0) return -1;
+            continue;
+        }
+        char key[64];
+        if (k.len >= sizeof(key)) return -1;
+        memcpy(key, k.ptr, k.len); key[k.len] = '\0';
+        json_key(&j, key);
+        json_rawn(&j, v.ptr, v.len);
+    }
+    if (rc < 0) return -1;
+
+    json_obj_close(&j);
+    return json_done(&j) == 0 ? 0 : -1;
 }

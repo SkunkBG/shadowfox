@@ -32,6 +32,7 @@ void json_str(json_t *j, const char *value);
 void json_int(json_t *j, long value);
 void json_bool(json_t *j, int value);
 void json_raw(json_t *j, const char *raw);   /* уже готовый JSON */
+void json_rawn(json_t *j, const char *raw, size_t len);   /* кусок без NUL */
 
 /* Сокращения для пар ключ-значение. */
 void json_kv_str(json_t *j, const char *key, const char *value);
