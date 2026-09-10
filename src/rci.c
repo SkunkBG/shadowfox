@@ -171,21 +171,32 @@ int rci_policy_create(const rci_t *r, const char *policy)
 
 /* Строковое поле верхнего уровня из ответа RCI. Разбор грубый: ответ
    короткий и свой, тащить разборщик JSON ради двух полей незачем. */
-static int rci_field(const char *text, const char *name, char *out, size_t out_size)
+int rci_field(const char *text, const char *name, char *out, size_t out_size)
 {
+    /* RCI печатает JSON с отступами: "title": "5.1.3". Ищем ключ, потом
+       двоеточие и кавычку через любые пробелы. */
     char pat[64];
-    int  n = snprintf(pat, sizeof(pat), "\"%s\":\"", name);
+    int  n = snprintf(pat, sizeof(pat), "\"%s\"", name);
     if (n < 0 || (size_t)n >= sizeof(pat)) return 0;
-    const char *p = strstr(text, pat);
-    if (!p) return 0;
-    p += n;
-    size_t i = 0;
-    while (*p && *p != '"' && i + 1 < out_size) {
-        if (*p == '\\' && p[1]) p++;
-        out[i++] = *p++;
+
+    const char *p = text;
+    while ((p = strstr(p, pat)) != NULL) {
+        const char *q = p + n;
+        while (*q == ' ' || *q == '\t' || *q == '\n' || *q == '\r') q++;
+        if (*q != ':') { p = q; continue; }
+        q++;
+        while (*q == ' ' || *q == '\t' || *q == '\n' || *q == '\r') q++;
+        if (*q != '"') { p = q; continue; }
+        q++;
+        size_t i = 0;
+        while (*q && *q != '"' && i + 1 < out_size) {
+            if (*q == '\\' && q[1]) q++;
+            out[i++] = *q++;
+        }
+        out[i] = '\0';
+        return i > 0;
     }
-    out[i] = '\0';
-    return i > 0;
+    return 0;
 }
 
 int rci_device_info(const rci_t *r, char *model, size_t model_size,

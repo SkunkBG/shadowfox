@@ -36,6 +36,9 @@ int  rci_policy_mark(const rci_t *r, const char *policy, unsigned *mark);
 
 /* Модель и прошивка из show version: «Keenetic Viva (KN-1910)», «4.3.6».
    Пустые строки, если роутер не ответил. 0 — успех. */
+/* Строковое поле из ответа RCI, с отступами и без. 1 — нашлось. */
+int  rci_field(const char *text, const char *name, char *out, size_t out_size);
+
 int  rci_device_info(const rci_t *r, char *model, size_t model_size,
                      char *osver, size_t osver_size);
 

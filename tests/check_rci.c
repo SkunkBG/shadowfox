@@ -145,8 +145,23 @@ static void test_no_server(void)
           "запрос без сервера не падает, а возвращает ошибку");
 }
 
+static void test_field(void)
+{
+    const char *pretty =
+        "{\n  \"release\": \"5.01.C.3.0-1\",\n  \"title\": \"5.1.3\",\n"
+        "  \"ndm\": {\n    \"exact\": \"0-b73c\"\n  },\n"
+        "  \"description\": \"Keenetic Ultra\",\n  \"model\": \"Ultra (KN-1811)\"\n}";
+    char v[64];
+    CHECK(rci_field(pretty, "title", v, sizeof(v)) && !strcmp(v, "5.1.3"), "title с пробелом: [%s]", v);
+    CHECK(rci_field(pretty, "description", v, sizeof(v)) && !strcmp(v, "Keenetic Ultra"), "description: [%s]", v);
+    CHECK(rci_field("{\"title\":\"4.2.6\"}", "title", v, sizeof(v)) && !strcmp(v, "4.2.6"), "без пробелов");
+    CHECK(!rci_field(pretty, "nothere", v, sizeof(v)), "нет ключа");
+    CHECK(!rci_field("{\"ndm\": {\"exact\": 1}}", "exact", v, sizeof(v)), "не строка — не берём");
+}
+
 int main(void)
 {
+    test_field();
     printf("check_rci " VERSION "\n");
 
     g_listen = socket(AF_INET, SOCK_STREAM, 0);
