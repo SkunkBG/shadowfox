@@ -571,7 +571,7 @@ static void stop_own_xray(engine_t *e, const char *why)
     e->xray_managed = 0;
 }
 
-static void start_own_xray(engine_t *e, const config_t *cfg)
+static void start_own_xray_ex(engine_t *e, const config_t *cfg, int force)
 {
     /* Отметка от прежней кнопки «выключить ядро». Кнопки больше нет, и
        оставленный файл держал бы ядро выключенным без способа включить
@@ -599,9 +599,52 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
         return;
     }
 
+    /* Подписки: адреса https:// раскрываются в список ссылок. Не при
+       каждом перечитывании: списки на странице сохраняют часто, а
+       каждая загрузка — соединение с панелью, которое провайдер видит.
+       Загрузка держит главный цикл до её конца (обычно секунда-две,
+       предел 40 с) — раз в шесть часов это терпимо. */
+    static char raw[256 * 1024], expanded[256 * 1024];
+    const char *text = body;
+    e->subs_urls = subs_count_urls(body);
+    if (e->subs_urls) {
+        time_t now   = time(NULL);
+        int    fresh = e->subs_ok && strcmp(raw, body) == 0 &&
+                       now - e->subs_at < ENGINE_SUBS_REFRESH;
+        if (force || !fresh) {
+            char cache[CFG_PATH_MAX + 40], why[160] = "";
+            int  cached = 0;
+            snprintf(cache, sizeof(cache), "%s/" SUBS_CACHE, cfg->conf_dir);
+            int rc = subs_expand(body, cache, expanded, sizeof(expanded),
+                                 &cached, why, sizeof(why));
+            subs_first_host(body, e->subs_host, sizeof(e->subs_host));
+            str_copy(raw, sizeof(raw), body);
+            e->subs_at     = now;
+            e->subs_cached = cached;
+            e->subs_ok     = rc > 0;
+            str_copy(e->subs_error, sizeof(e->subs_error), why);
+            if (rc < 0) {
+                log_error("подписка %s: %s", e->subs_host, why);
+                e->server_count = 0;
+                e->server_active[0] = '\0';
+                stop_own_xray(e, "подписка не загружена");
+                return;
+            }
+            if (cached)
+                log_warn("подписка %s: сервер не ответил (%s), список из кеша",
+                         e->subs_host, why);
+            else
+                log_info("подписка %s загружена", e->subs_host);
+        }
+        text = expanded;
+    } else {
+        e->subs_ok = 0;
+        e->subs_host[0] = '\0';
+    }
+
     static nodelist_t list;
     nodelist_init(&list);
-    int added = nodelist_from_subscription(&list, body);
+    int added = nodelist_from_subscription(&list, text);
 
     /* allowInsecure из ссылки в конфиг не переносится — см. xraycfg.c.
        Но молчать о том, что ссылка его просила, нельзя: человек будет
@@ -622,6 +665,35 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
     }
     if (list.skipped)
         log_warn("в %s пропущено строк: %d", cfg->nodes_file, list.skipped);
+
+    /* Список серверов — на страницу; ядру один, выбранный там же.
+       Балансировщик со всеми сразу — только по balancer=yes. */
+    e->server_count = list.count;
+    for (int i = 0; i < list.count; i++)
+        str_copy(e->server_tags[i], sizeof(e->server_tags[i]), list.items[i].tag);
+    if (list.count > 1 && !cfg->balancer) {
+        char want[NODE_TAG_MAX] = "";
+        char spath[CFG_PATH_MAX + 40];
+        snprintf(spath, sizeof(spath), "%s/" SERVER_FILE, cfg->conf_dir);
+        FILE *sf = fopen(spath, "r");
+        if (sf) {
+            if (!fgets(want, sizeof(want), sf)) want[0] = '\0';
+            fclose(sf);
+            want[strcspn(want, "\r\n")] = '\0';
+        }
+        int pick = 0;
+        for (int i = 0; i < list.count; i++)
+            if (want[0] && !strcmp(list.items[i].tag, want)) pick = i;
+        if (want[0] && strcmp(list.items[pick].tag, want))
+            log_warn("сервера «%s» в списке нет, взят первый: «%s»",
+                     want, list.items[0].tag);
+        if (pick) list.items[0] = list.items[pick];
+        list.count = 1;
+        log_info("серверов в списке %d, ядру отдан «%s»",
+                 e->server_count, list.items[0].tag);
+    }
+    str_copy(e->server_active, sizeof(e->server_active),
+             list.count == 1 ? list.items[0].tag : "все сразу (balancer)");
 
     /* Прокси-клиент Keenetic приходит на LAN-адрес роутера, а не на
        петлю, поэтому и слушать надо там. */
@@ -706,6 +778,11 @@ static void start_own_xray(engine_t *e, const config_t *cfg)
         e->xray_managed = 1;
         str_copy(e->xray_listen, sizeof(e->xray_listen), lan);
     }
+}
+
+static void start_own_xray(engine_t *e, const config_t *cfg)
+{
+    start_own_xray_ex(e, cfg, 0);
 }
 
 /* Пассивная проверка: сокеты ядра к серверу. Установленные есть —
@@ -902,6 +979,12 @@ void engine_tick(engine_t *e, time_t now)
     /* Подхватываем падение своего ядра и перезапускаем с паузой. */
     if (e->xray_managed) sv_tick(&e->xray, now);
     tunnel_sample(e, now);
+
+    /* Подписка по расписанию: список серверов у панели меняется. */
+    if (e->subs_urls && e->cfg) {
+        time_t due = e->subs_at + (e->subs_ok ? ENGINE_SUBS_REFRESH : ENGINE_SUBS_RETRY);
+        if (now >= due) start_own_xray_ex(e, e->cfg, 1);
+    }
 
     if (e->restore_due && now >= e->restore_due) {
         e->restore_due = 0;

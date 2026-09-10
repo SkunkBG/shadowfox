@@ -182,6 +182,11 @@ int config_set(config_t *cfg, const char *key, const char *value)
         return 0;
     }
 
+    if (!strcasecmp(key, "balancer")) {
+        cfg->balancer = parse_bool(value, cfg->balancer);
+        return 0;
+    }
+
     if (!strcasecmp(key, "noise")) {
         return 0;   /* устаревший ключ, см. config_defaults */
     }
@@ -397,7 +402,13 @@ int config_write_default(const char *path)
         "# fingerprint перекрывает отпечаток uTLS из ссылки; пусто — брать\n"
         "# из ссылки, а если и там нет — chrome, как у самого ядра.\n"
         "fragment=%s\n"
-        "fingerprint=%s\n",
+        "fingerprint=%s\n"
+        "\n"
+        "# Несколько серверов (подписка или несколько ссылок): ядру отдаётся\n"
+        "# один, выбранный на странице. balancer=yes отдаёт все сразу с\n"
+        "# наблюдателем, который каждые пять минут ходит через каждый сервер\n"
+        "# к gstatic — провайдер такое сердцебиение видит.\n"
+        "balancer=no\n",
         cfg.log_file, cfg.pid_file, cfg.conf_dir, cfg.capture_iface,
         cfg.web_proxy,
         cfg.nodes_file, cfg.xray_config, cfg.xray_bin, cfg.socks_port, cfg.socks_secret,

@@ -3,6 +3,8 @@
 
 #include "config.h"
 #include "dnscap.h"
+#include "nodelist.h"
+#include "subs.h"
 #include "ipsets.h"
 #include "tcpstat.h"
 #include "rci.h"
@@ -23,6 +25,12 @@
    выдержит. */
 #define ENG_KNOWN_MAX 8192
 #define ENG_PENDING_MAX 64
+
+/* Подписку перечитываем раз в шесть часов: список серверов у панели
+   меняется редко, а каждая загрузка — соединение с панелью, которое
+   провайдер видит. После неудачи пробуем чаще. */
+#define ENGINE_SUBS_REFRESH (6 * 3600)
+#define ENGINE_SUBS_RETRY   (10 * 60)
 
 typedef struct engine {
     wl_t   wl;
@@ -51,6 +59,20 @@ typedef struct engine {
     unsigned long tunnel_retrans_prev;
     int     tunnel_retrans_grow;       /* повторы растут между срезами */
     char    tunnel_why[160];
+
+    /* Подписка и выбор сервера. Из списка ядру отдаётся один сервер:
+       балансировщик со своим наблюдателем каждые пять минут ходил бы
+       через каждый сервер к gstatic — то самое сердцебиение, которое
+       мы убрали. Включается явно, balancer=yes. */
+    int    subs_urls;          /* адресов подписок в файле ссылок */
+    int    subs_ok;            /* последняя загрузка удалась */
+    int    subs_cached;        /* список взят из кеша */
+    time_t subs_at;            /* когда загружали */
+    char   subs_host[SUBS_HOST_MAX];
+    char   subs_error[160];
+    int    server_count;       /* серверов в списке до выбора */
+    char   server_tags[NODELIST_MAX][NODE_TAG_MAX];
+    char   server_active[NODE_TAG_MAX];
 
     int    rules_applied;
     int    capturing;

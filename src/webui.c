@@ -135,6 +135,7 @@ static int file_for(const config_t *cfg, const char *what,
     if (!strcmp(what, "domains")) { path_in_conf(cfg, "domain.conf", dst, size); return 1; }
     if (!strcmp(what, "cidrs"))   { path_in_conf(cfg, "ip.list",     dst, size); return 1; }
     if (!strcmp(what, "nodes"))   { str_copy(dst, size, cfg->nodes_file);        return 1; }
+    if (!strcmp(what, "server"))  { path_in_conf(cfg, SERVER_FILE,    dst, size); return 1; }
     return 0;
 }
 
@@ -211,6 +212,19 @@ static void send_data(const http_req_t *req, int fd, struct engine *ce,
     else                  apply_find_xray(xbin, sizeof(xbin));
     json_kv_str(&j, "xray_bin", xbin);
     json_kv_str(&j, "xray_version", e->xray_version);
+
+    /* Подписка и список серверов. Имена — не секрет, адреса не отдаём. */
+    json_kv_int(&j, "subs_urls", e->subs_urls);
+    json_kv_bool(&j, "subs_ok", e->subs_ok);
+    json_kv_bool(&j, "subs_cached", e->subs_cached);
+    json_kv_int(&j, "subs_at", (long)e->subs_at);
+    json_kv_str(&j, "subs_host", e->subs_host);
+    json_kv_str(&j, "subs_error", e->subs_error);
+    json_kv_str(&j, "server_active", e->server_active);
+    json_key(&j, "servers");
+    json_arr_open(&j);
+    for (int i = 0; i < e->server_count; i++) json_str(&j, e->server_tags[i]);
+    json_arr_close(&j);
 
     /* Журнал ошибок ядра: число и последняя строка. Адреса в ней ядро
        уже маскирует само (maskAddress). */

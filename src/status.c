@@ -82,7 +82,15 @@ void status_write(const struct engine *ce, const config_t *cfg)
         "tunnel_at=%ld\n"
         "tunnel_est=%d\n"
         "tunnel_pending=%d\n"
-        "tunnel_why=%s\n",
+        "tunnel_why=%s\n"
+        "subs_urls=%d\n"
+        "subs_ok=%d\n"
+        "subs_cached=%d\n"
+        "subs_at=%ld\n"
+        "subs_host=%s\n"
+        "subs_error=%s\n"
+        "server_count=%d\n"
+        "server_active=%s\n",
         VERSION, (long)e->started_at,
         cfg->capture_iface, e->capturing, e->cap.filtered,
         e->cap.seen, e->cap.parsed, e->matched,
@@ -94,7 +102,9 @@ void status_write(const struct engine *ce, const config_t *cfg)
         e->cap.drop_foreign, e->sni.drop_foreign, e->sni_throttled,
         e->sni.partial_kept, e->sni.reassembled, e->sni.partial_lost,
         e->tunnel_state, (long)e->tunnel_since, (long)e->tunnel_sampled,
-        e->tunnel_established, e->tunnel_pending, e->tunnel_why);
+        e->tunnel_established, e->tunnel_pending, e->tunnel_why,
+        e->subs_urls, e->subs_ok, e->subs_cached, (long)e->subs_at,
+        e->subs_host, e->subs_error, e->server_count, e->server_active);
 
     fclose(f);
     rename(tmp, path);
@@ -294,6 +304,29 @@ int status_print(const config_t *cfg)
         rt_init(&rt0);
         if (rt_find_bins(&rt0)) print_rule_counters(&rt0, &wl);
         return 0;
+    }
+
+    if (status_num(spath, "subs_urls") > 0) {
+        char host[SUBS_HOST_MAX] = "", serr[160] = "";
+        status_get(spath, "subs_host", host, sizeof(host));
+        status_get(spath, "subs_error", serr, sizeof(serr));
+        long at = status_num(spath, "subs_at");
+        char when[32] = "";
+        if (at > 0) {
+            time_t t = (time_t)at;
+            strftime(when, sizeof(when), "%d.%m %H:%M", localtime(&t));
+        }
+        if (status_num(spath, "subs_ok") > 0)
+            printf("  подписка:   %s, серверов %ld, загружена %s%s\n", host,
+                   status_num(spath, "server_count"), when,
+                   status_num(spath, "subs_cached") > 0 ? " (из кеша, сервер не ответил)" : "");
+        else
+            printf("  подписка:   %s НЕ ЗАГРУЖЕНА: %s\n", host, serr);
+    }
+    if (status_num(spath, "server_count") > 0) {
+        char tag[128] = "";
+        status_get(spath, "server_active", tag, sizeof(tag));
+        printf("  сервер:     %s (в списке %ld)\n", tag, status_num(spath, "server_count"));
     }
 
     long xpid = status_num(spath, "xray_pid");
